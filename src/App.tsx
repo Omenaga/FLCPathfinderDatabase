@@ -1,8 +1,14 @@
+import flcLogo from './assets/FL_Logo.png'
+
 function App() {
   return (
     <main>
-      <h1>FLC Pathfinder Database</h1>
-      <p>Application setup is ready.</p>
+      <h1>
+        FLC Pathfinder<br />
+        Database
+      </h1>
+      <img src={flcLogo} alt="Folsom Lake College logo" className="logo" />
+      <p>Search bar will go here</p>
     </main>
   )
 }
