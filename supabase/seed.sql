@@ -1,0 +1,2 @@
+-- Intentionally empty: do not seed real student records or staff credentials.
+-- Automated database tests create their own synthetic fixtures in memory.

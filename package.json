@@ -8,7 +8,9 @@
         "build": "tsc -b && vite build",
         "lint": "oxlint",
         "preview": "vite preview",
-        "supabase": "supabase"
+        "supabase": "supabase",
+        "test": "node --test tests/database.test.mjs",
+        "test:ui": "playwright test"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.116.0",
@@ -16,6 +18,8 @@
         "react-dom": "^19.2.8"
     },
     "devDependencies": {
+        "@electric-sql/pglite": "^0.5.8",
+        "@playwright/test": "^1.63.0",
         "@rolldown/binding-win32-x64-msvc": "^1.2.7",
         "@types/node": "^24.13.3",
         "@types/react": "^19.2.18",

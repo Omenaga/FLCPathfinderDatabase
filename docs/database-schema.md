@@ -1,6 +1,6 @@
 # FLC Pathfinder Database Schema
 
-This document describes the planned structure for the FLC Pathfinder member tracking database.
+This document describes the structure for the FLC Pathfinder member tracking database. The initial implementation is in [`20260908000000_pathfinder_database.sql`](../supabase/migrations/20260908000000_pathfinder_database.sql). JSON columns use PostgreSQL `jsonb`.
 
 ---
 
@@ -17,6 +17,8 @@ Holds one row per individual Pathfinder.
 | `levels`        | JSON    | Array of earned level objects with `name` and `advanced` — see [Levels Options](#levels-options) |
 | `extracurriculars` | JSON | Array of activity names — e.g. `["Drill", "Drums", "PBE", "TLT"]`; see [Extracurricular Names Options](#extracurricular-names-options) for linked detail tables |
 | `red_zone_participation` | JSON | Array of events participated in — e.g. `["Drill Performance", "Archery"]`; see [Red Zone Participation Links](#red-zone-participation-links) for linked event tables |
+| `created_at` | Timestamp | Creation time, automatically set by the database |
+| `updated_at` | Timestamp | Most recent member-row update time, maintained by a database trigger |
 
 The extracurricular and Red Zone event arrays default to `[]` and contain unique values. Extracurricular membership is stored directly in `pathfinders.extracurriculars`, replacing the activity master list and membership junction table. Red Zone participation is stored directly in `pathfinders.red_zone_participation`, replacing the separate participation table.
 
@@ -49,6 +51,8 @@ Records when a Pathfinder earned an honor.
 Each table links to the member through `pathfinder_id`. Its activity name must appear in that member's `extracurriculars` array. Searching a member's activities resolves each name using [Extracurricular Names Options](#extracurricular-names-options), then returns all matching detail rows for that member, including their years and any associated instrument, Bible book, or TLT operation.
 
 In `drum_corps`, `pbe`, and `tlt`, the string value in a row applies to **every year in that same row's `years` array**. Store another row for a different string value; do not combine years with unrelated details. Multiple values in the same year are represented by separate rows whose year arrays include that year. Require nonempty arrays of unique school years and prevent duplicate member/year/string combinations across rows.
+
+The implementation groups all years for the same member/string value in one row, enforced by unique `(pathfinder_id, drum_played)`, `(pathfinder_id, bible_book)`, and `(pathfinder_id, tlt_operation)` constraints. Add further years to the existing row when the string is unchanged. This prevents duplicate member/year/string combinations without parallel arrays.
 
 For example, a member who played Snare in 2024-2025 and Bass in 2025-2026 has two `drum_corps` rows:
 
@@ -290,3 +294,9 @@ All available options are:
 Store only the events that the member actually participated in; use `[]` when there are none. Every event detail record links to `pathfinders.id` through `pathfinder_id`, and its mapped event name must appear in that member's array. Years and placements are stored together in the detail rows.
 
 Keep extracurricular and Red Zone arrays consistent with their detail records when adding, updating, or removing participation. JSON names are logical links resolved using the mappings above, rather than ordinary foreign keys. Enforce name membership through application validation or database triggers; the detail tables' `pathfinder_id` columns remain database foreign keys.
+
+## Implementation and access
+
+The database validates JSON option values, unique array entries, consecutive school years, and level objects. Participation triggers reject a detail row unless its activity/event appears in the core array, and reject removal of a core name while matching details remain. Core participation can exist before details are recorded. Add the core name first, then the detail records.
+
+All 17 application tables have row-level security. A separate private `staff_access` allowlist links Supabase Auth user IDs to `viewer` or `editor` roles. Viewers can search and read; editors can also insert and update. Browser clients cannot delete records or change staff permissions. This infrastructure table is separate from the member data model above. See the [README](../README.md#first-staff-account) for first-account setup and the current search interface.
