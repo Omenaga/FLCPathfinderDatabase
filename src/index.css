@@ -47,3 +47,17 @@ li { padding: .25rem 0; line-height: 1.5; }
 .login form { display: grid; gap: 1rem; }
 @media (max-width: 760px) { .filters { grid-template-columns: repeat(2, minmax(0, 1fr)); } .brand { align-items: flex-start; gap: 1rem; } .brand img { width: 65px; height: 65px; } .panel { padding: 1rem; } }
 @media (max-width: 450px) { .filters { grid-template-columns: 1fr; } .name-filter { grid-column: auto; } .shell { padding: 1.5rem .75rem; } .brand img { width: 48px; height: 48px; } }
+
+.profile-overlay { width: min(640px, calc(100% - 2rem)); max-height: 85vh; overflow: auto; border: 1px solid #d8e1ee; border-radius: .8rem; padding: 1.5rem; color: #172d52; }
+.profile-overlay::backdrop { background: rgb(15 30 55 / 60%); }
+.profile-overlay button { display: block; margin-left: auto; }
+.profile-overlay p { text-align: center; padding: 3rem 0; font-size: 1.5rem; }
+
+.multi-select { position: relative; min-width: 0; }
+.multi-select label { margin-bottom: .4rem; }
+.selected-options { display: flex; flex-wrap: wrap; gap: .3rem; }
+.selected-options button { font-size: .8rem; padding: .3rem .5rem; margin-bottom: .4rem; }
+.option-list { position: absolute; z-index: 10; background: white; border: 1px solid #adbbd0; border-radius: .4rem; width: 100%; max-height: 220px; overflow-y: auto; margin: 0; padding: .25rem; list-style: none; box-shadow: 0 4px 12px #172d5220; }
+.option-list li { padding: .55rem; cursor: pointer; }
+.option-list li[aria-selected="true"], .option-list li:hover { background: #edf2fb; }
+.multi-select small { display: block; color: #58677c; margin-top: .3rem; }

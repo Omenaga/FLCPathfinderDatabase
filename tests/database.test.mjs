@@ -28,6 +28,9 @@ before(async () => {
   await db.exec(await readFile(new URL('../supabase/migrations/20260908000000_pathfinder_database.sql', import.meta.url), 'utf8'))
   await db.exec(`insert into private.staff_access values ('${viewer}', 'viewer', now()), ('${editor}', 'editor', now());`)
   await db.exec(await readFile(new URL('../supabase/migrations/20260911000000_auth_users_are_staff.sql', import.meta.url), 'utf8'))
+  await db.exec(await readFile(new URL('../supabase/migrations/20260911010000_current_data.sql', import.meta.url), 'utf8'))
+  await db.exec(await readFile(new URL('../supabase/migrations/20260911020000_registration_status.sql', import.meta.url), 'utf8'))
+  await db.exec(await readFile(new URL('../supabase/migrations/20260911030000_searchable_status.sql', import.meta.url), 'utf8'))
 })
 after(async () => { await db?.close() })
 
@@ -126,4 +129,80 @@ test('an authenticated database role without a user identity has no access', asy
     for (const table of tables) assert.equal((await db.query(`select * from ${table}`)).rows.length, 0)
     await reject("insert into pathfinders(name) values ('Forbidden')", '42501')
   })
+})
+
+
+test('current data preserves historical search, validates fields and enforces access', async () => {
+  await asRole('authenticated', editor, async () => {
+    const id = (await db.query("select id from pathfinders where name='Synthetic Member'")).rows[0].id
+    await db.query(`insert into current_data(pathfinder_id,school_year,status,grade,class_level,current_activities)
+      values ($1,'2026-2027','returning',7,'Explorer','["Drums"]')`, [id])
+    let row = (await db.query('select * from member_search where id=$1', [id])).rows[0]
+    assert.equal(row.grade, 7)
+    assert.ok(row.search_years.includes('2026-2027'))
+    assert.ok(row.search_years.includes('2024-2025'))
+    assert.equal((await db.query(`select * from member_search where search_years @> '["2024-2025"]' and levels @> '[{"name":"Friend","advanced":true}]' `)).rows.length, 1)
+    await reject(`insert into current_data(pathfinder_id,school_year) values (${id},'2026-2027')`, '23505')
+    await reject(`update current_data set school_year='2026-2028' where pathfinder_id=${id}`)
+    await reject(`update current_data set status='left' where pathfinder_id=${id}`)
+    await reject(`update current_data set status='other' where pathfinder_id=${id}`)
+    await reject(`update current_data set current_activities='["Unknown"]' where pathfinder_id=${id}`)
+    await db.query("update current_data set status='graduated' where pathfinder_id=$1", [id])
+    row = (await db.query('select * from member_search where id=$1', [id])).rows[0]
+    assert.ok(!row.search_years.includes('2026-2027'))
+    assert.ok(row.search_years.includes('2024-2025'))
+    await db.query("update current_data set school_year='2025-2026' where pathfinder_id=$1", [id])
+    assert.equal((await db.query('select has_current_data from member_search where id=$1', [id])).rows[0].has_current_data, false)
+    assert.equal((await db.query('select status from member_search where id=$1', [id])).rows[0].status, 'graduated')
+    assert.ok((await db.query('select * from member_search where not has_current_data')).rows.length > 0)
+    await reject('delete from current_data', '42501')
+  })
+  await asRole('anon', null, async () => {
+    await reject('select * from current_data', '42501')
+    await reject('select * from member_search', '42501')
+  })
+  await asRole('authenticated', null, async () => {
+    assert.equal((await db.query('select * from member_search')).rows.length, 0)
+    assert.equal((await db.query('select * from current_data')).rows.length, 0)
+  })
+})
+
+
+test('graduation persists after current registration is removed', async () => {
+  const id = (await db.query("select id from pathfinders where name='Synthetic Member'")).rows[0].id
+  await db.query('delete from current_data where pathfinder_id=$1', [id])
+  const row = (await db.query('select * from member_search where id=$1', [id])).rows[0]
+  assert.equal(row.has_current_data, false)
+  assert.equal(row.status, 'graduated')
+  assert.ok(row.search_years.includes('2024-2025'))
+})
+
+
+test('effective status filters distinguish registration and graduation', async () => {
+  await asRole('authenticated', editor, async () => {
+    for (const status of ['new', 'returning']) {
+      const id = (await db.query('insert into pathfinders(name) values ($1) returning id', ['Status ' + status])).rows[0].id
+      await db.query('insert into current_data(pathfinder_id, school_year, status) values ($1, $2, $3)', [id, '2026-2027', status])
+      assert.equal((await db.query('select name from member_search where status=$1', [status])).rows[0].name, 'Status ' + status)
+    }
+    const inactive = (await db.query("select * from member_search where status='unregistered'")).rows
+    assert.ok(inactive.length > 0)
+    assert.ok(inactive.every(row => !row.has_current_data))
+    assert.equal((await db.query("select name from member_search where status='graduated'")).rows[0].name, 'Synthetic Member')
+  })
+})
+
+
+test('multiple selected values require all matches, with adjacent school-year alternatives', async () => {
+  const { rows } = await db.query(`
+    with fixtures(name, years, activities) as (values
+      ('both', '["2013-2014","2015-2016"]'::jsonb, '["Drill","Drums"]'::jsonb),
+      ('one year', '["2013-2014"]'::jsonb, '["Drill","Drums"]'::jsonb),
+      ('one activity', '["2013-2014","2015-2016"]'::jsonb, '["Drill"]'::jsonb))
+    select name from fixtures
+    where (years @> '["2013-2014"]' or years @> '["2014-2015"]')
+      and (years @> '["2015-2016"]' or years @> '["2016-2017"]')
+      and activities @> '["Drill","Drums"]'
+  `)
+  assert.deepEqual(rows, [{ name: 'both' }])
 })

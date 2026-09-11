@@ -4,10 +4,10 @@ A web application for searching current and historical member records for the Fo
 
 ## Current features
 
-- Supabase PostgreSQL database with all 17 tables in [the database schema](docs/database-schema.md).
+- Supabase PostgreSQL database with 18 application tables in [the database schema](docs/database-schema.md).
 - Staff email/password sign-in: every Supabase Auth account has immediate staff access.
-- Search by name, active year, level (including Advanced), extracurricular, and Red Zone event. An active year of `2014` matches either `2013-2014` or `2014-2015`. Filters combine with AND; name search matches part of a name, ignoring case. Results are sorted by name with an internal ID tie-breaker in pages of 25. Member IDs are not displayed or offered as a search filter. Advanced levels display as `Friend (Advanced)`.
-- Member details show honors, activity years paired with instruments/books/TLT operations, and Red Zone years paired with placements.
+- Search by name, active year, level (including Advanced), extracurricular, and Red Zone event. An active year of `2014` matches either `2013-2014` or `2014-2015`. Filters combine with AND; name search matches part of a name, ignoring case. Results are sorted by name with an internal ID tie-breaker in pages of 25. Member IDs are not displayed or offered as a search filter. Earned level filters still distinguish Advanced status.
+- Results show current Status, Grade, Current class, and Current activities. Unregistered and Graduated members show N/A for grade, current class, and current activities. Clicking a name opens a WIP modal with no profile data. Historical fields remain searchable.
 - Database constraints, foreign keys, participation validation, and row-level security support future add/edit screens. The current UI is for searching and viewing; administrators can enter records through Supabase now.
 
 The initial migration was applied to the linked hosted project on September 8, 2026. No member data or login credentials are seeded.
@@ -89,8 +89,20 @@ npm run build
 
 `npm test` executes the migration in PGlite (PostgreSQL in memory) and checks validation, paired histories, search predicates, foreign keys, and role permissions using a minimal Supabase Auth contract. It does not connect to or modify the hosted project.
 
-`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies sign-in, combined filters, details, empty/error states, retries, pagination, immediate authenticated access, and signed-out isolation. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
+`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies sign-in, combined filters, the WIP overlay, empty/error states, retries, pagination, immediate authenticated access, and signed-out isolation. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
 
 ## Project context
 
 Read [the project context](docs/project-context.md) for ministry background, source links, and terminology. The implemented data model follows [the database schema](docs/database-schema.md); preliminary ideas in the context document are not additional implemented features.
+
+## Current registration view
+
+The [Current Data schema](docs/database-schema.md#current-data) is implemented. `current_data` has one row per member, linked by `pathfinder_id`. Populate it through Supabase with the known school year, status (`new`, `returning`, `graduated`), grade, class, and activities. No current rows are inferred from historical records.
+
+`public.current_club_year()` explicitly selects `2026-2027`. The `member_search` view left-joins that season's current data and applies underlying RLS. Members without current records appear as Unregistered unless marked Graduated. Graduation persists in `pathfinders.graduated`, independently of registration, and takes precedence in results. Single-year and activity filters include current enrollment as well as history; level/event filters retain their historical meaning. IDs and school year remain internal.
+
+The profile modal displays only WIP and Close, supports Escape and focus restoration, and fetches no history. Full profile content and annual rollover are future work.
+
+Status is searchable through `member_search.status`: New, Returning, Graduated, or Unregistered. Unregistered is derived from the absence of current-year data; graduation takes precedence. Existing current rows with an unknown status remain unclassified rather than being assumed inactive. The Status filter combines with historical filters using AND.
+
+Active year, Level earned, Extracurricular, and Red Zone event support multiple selections with searchable dropdowns. Type to narrow options and press Enter to add; selected chips can be removed. Every selected value must match (AND), including across filter categories. Each selected calendar year matches either adjacent school year. Year choices run from 2010 through the current calendar year. Level status applies to all selected earned levels. Status remains a single-select filter.

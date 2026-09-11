@@ -1,4 +1,4 @@
-export type Json =
+﻿export type Json =
   | string
   | number
   | boolean
@@ -14,6 +14,54 @@ export type Database = {
   }
   public: {
     Tables: {
+      current_data: {
+        Row: {
+          class_level: string | null
+          created_at: string
+          current_activities: Json
+          grade: number | null
+          pathfinder_id: number
+          school_year: string
+          status: string | null
+          updated_at: string
+        }
+        Insert: {
+          class_level?: string | null
+          created_at?: string
+          current_activities?: Json
+          grade?: number | null
+          pathfinder_id: number
+          school_year: string
+          status?: string | null
+          updated_at?: string
+        }
+        Update: {
+          class_level?: string | null
+          created_at?: string
+          current_activities?: Json
+          grade?: number | null
+          pathfinder_id?: number
+          school_year?: string
+          status?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "current_data_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: true
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "current_data_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: true
+            referencedRelation: "pathfinders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       drill: {
         Row: {
           pathfinder_id: number
@@ -28,6 +76,13 @@ export type Database = {
           years?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "drill_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: true
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "drill_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
@@ -57,6 +112,13 @@ export type Database = {
           years?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "drum_corps_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "drum_corps_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
@@ -112,6 +174,13 @@ export type Database = {
             foreignKeyName: "honors_earned_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "honors_earned_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -121,6 +190,7 @@ export type Database = {
         Row: {
           created_at: string
           extracurriculars: Json
+          graduated: boolean
           id: number
           levels: Json
           name: string
@@ -131,6 +201,7 @@ export type Database = {
         Insert: {
           created_at?: string
           extracurriculars?: Json
+          graduated?: boolean
           id?: never
           levels?: Json
           name: string
@@ -141,6 +212,7 @@ export type Database = {
         Update: {
           created_at?: string
           extracurriculars?: Json
+          graduated?: boolean
           id?: never
           levels?: Json
           name?: string
@@ -174,6 +246,13 @@ export type Database = {
             foreignKeyName: "pbe_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbe_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -199,6 +278,13 @@ export type Database = {
           year?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "red_zone_archery_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "red_zone_archery_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
@@ -235,6 +321,13 @@ export type Database = {
             foreignKeyName: "red_zone_bible_events_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_bible_events_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -260,6 +353,13 @@ export type Database = {
           year?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "red_zone_burning_twine_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "red_zone_burning_twine_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
@@ -293,6 +393,13 @@ export type Database = {
             foreignKeyName: "red_zone_drill_performance_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_drill_performance_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -318,6 +425,13 @@ export type Database = {
           year?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "red_zone_drum_performance_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "red_zone_drum_performance_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
@@ -354,6 +468,13 @@ export type Database = {
             foreignKeyName: "red_zone_honor_evaluations_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_honor_evaluations_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -379,6 +500,13 @@ export type Database = {
           year?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "red_zone_jump_rope_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "red_zone_jump_rope_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
@@ -412,6 +540,13 @@ export type Database = {
             foreignKeyName: "red_zone_knots_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_knots_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -437,6 +572,13 @@ export type Database = {
           year?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "red_zone_lashing_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "red_zone_lashing_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
@@ -470,6 +612,13 @@ export type Database = {
             foreignKeyName: "red_zone_tents_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_tents_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -499,6 +648,13 @@ export type Database = {
             foreignKeyName: "tlt_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tlt_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -506,9 +662,29 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      member_search: {
+        Row: {
+          class_level: string | null
+          created_at: string | null
+          current_activities: Json | null
+          extracurriculars: Json | null
+          grade: number | null
+          has_current_data: boolean | null
+          id: number | null
+          levels: Json | null
+          name: string | null
+          red_zone_participation: Json | null
+          search_activities: Json | null
+          search_years: Json | null
+          status: string | null
+          updated_at: string | null
+          years_active: Json | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      current_club_year: { Args: never; Returns: string }
       current_staff_role: { Args: never; Returns: string }
     }
     Enums: {

@@ -4,6 +4,8 @@ import type { Database } from './database.types'
 export const LEVELS = ['Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'Pioneer', 'Navigator'] as const
 export const ACTIVITIES = ['Drill', 'Drums', 'PBE', 'TLT'] as const
 export const EVENTS = ['Drill Performance', 'Drum Performance', 'Honor Evaluations', 'Bible Events', 'Knots Relay', 'Tents', 'Jump Rope', 'Archery', 'Lashing', 'Burning Twine'] as const
+export const STATUSES = ['New', 'Returning', 'Graduated', 'Unregistered'] as const
+export const YEARS = Array.from({ length: Math.max(0, new Date().getFullYear() - 2009) }, (_, index) => String(2010 + index))
 export const PAGE_SIZE = 25
 type EarnedLevel = { name: string; advanced: boolean }
 type MemberRow = Database['public']['Tables']['pathfinders']['Row']
@@ -12,31 +14,33 @@ function member(row: MemberRow) {
   return { ...row, years_active: row.years_active as string[], levels: row.levels as EarnedLevel[],
     extracurriculars: row.extracurriculars as string[], red_zone_participation: row.red_zone_participation as string[] }
 }
-export type Pathfinder = ReturnType<typeof member>
-export type Filters = { name: string; year: string; level: string; advanced: string; activity: string; event: string }
-export const EMPTY_FILTERS: Filters = { name: '', year: '', level: '', advanced: '', activity: '', event: '' }
+export type Pathfinder = Database['public']['Views']['member_search']['Row']
+export type Filters = { status: string; name: string; year: string[]; level: string[]; advanced: string; activity: string[]; event: string[] }
+export const EMPTY_FILTERS: Filters = { status: '', name: '', year: [], level: [], advanced: '', activity: [], event: [] }
 
 export async function searchPathfinders(filters: Filters, page: number, signal: AbortSignal) {
-  let query = getSupabase().from('pathfinders').select('*', { count: 'exact' })
+  let query = getSupabase().from('member_search').select('*', { count: 'exact' })
+  if (filters.status) query = query.eq('status', filters.status.toLowerCase())
   const name = filters.name.trim()
   if (name) query = query.ilike('name', `%${name.replace(/[\\%_]/g, '\\$&')}%`)
   // Supabase treats JS arrays as PostgreSQL arrays; JSONB arrays need JSON text.
-  const yearText = filters.year.trim()
-  if (yearText) {
-    if (!/^[0-9]{4}$/.test(yearText) || Number(yearText) < 1900) {
-      throw new Error('Enter a four-digit year, such as 2014.')
-    }
-    const year = Number(yearText)
-    query = query.or(`years_active.cs.["${year - 1}-${year}"],years_active.cs.["${year}-${year + 1}"]`)
+  if (filters.year.length) {
+    const conditions = [...new Set(filters.year)].map(value => {
+      if (!YEARS.includes(value)) throw new Error('Select a year from 2010 through the current year.')
+      const year = Number(value)
+      return `or(search_years.cs.["${year - 1}-${year}"],search_years.cs.["${year}-${year + 1}"])`
+    })
+    // Each calendar year may match either adjacent school year; all selected years must match.
+    query = query.or(`and(${conditions.join(',')})`)
   }
-  if (filters.level) query = query.contains('levels', JSON.stringify([{ name: filters.level,
-    ...(filters.advanced ? { advanced: filters.advanced === 'true' } : {}) }]))
-  if (filters.activity) query = query.contains('extracurriculars', JSON.stringify([filters.activity]))
-  if (filters.event) query = query.contains('red_zone_participation', JSON.stringify([filters.event]))
+  if (filters.level.length) query = query.contains('levels', JSON.stringify(filters.level.map(name => ({ name,
+    ...(filters.advanced ? { advanced: filters.advanced === 'true' } : {}) }))))
+  if (filters.activity.length) query = query.contains('search_activities', JSON.stringify(filters.activity))
+  if (filters.event.length) query = query.contains('red_zone_participation', JSON.stringify(filters.event))
   const { data, count, error } = await query.order('name').order('id')
     .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1).abortSignal(signal)
   if (error) throw error
-  return { members: (data ?? []).map(member), count: count ?? 0 }
+  return { members: (data ?? []), count: count ?? 0 }
 }
 
 export async function getPathfinder(id: number, signal: AbortSignal) {
