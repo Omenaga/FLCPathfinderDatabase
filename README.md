@@ -5,12 +5,12 @@ A web application for searching current and historical member records for the Fo
 ## Current features
 
 - Supabase PostgreSQL database with all 17 tables in [the database schema](docs/database-schema.md).
-- Staff email/password sign-in, with explicit viewer/editor access.
-- Search by name, member ID, active school year, level (including Advanced), extracurricular, and Red Zone event. Filters combine with AND; name search matches part of a name, ignoring case. Results are sorted by name and ID in pages of 25.
+- Staff email/password sign-in: every Supabase Auth account has immediate staff access.
+- Search by name, active year, level (including Advanced), extracurricular, and Red Zone event. An active year of `2014` matches either `2013-2014` or `2014-2015`. Filters combine with AND; name search matches part of a name, ignoring case. Results are sorted by name with an internal ID tie-breaker in pages of 25. Member IDs are not displayed or offered as a search filter. Advanced levels display as `Friend (Advanced)`.
 - Member details show honors, activity years paired with instruments/books/TLT operations, and Red Zone years paired with placements.
 - Database constraints, foreign keys, participation validation, and row-level security support future add/edit screens. The current UI is for searching and viewing; administrators can enter records through Supabase now.
 
-The initial migration was applied to the linked hosted project on September 8, 2026. No member data or login credentials are seeded. The first staff Auth account still needs to be created; see below.
+The initial migration was applied to the linked hosted project on September 8, 2026. No member data or login credentials are seeded.
 
 ## Stack and local development
 
@@ -31,22 +31,13 @@ On Windows PowerShell, use `npm.cmd` if execution policy blocks `npm.ps1`.
 
 Only put a publishable key in the frontend. `VITE_` values are bundled into the browser; database passwords and secret/service-role keys must never go there. `src/lib/supabase.ts` initializes the client on demand and uses generated database types.
 
-## First staff account
+## Staff accounts
 
-The designated first editor is **forestlakepathfinderpics@gmail.com**. This address did not have an Auth account when the schema was deployed.
+Create staff accounts in Supabase **Authentication > Users**, then sign in through the app. No allowlist entry, SQL grant, or separate approval is needed. All authenticated accounts can read, insert, and update through the API; the current interface supports searching and viewing. Browser deletion remains disabled.
 
-1. In the linked Supabase project's **Authentication > Users**, create that email/password user. Set the password privately in the dashboard; do not put it in the repository.
-2. Run [grant-initial-staff.sql](supabase/admin/grant-initial-staff.sql) in the project's SQL Editor, or use:
+Keep **Allow new users to sign up** disabled in hosted Supabase Auth settings, and anonymous sign-ins disabled. Accounts are provisioned by administrators. Local `supabase/config.toml` also disables signup. Configure hosted Auth before applying the access migration; changing the local file alone does not update hosted settings.
 
-   ```sh
-   npm run supabase -- db query --linked --file supabase/admin/grant-initial-staff.sql
-   ```
-
-3. Sign in through the app. An empty database correctly shows no members.
-
-This grant script fails clearly if the account does not exist and is safe to rerun. It sends no email. For other staff, a database administrator can insert their `auth.users.id` into `private.staff_access` with `role = 'viewer'` or `'editor'`. To revoke access, delete that allowlist row. Auth accounts alone do not grant access, and browser clients cannot modify the allowlist. Password resets are currently handled by the administrator through Supabase.
-
-Viewers can read all club records. Editors can also insert and update through the API once editing screens are added. Browser deletion is disabled for both roles. All 17 application tables have row-level security; anonymous visitors have no table privileges. These policies follow [Supabase's RLS guidance](https://supabase.com/docs/guides/database/postgres/row-level-security).
+The September 11 migration changes `current_staff_role()` to return `editor` for any authenticated user identity. Existing RLS policies and older clients remain compatible. The old private allowlist table is retained only as historical data and is never consulted for access; its grant script is retired. Manage accounts and password resets through Supabase Auth.
 
 ## Entering records and preserving relationships
 
@@ -85,7 +76,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Type generation failed' }
 $types | Set-Content src/lib/database.types.ts -Encoding UTF8
 ```
 
-For optional local Supabase, install and run Docker, then use `npm run supabase -- start`. Local Auth users and staff grants are separate from the hosted project. `supabase/seed.sql` is intentionally empty. Stop local services with `npm run supabase -- stop`; Docker is not needed for hosted development or the database test suite.
+For optional local Supabase, install and run Docker, then use `npm run supabase -- start`. Local Auth users are separate from the hosted project. `supabase/seed.sql` is intentionally empty. Stop local services with `npm run supabase -- stop`; Docker is not needed for hosted development or the database test suite.
 
 ## Verification
 
@@ -98,7 +89,7 @@ npm run build
 
 `npm test` executes the migration in PGlite (PostgreSQL in memory) and checks validation, paired histories, search predicates, foreign keys, and role permissions using a minimal Supabase Auth contract. It does not connect to or modify the hosted project.
 
-`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies sign-in, combined filters, details, empty/error states, retries, pagination, and denied staff access. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
+`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies sign-in, combined filters, details, empty/error states, retries, pagination, immediate authenticated access, and signed-out isolation. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
 
 ## Project context
 

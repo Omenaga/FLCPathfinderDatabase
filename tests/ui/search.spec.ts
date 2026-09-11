@@ -14,12 +14,11 @@ const fixture = {
   red_zone_lashing: [], red_zone_burning_twine: [],
 }
 
-async function setup(page: Page, role: string | null = 'viewer') {
+async function setup(page: Page) {
   const user = { id: '00000000-0000-0000-0000-000000000001', email: 'staff@example.test', aud: 'authenticated', role: 'authenticated', app_metadata: {}, user_metadata: {}, created_at: '2026-01-01T00:00:00Z' }
   await page.route('http://127.0.0.1:54321/auth/v1/**', async route => {
     await route.fulfill({ json: { access_token: 'test-session-token', refresh_token: 'test-refresh', token_type: 'bearer', expires_in: 3600, user } })
   })
-  await page.route('http://127.0.0.1:54321/rest/v1/rpc/current_staff_role', route => route.fulfill({ json: role }))
   await page.route('http://127.0.0.1:54321/rest/v1/pathfinders?**', route => {
     const details = new URL(route.request().url()).searchParams.get('id') === 'eq.42'
     return route.fulfill({ json: details ? fixture : [fixture], headers: { 'access-control-expose-headers': 'content-range', 'content-range': '0-0/1' } })
@@ -34,7 +33,7 @@ test('combines core filters and displays year-linked histories', async ({ page }
   await setup(page)
   await expect(page.getByRole('button', { name: 'Synthetic Pathfinder' })).toBeVisible()
   await page.getByLabel('Name', { exact: true }).fill('Synthetic')
-  await page.getByLabel('Active school year').fill('2024-2025')
+  await page.getByLabel('Active year', { exact: true }).fill('2024')
   await page.getByLabel('Level earned').selectOption('Friend')
   await page.getByLabel('Level status').selectOption('true')
   await page.getByRole('combobox', { name: 'Extracurricular', exact: true }).selectOption('Drums')
@@ -43,7 +42,7 @@ test('combines core filters and displays year-linked histories', async ({ page }
   await page.getByRole('button', { name: 'Search records' }).click()
   const params = new URL((await request).url()).searchParams
   expect(params.get('name')).toBe('ilike.%Synthetic%')
-  expect(params.get('years_active')).toBe('cs.["2024-2025"]')
+  expect(params.get('or')).toBe('(years_active.cs.["2023-2024"],years_active.cs.["2024-2025"])')
   expect(params.get('levels')).toBe('cs.[{"name":"Friend","advanced":true}]')
   expect(params.get('extracurriculars')).toBe('cs.["Drums"]')
   expect(params.get('red_zone_participation')).toBe('cs.["Archery"]')
@@ -75,11 +74,19 @@ test('distinguishes an empty result from a database failure and retries', async 
   await expect(page.getByRole('button', { name: 'Synthetic Pathfinder' })).toBeVisible()
 })
 
-test('does not query member data for an unapproved account', async ({ page }) => {
+test('an Auth account immediately reaches search without an approval RPC', async ({ page }) => {
+  let approvalRequests = 0
+  page.on('request', request => { if (request.url().includes('/rpc/current_staff_role')) approvalRequests++ })
+  await setup(page)
+  await expect(page.getByRole('button', { name: 'Synthetic Pathfinder' })).toBeVisible()
+  expect(approvalRequests).toBe(0)
+})
+
+test('signed-out visitors see login and make no member requests', async ({ page }) => {
   let memberRequests = 0
   page.on('request', request => { if (request.url().includes('/rest/v1/pathfinders')) memberRequests++ })
-  await setup(page, null)
-  await expect(page.getByRole('heading', { name: 'Staff access required' })).toBeVisible()
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Staff sign in' })).toBeVisible()
   expect(memberRequests).toBe(0)
 })
 

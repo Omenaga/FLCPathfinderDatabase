@@ -27,6 +27,7 @@ before(async () => {
   `)
   await db.exec(await readFile(new URL('../supabase/migrations/20260908000000_pathfinder_database.sql', import.meta.url), 'utf8'))
   await db.exec(`insert into private.staff_access values ('${viewer}', 'viewer', now()), ('${editor}', 'editor', now());`)
+  await db.exec(await readFile(new URL('../supabase/migrations/20260911000000_auth_users_are_staff.sql', import.meta.url), 'utf8'))
 })
 after(async () => { await db?.close() })
 
@@ -103,21 +104,26 @@ test('editor creates a member and paired activity and Red Zone histories', async
   })
 })
 
-test('viewers read all histories but cannot insert, edit, delete or grant themselves access', async () => {
-  await asRole('authenticated', viewer, async () => {
-    for (const table of tables) assert.ok((await db.query(`select * from ${table}`)).rows.length > 0)
-    await reject("insert into pathfinders(name) values ('Forbidden')", '42501')
-    assert.equal((await db.query("update pathfinders set name='Forbidden' returning id")).rows.length, 0)
-    await reject('delete from pathfinders', '42501')
-    await reject("update private.staff_access set role='editor'", '42501')
-  })
+test('every Auth account can read and write without allowlist approval; deletion stays denied', async () => {
+  for (const uid of [viewer, outsider]) {
+    await asRole('authenticated', uid, async () => {
+      assert.equal((await db.query('select public.current_staff_role() as role')).rows[0].role, 'editor')
+      for (const table of tables) {
+        assert.ok((await db.query(`select * from ${table}`)).rows.length > 0)
+        const column = ['pathfinders', 'honors'].includes(table) ? 'name' : 'pathfinder_id'
+        assert.ok((await db.query(`update ${table} set ${column}=${column} returning ${column}`)).rows.length > 0)
+        await reject(`delete from ${table}`, '42501')
+      }
+      await db.query("insert into pathfinders(name) values ('New staff fixture')")
+      await reject('select * from private.staff_access', '42501')
+    })
+  }
 })
 
-test('an unapproved authenticated account sees no records and cannot write', async () => {
-  await asRole('authenticated', outsider, async () => {
+test('an authenticated database role without a user identity has no access', async () => {
+  await asRole('authenticated', null, async () => {
     assert.equal((await db.query('select public.current_staff_role() as role')).rows[0].role, null)
     for (const table of tables) assert.equal((await db.query(`select * from ${table}`)).rows.length, 0)
     await reject("insert into pathfinders(name) values ('Forbidden')", '42501')
-    await reject('select * from private.staff_access', '42501')
   })
 })

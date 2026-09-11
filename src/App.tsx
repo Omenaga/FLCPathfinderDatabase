@@ -62,31 +62,14 @@ function ConnectedApp() {
     {error && <p role="alert" className="error">{error}</p>}
     {session === undefined ? <p role="status">Checking your session…</p> : session ? <>
       <div className="session"><span>{session.user.email}</span><button className="secondary" disabled={pending} onClick={signOut}>Sign out</button></div>
-      <Workspace key={session.user.id} />
-    </> : <section className="panel login"><h2>Staff sign in</h2><p>Use your approved staff account to search member records.</p>
+      <Search key={session.user.id} />
+    </> : <section className="panel login"><h2>Staff sign in</h2><p>Use your staff account to search member records.</p>
       <form onSubmit={signIn}><label>Email<input name="email" type="email" autoComplete="username" required /></label>
       <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>
       <button disabled={pending}>{pending ? 'Signing in…' : 'Sign in'}</button></form>
       <p className="muted">Need access or a password reset? Contact your database administrator.</p>
     </section>}
   </main>
-}
-
-function Workspace() {
-  const [access, setAccess] = useState<string | null>()
-  const [error, setError] = useState('')
-  const [attempt, setAttempt] = useState(0)
-  useEffect(() => {
-    let active = true
-    getSupabase().rpc('current_staff_role').then(({ data, error }) => {
-      if (active) { if (error) setError(message(error)); else setAccess(data) }
-    }, error => { if (active) setError(message(error)) })
-    return () => { active = false }
-  }, [attempt])
-  if (error) return <section className="panel"><p role="alert" className="error">{error}</p><button onClick={() => { setError(''); setAccess(undefined); setAttempt(attempt + 1) }}>Retry connection</button></section>
-  if (access === undefined) return <p role="status">Checking staff access…</p>
-  if (!access) return <section className="panel"><h2>Staff access required</h2><p>Your account is signed in but has not been approved to view member records. Ask the database administrator to grant access.</p><button onClick={() => { setError(''); setAccess(undefined); setAttempt(attempt + 1) }}>Check access again</button></section>
-  return <Search />
 }
 
 function Search() {
@@ -117,8 +100,7 @@ function Search() {
     <section className="panel"><h2>Find a Pathfinder</h2><p className="muted">Combine filters to narrow the results. Leave them blank to browse all members.</p>
       <form onSubmit={submit} className="filters">
         <label className="name-filter">Name<input type="search" value={draft.name} onChange={e => update('name', e.target.value)} placeholder="Search by name" maxLength={200} /></label>
-        <label>Member ID<input type="number" min="1" max="2147483647" step="1" value={draft.id} onChange={e => update('id', e.target.value)} placeholder="Any ID" /></label>
-        <label>Active school year<input value={draft.year} onChange={e => update('year', e.target.value)} placeholder="2024-2025" pattern="[0-9]{4}-[0-9]{4}" title="Use a school year such as 2024-2025" /></label>
+        <label>Active year<input value={draft.year} onChange={e => update('year', e.target.value)} placeholder="2014" inputMode="numeric" maxLength={4} pattern="[0-9]{4}" title="Enter a year, such as 2014, to match 2013-2014 or 2014-2015" /></label>
         <Select label="Level earned" value={draft.level} options={LEVELS} onChange={value => update('level', value)} />
         <label>Level status<select disabled={!draft.level} value={draft.advanced} onChange={e => update('advanced', e.target.value)}><option value="">Any status</option><option value="true">Advanced</option><option value="false">Regular</option></select></label>
         <Select label="Extracurricular" value={draft.activity} options={ACTIVITIES} onChange={value => update('activity', value)} />
@@ -129,9 +111,9 @@ function Search() {
     <section className="panel" aria-busy={busy}><div className="section-heading"><h2>Members</h2><span role="status">{busy ? 'Searching…' : `${count} ${count === 1 ? 'member' : 'members'} found`}</span></div>
       {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { beginSearch(); setAttempt(attempt + 1) }}>Try again</button></> : !busy && members.length === 0 ?
         <p>No members found. Try fewer filters. If this is a new database, add the first records through Supabase.</p> : members.length > 0 && <>
-        <div className="table-scroll"><table><thead><tr><th>Name / ID</th><th>Active years</th><th>Levels earned</th><th>Extracurriculars</th><th>Red Zone</th></tr></thead><tbody>
-          {members.map(member => <tr key={member.id}><td><button className="member-link" aria-expanded={selected === member.id} aria-controls="member-details" onClick={() => setSelected(member.id)}>{member.name}</button><small>#{member.id}</small></td>
-            <td>{member.years_active.join(', ') || '—'}</td><td>{member.levels.map(l => `${l.advanced ? 'Advanced ' : ''}${l.name}`).join(', ') || '—'}</td>
+        <div className="table-scroll"><table><thead><tr><th>Name</th><th>Active years</th><th>Levels earned</th><th>Extracurriculars</th><th>Red Zone</th></tr></thead><tbody>
+          {members.map(member => <tr key={member.id}><td><button className="member-link" aria-expanded={selected === member.id} aria-controls="member-details" onClick={() => setSelected(member.id)}>{member.name}</button></td>
+            <td>{member.years_active.join(', ') || '—'}</td><td>{member.levels.map(l => `${l.name}${l.advanced ? ' (Advanced)' : ''}`).join(', ') || '—'}</td>
             <td>{member.extracurriculars.join(', ') || '—'}</td><td>{member.red_zone_participation.join(', ') || '—'}</td></tr>)}
         </tbody></table></div>
         <div className="pagination"><button className="secondary" disabled={page === 0 || busy} onClick={() => { beginSearch(); setPage(page - 1) }}>Previous</button>
@@ -159,8 +141,8 @@ function Details({ id, onClose }: { id: number; onClose: () => void }) {
   }, [id, attempt])
   return <section className="panel" id="member-details" aria-label="Member details"><div className="section-heading"><h2>{data?.member.name ?? 'Member details'}</h2><button className="secondary" onClick={onClose}>Close details</button></div>
     {error ? <><p className="error" role="alert">{error}</p><button onClick={() => { setData(undefined); setError(''); setAttempt(attempt + 1) }}>Retry details</button></> : !data ? <p role="status">Loading participation history…</p> : <>
-      <p className="muted">Member #{data.member.id} · Active years: {data.member.years_active.join(', ') || 'Not recorded'}</p>
-      <h3>Levels earned</h3><p>{data.member.levels.map(l => `${l.advanced ? 'Advanced ' : ''}${l.name}`).join(', ') || 'No levels recorded.'}</p>
+      <p className="muted">Active years: {data.member.years_active.join(', ') || 'Not recorded'}</p>
+      <h3>Levels earned</h3><p>{data.member.levels.map(l => `${l.name}${l.advanced ? ' (Advanced)' : ''}`).join(', ') || 'No levels recorded.'}</p>
       <h3>Extracurricular history</h3>{data.activities.length === 0 && <p>No extracurriculars recorded.</p>}
       <div className="history-grid">{data.activities.map(group => <article key={group.name}><h4>{group.name}</h4>{group.records.length === 0 ? <p>Participation recorded; year details pending.</p> : <ul>{group.records.flatMap((r, index) => r.years.map(year => <li key={`${index}-${year}`}><strong>{year}</strong> — {r.detail}</li>))}</ul>}</article>)}</div>
       <h3>Red Zone history</h3>{data.events.length === 0 && <p>No Red Zone events recorded.</p>}

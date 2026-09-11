@@ -13,16 +13,22 @@ function member(row: MemberRow) {
     extracurriculars: row.extracurriculars as string[], red_zone_participation: row.red_zone_participation as string[] }
 }
 export type Pathfinder = ReturnType<typeof member>
-export type Filters = { name: string; id: string; year: string; level: string; advanced: string; activity: string; event: string }
-export const EMPTY_FILTERS: Filters = { name: '', id: '', year: '', level: '', advanced: '', activity: '', event: '' }
+export type Filters = { name: string; year: string; level: string; advanced: string; activity: string; event: string }
+export const EMPTY_FILTERS: Filters = { name: '', year: '', level: '', advanced: '', activity: '', event: '' }
 
 export async function searchPathfinders(filters: Filters, page: number, signal: AbortSignal) {
   let query = getSupabase().from('pathfinders').select('*', { count: 'exact' })
   const name = filters.name.trim()
   if (name) query = query.ilike('name', `%${name.replace(/[\\%_]/g, '\\$&')}%`)
-  if (filters.id) query = query.eq('id', Number(filters.id))
   // Supabase treats JS arrays as PostgreSQL arrays; JSONB arrays need JSON text.
-  if (filters.year.trim()) query = query.contains('years_active', JSON.stringify([filters.year.trim()]))
+  const yearText = filters.year.trim()
+  if (yearText) {
+    if (!/^[0-9]{4}$/.test(yearText) || Number(yearText) < 1900) {
+      throw new Error('Enter a four-digit year, such as 2014.')
+    }
+    const year = Number(yearText)
+    query = query.or(`years_active.cs.["${year - 1}-${year}"],years_active.cs.["${year}-${year + 1}"]`)
+  }
   if (filters.level) query = query.contains('levels', JSON.stringify([{ name: filters.level,
     ...(filters.advanced ? { advanced: filters.advanced === 'true' } : {}) }]))
   if (filters.activity) query = query.contains('extracurriculars', JSON.stringify([filters.activity]))
