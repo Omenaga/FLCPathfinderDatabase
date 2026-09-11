@@ -2,6 +2,7 @@ import { getSupabase } from './supabase'
 import type { Database } from './database.types'
 
 export const LEVELS = ['Friend', 'Companion', 'Explorer', 'Ranger', 'Voyager', 'Guide', 'Pioneer', 'Navigator'] as const
+export const LEVEL_OPTIONS = LEVELS.flatMap(level => [level, `${level} (Advanced)`])
 export const ACTIVITIES = ['Drill', 'Drums', 'PBE', 'TLT'] as const
 export const EVENTS = ['Drill Performance', 'Drum Performance', 'Honor Evaluations', 'Bible Events', 'Knots Relay', 'Tents', 'Jump Rope', 'Archery', 'Lashing', 'Burning Twine'] as const
 export const STATUSES = ['New', 'Returning', 'Graduated', 'Unregistered'] as const
@@ -15,8 +16,8 @@ function member(row: MemberRow) {
     extracurriculars: row.extracurriculars as string[], red_zone_participation: row.red_zone_participation as string[] }
 }
 export type Pathfinder = Database['public']['Views']['member_search']['Row']
-export type Filters = { status: string; name: string; year: string[]; level: string[]; advanced: string; activity: string[]; event: string[] }
-export const EMPTY_FILTERS: Filters = { status: '', name: '', year: [], level: [], advanced: '', activity: [], event: [] }
+export type Filters = { status: string; name: string; year: string[]; level: string[]; activity: string[]; event: string[] }
+export const EMPTY_FILTERS: Filters = { status: '', name: '', year: [], level: [], activity: [], event: [] }
 
 export async function searchPathfinders(filters: Filters, page: number, signal: AbortSignal) {
   let query = getSupabase().from('member_search').select('*', { count: 'exact' })
@@ -33,8 +34,9 @@ export async function searchPathfinders(filters: Filters, page: number, signal: 
     // Each calendar year may match either adjacent school year; all selected years must match.
     query = query.or(`and(${conditions.join(',')})`)
   }
-  if (filters.level.length) query = query.contains('levels', JSON.stringify(filters.level.map(name => ({ name,
-    ...(filters.advanced ? { advanced: filters.advanced === 'true' } : {}) }))))
+  if (filters.level.length) query = query.contains('levels', JSON.stringify(filters.level.map(option => ({
+    name: option.replace(/ \(Advanced\)$/, ''), advanced: option.endsWith(' (Advanced)'),
+  }))))
   if (filters.activity.length) query = query.contains('search_activities', JSON.stringify(filters.activity))
   if (filters.event.length) query = query.contains('red_zone_participation', JSON.stringify(filters.event))
   const { data, count, error } = await query.order('name').order('id')

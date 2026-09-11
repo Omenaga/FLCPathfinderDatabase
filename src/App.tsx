@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import flcLogo from './assets/FL_Logo.png'
 import { getSupabase } from './lib/supabase'
-import { ACTIVITIES, EMPTY_FILTERS, EVENTS, LEVELS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
+import { ACTIVITIES, EMPTY_FILTERS, EVENTS, LEVEL_OPTIONS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
   type Filters, type Pathfinder } from './lib/pathfinders'
 
 function message(error: unknown) {
@@ -73,6 +73,8 @@ function ConnectedApp() {
 }
 
 function Search() {
+  // Honors are a UI placeholder until the catalog and search integration are added.
+  const [honors, setHonors] = useState<string[]>([])
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [page, setPage] = useState(0)
@@ -91,21 +93,21 @@ function Search() {
     return () => controller.abort()
   }, [filters, page, attempt])
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
-    setDraft(current => ({ ...current, [key]: value, ...(key === 'level' && Array.isArray(value) && !value.length ? { advanced: '' } : {}) }))
+    setDraft(current => ({ ...current, [key]: value }))
   }
   function beginSearch() { setBusy(true); setError(''); setMembers([]); setCount(0); setSelected(null) }
   function submit(event: FormEvent) { event.preventDefault(); beginSearch(); setFilters({ ...draft }); setPage(0) }
-  function reset() { beginSearch(); setDraft(EMPTY_FILTERS); setFilters({ ...EMPTY_FILTERS }); setPage(0) }
+  function reset() { setHonors([]); beginSearch(); setDraft(EMPTY_FILTERS); setFilters({ ...EMPTY_FILTERS }); setPage(0) }
   return <>
     <section className="panel"><h2>Find a Pathfinder</h2><p className="muted">Select one or more options, or type and press Enter to add them. Members must match every selection. Leave filters blank to browse all members.</p>
       <form onSubmit={submit} onReset={reset} className="filters">
         <label className="name-filter">Name<input type="search" value={draft.name} onChange={e => update('name', e.target.value)} placeholder="Search by name" maxLength={200} /></label>
-        <MultiSelect label="Active year" values={draft.year} options={YEARS} onChange={value => update('year', value)} />
         <Select label="Status" value={draft.status} options={STATUSES} onChange={value => update('status', value)} />
-        <MultiSelect label="Level earned" values={draft.level} options={LEVELS} onChange={value => update('level', value)} />
-        <label>Level status<select disabled={!draft.level.length} value={draft.advanced} onChange={e => update('advanced', e.target.value)}><option value="">Any status</option><option value="true">Advanced</option><option value="false">Regular</option></select></label>
+        <MultiSelect label="Years Active" values={draft.year} options={YEARS} onChange={value => update('year', value)} />
+        <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} exclusiveKey={option => option.replace(/ \(Advanced\)$/, '')} onChange={value => update('level', value)} />
         <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITIES} onChange={value => update('activity', value)} />
-        <MultiSelect label="Red Zone event" values={draft.event} options={EVENTS} onChange={value => update('event', value)} />
+        <MultiSelect label="Red Zone Events" values={draft.event} options={EVENTS} onChange={value => update('event', value)} />
+        <MultiSelect label="Honors" values={honors} options={[]} onChange={setHonors} emptyMessage="No honors available yet" />
         <div className="actions"><button type="submit" disabled={busy}>Search records</button><button type="reset" className="secondary">Clear filters</button></div>
       </form>
     </section>
@@ -136,8 +138,8 @@ function Select({ label, value, options, onChange }: { label: string; value: str
   return <label>{label}<select value={value} onChange={e => onChange(e.target.value)}><option value="">Any</option>{options.map(option => <option key={option}>{option}</option>)}</select></label>
 }
 
-function MultiSelect({ label, values, options, onChange }: {
-  label: string; values: string[]; options: readonly string[]; onChange: (values: string[]) => void
+function MultiSelect({ label, values, options, onChange, exclusiveKey, emptyMessage = 'No matching options' }: {
+  label: string; values: string[]; options: readonly string[]; onChange: (values: string[]) => void; exclusiveKey?: (option: string) => string; emptyMessage?: string
 }) {
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
@@ -145,7 +147,11 @@ function MultiSelect({ label, values, options, onChange }: {
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
   const matches = options.filter(option => !values.includes(option) && option.toLowerCase().includes(text.trim().toLowerCase()))
+  function disabled(option: string) {
+    return values.includes(option) || !!exclusiveKey && values.some(value => exclusiveKey(value) === exclusiveKey(option))
+  }
   function add(option: string) {
+    if (disabled(option)) return
     onChange([...values, option]); setText(''); setActive(0); input.current?.focus()
   }
   useEffect(() => {
@@ -156,8 +162,6 @@ function MultiSelect({ label, values, options, onChange }: {
   }, [])
   return <div className="multi-select" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
     <label htmlFor={id}>{label}</label>
-    <div className="selected-options">{values.map(value => <button type="button" className="secondary" key={value}
-      aria-label={`Remove ${value} from ${label}`} onClick={() => onChange(values.filter(item => item !== value))}>{value} ?</button>)}</div>
     <input ref={input} id={id} role="combobox" autoComplete="off" value={text} placeholder="Type or choose?"
       aria-expanded={open} aria-controls={`${id}-options`} aria-autocomplete="list"
       aria-activedescendant={open && matches[active] ? `${id}-option-${active}` : undefined}
@@ -173,12 +177,25 @@ function MultiSelect({ label, values, options, onChange }: {
           setOpen(true)
         } else if (event.key === 'Escape') { event.preventDefault(); setOpen(false) }
       }} />
+    <div className="selected-options">{values.map(value => <button type="button" className="secondary" key={value}
+      aria-label={`Remove ${value} from ${label}`} onClick={() => onChange(values.filter(item => item !== value))}>{value}</button>)}</div>
     {open && <ul id={`${id}-options`} role="listbox" aria-label={`${label} options`} className="option-list">
-      {matches.map((option, index) => <li key={option} id={`${id}-option-${index}`} role="option" aria-selected={index === active}
+      {exclusiveKey ? [...new Set(matches.map(exclusiveKey))].map(level => <li key={level} role="presentation" className="level-choice">
+        <div role="group" aria-label={level}>
+          <span className="level-name">{level}</span>
+          <div className="level-variants">{matches.filter(option => exclusiveKey(option) === level).map(option => {
+            const index = matches.indexOf(option)
+            return <button type="button" role="option" tabIndex={-1} key={option} id={`${id}-option-${index}`}
+              aria-label={option} aria-selected={index === active} aria-disabled={disabled(option)}
+              onMouseDown={event => event.preventDefault()} onClick={() => add(option)}>
+              {option.endsWith(' (Advanced)') ? 'Advanced' : 'Regular'}
+            </button>
+          })}</div>
+        </div>
+      </li>) : matches.map((option, index) => <li key={option} id={`${id}-option-${index}`} role="option" aria-selected={index === active} aria-disabled={disabled(option)}
         onMouseDown={event => event.preventDefault()} onClick={() => add(option)}>{option}</li>)}
-      {!matches.length && <li role="presentation">No matching options</li>}
+      {!matches.length && <li role="presentation">{emptyMessage}</li>}
     </ul>}
-    {label === 'Level earned' && <small>Level status applies to every selected level.</small>}
   </div>
 }
 

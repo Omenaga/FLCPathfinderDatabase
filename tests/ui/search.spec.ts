@@ -33,15 +33,14 @@ test('combines historical filters and opens the WIP profile', async ({ page }) =
   await setup(page)
   await expect(page.getByRole('button', { name: 'Synthetic Pathfinder' })).toBeVisible()
   await page.getByLabel('Name', { exact: true }).fill('Synthetic')
-  await page.getByLabel('Active year', { exact: true }).fill('2024')
-  await page.getByLabel('Active year', { exact: true }).press('Enter')
-  await page.getByLabel('Level earned', { exact: true }).fill('Friend')
-  await page.getByLabel('Level earned', { exact: true }).press('Enter')
-  await page.getByLabel('Level status').selectOption('true')
+  await page.getByLabel('Years Active', { exact: true }).fill('2024')
+  await page.getByLabel('Years Active', { exact: true }).press('Enter')
+  await page.getByLabel('Level Earned', { exact: true }).fill('Friend (Advanced)')
+  await page.getByLabel('Level Earned', { exact: true }).press('Enter')
   await page.getByRole('combobox', { name: 'Extracurricular', exact: true }).fill('Drums')
   await page.getByRole('combobox', { name: 'Extracurricular', exact: true }).press('Enter')
-  await page.getByLabel('Red Zone event', { exact: true }).fill('Archery')
-  await page.getByLabel('Red Zone event', { exact: true }).press('Enter')
+  await page.getByLabel('Red Zone Events', { exact: true }).fill('Archery')
+  await page.getByLabel('Red Zone Events', { exact: true }).press('Enter')
   const request = page.waitForRequest(r => r.url().includes('/rest/v1/member_search?') && r.url().includes('levels='))
   await page.getByRole('button', { name: 'Search records' }).click()
   const params = new URL((await request).url()).searchParams
@@ -150,14 +149,14 @@ test('status filter sends each effective status and clears with other filters', 
 
 test('multi-select filters combine every option and support typing, removal and reset', async ({ page }) => {
   await setup(page)
-  const year = page.getByRole('combobox', { name: 'Active year', exact: true })
+  const year = page.getByRole('combobox', { name: 'Years Active', exact: true })
   await year.focus()
   await expect(page.getByRole('option', { name: '2010', exact: true })).toBeVisible()
   await expect(page.getByRole('option', { name: String(new Date().getFullYear()), exact: true })).toHaveCount(1)
   await expect(page.getByRole('option', { name: '2009', exact: true })).toHaveCount(0)
   for (const [label, values] of [
-    ['Active year', ['2024', '2025']], ['Level earned', ['Friend', 'Companion']],
-    ['Extracurricular', ['Drill', 'Drums']], ['Red Zone event', ['Archery', 'Knots Relay']],
+    ['Years Active', ['2024', '2025']], ['Level Earned', ['Friend', 'Companion (Advanced)']],
+    ['Extracurricular', ['Drill', 'Drums']], ['Red Zone Events', ['Archery', 'Knots Relay']],
   ] as const) {
     const input = page.getByRole('combobox', { name: label, exact: true })
     for (const value of values) { await input.fill(value.toLowerCase()); await input.press('Enter') }
@@ -165,16 +164,35 @@ test('multi-select filters combine every option and support typing, removal and 
   const request = page.waitForRequest(r => r.url().includes('/rest/v1/member_search?') && r.url().includes('levels='))
   await page.getByRole('button', { name: 'Search records' }).click()
   const params = new URL((await request).url()).searchParams
-  expect(params.get('levels')).toBe('cs.[{"name":"Friend"},{"name":"Companion"}]')
+  expect(params.get('levels')).toBe('cs.[{"name":"Friend","advanced":false},{"name":"Companion","advanced":true}]')
   expect(params.get('search_activities')).toBe('cs.["Drill","Drums"]')
   expect(params.get('red_zone_participation')).toBe('cs.["Archery","Knots Relay"]')
   expect(params.get('or')).toBe('(and(or(search_years.cs.["2023-2024"],search_years.cs.["2024-2025"]),or(search_years.cs.["2024-2025"],search_years.cs.["2025-2026"])))')
-  await page.getByRole('button', { name: 'Remove Friend from Level earned', exact: true }).click()
-  await expect(page.getByRole('button', { name: 'Remove Friend from Level earned', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Remove Friend from Level Earned', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Remove Friend from Level Earned', exact: true })).toHaveCount(0)
   await year.fill('bad year')
   await year.press('Enter')
   await expect(page.getByText('No matching options', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'Clear filters' }).click()
   await expect(year).toHaveValue('')
   await expect(page.getByRole('button', { name: /^Remove / })).toHaveCount(0)
+})
+
+
+test('regular and Advanced versions are mutually exclusive and removal re-enables them', async ({ page }) => {
+  await setup(page)
+  const input = page.getByRole('combobox', { name: 'Level Earned', exact: true })
+  await input.fill('Friend')
+  await input.press('Enter')
+  await input.fill('Friend (Advanced)')
+  await expect(page.getByRole('option', { name: 'Friend (Advanced)', exact: true })).toHaveAttribute('aria-disabled', 'true')
+  await input.press('Enter')
+  await expect(page.getByRole('button', { name: 'Remove Friend (Advanced) from Level Earned', exact: true })).toHaveCount(0)
+  await page.getByRole('button', { name: 'Remove Friend from Level Earned', exact: true }).click()
+  await input.focus()
+  await input.press('Enter')
+  await input.fill('Friend')
+  await expect(page.getByRole('option', { name: 'Friend', exact: true })).toHaveAttribute('aria-disabled', 'true')
+  await page.getByRole('option', { name: 'Friend', exact: true }).click({ force: true })
+  await expect(page.getByRole('button', { name: 'Remove Friend from Level Earned', exact: true })).toHaveCount(0)
 })
