@@ -684,6 +684,8 @@ export type Database = {
           name: string | null
           red_zone_participation: Json | null
           search_activities: Json | null
+          search_activity_years: Json | null
+          search_event_years: Json | null
           search_years: Json | null
           status: string | null
           updated_at: string | null

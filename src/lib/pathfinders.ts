@@ -7,6 +7,10 @@ export const ACTIVITIES = ['Drill', 'Drums', 'PBE', 'TLT'] as const
 export const EVENTS = ['Drill Performance', 'Drum Performance', 'Honor Evaluations', 'Bible Events', 'Knots Relay', 'Tents', 'Jump Rope', 'Archery', 'Lashing', 'Burning Twine'] as const
 export const STATUSES = ['New', 'Returning', 'Graduated', 'Unregistered'] as const
 export const YEARS = Array.from({ length: Math.max(0, new Date().getFullYear() - 2009) }, (_, index) => String(2010 + index))
+export const ACTIVITY_OPTIONS = ACTIVITIES.flatMap(activity => [activity, ...YEARS
+  .filter(year => activity !== 'TLT' || Number(year) >= 2017)
+  .map(year => `${activity} (${year})`)])
+export const EVENT_OPTIONS = EVENTS.flatMap(event => [event, ...YEARS.map(year => `${event} (${year})`)])
 export const PAGE_SIZE = 25
 type EarnedLevel = { name: string; advanced: boolean }
 type MemberRow = Database['public']['Tables']['pathfinders']['Row']
@@ -37,8 +41,16 @@ export async function searchPathfinders(filters: Filters, page: number, signal: 
   if (filters.level.length) query = query.contains('levels', JSON.stringify(filters.level.map(option => ({
     name: option.replace(/ \(Advanced\)$/, ''), advanced: option.endsWith(' (Advanced)'),
   }))))
-  if (filters.activity.length) query = query.contains('search_activities', JSON.stringify(filters.activity))
-  if (filters.event.length) query = query.contains('red_zone_participation', JSON.stringify(filters.event))
+  if (filters.activity.some(option => !ACTIVITY_OPTIONS.includes(option))) throw new Error('Select a valid activity and year.')
+  const anyYear = filters.activity.filter(option => !option.includes(' ('))
+  const dated = filters.activity.filter(option => option.includes(' ('))
+  if (anyYear.length) query = query.contains('search_activities', JSON.stringify(anyYear))
+  if (dated.length) query = query.contains('search_activity_years', JSON.stringify(dated))
+  if (filters.event.some(option => !EVENT_OPTIONS.includes(option))) throw new Error('Select a valid event and year.')
+  const anyEventYear = filters.event.filter(option => !option.includes(' ('))
+  const datedEvents = filters.event.filter(option => option.includes(' ('))
+  if (anyEventYear.length) query = query.contains('red_zone_participation', JSON.stringify(anyEventYear))
+  if (datedEvents.length) query = query.contains('search_event_years', JSON.stringify(datedEvents))
   const { data, count, error } = await query.order('name').order('id')
     .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1).abortSignal(signal)
   if (error) throw error

@@ -133,3 +133,9 @@ TLT also uses one row per Pathfinder, with a `history` array:
 TLT years are integers from 2017 through the current database year, with the upper limit advancing automatically. Any of Administrative, Outreach, Teaching, Activity, Records, and Counseling can be paired with any allowed year. Multiple operations per year are allowed; duplicate years and duplicate operations within a year are rejected. An empty operations array records participation with details unknown. The calendar-year migration requires legacy TLT rows to be explicitly mapped first; the live table was empty when it was applied.
 
 Keep the member's PBE/TLT extracurricular entry before adding details. Honor Evaluation and Bible Event catalogs remain at the design stage.
+
+
+Activity search supports Any year or specific calendar years for Drill, Drums, PBE, and TLT. Multiple selections require every activity/year pair. Drill, Drums, and PBE search both adjacent school years: 2024 matches 2023-2024 or 2024-2025 in that activity's history, without changing stored school years. Confirmed current activities also match their school year's calendar endpoints. TLT matches its recorded calendar year exactly (2017 through the current year); current registration alone does not imply a completed TLT operation in a calendar year. Other activity choices start at 2010. The security-invoker member_search view exposes search_activity_years for server-side filtering before pagination.
+
+
+Red Zone event filters offer Any year and calendar years from 2010 through the current year, grouped under each event with compact year buttons. Typing and multiple selections are supported. Every selected event/year must match an actual result in that event table; years match exactly. The security-invoker `member_search.search_event_years` field performs this filtering before pagination. Honor Evaluation and Bible Event name catalogs remain unchanged.

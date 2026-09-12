@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import flcLogo from './assets/FL_Logo.png'
 import { getSupabase } from './lib/supabase'
-import { ACTIVITIES, EMPTY_FILTERS, EVENTS, LEVEL_OPTIONS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
+import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
   type Filters, type Pathfinder } from './lib/pathfinders'
 
 function message(error: unknown) {
@@ -105,8 +105,8 @@ function Search() {
         <Select label="Status" value={draft.status} options={STATUSES} onChange={value => update('status', value)} />
         <MultiSelect label="Years Active" values={draft.year} options={YEARS} onChange={value => update('year', value)} />
         <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} exclusiveKey={option => option.replace(/ \(Advanced\)$/, '')} onChange={value => update('level', value)} />
-        <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITIES} onChange={value => update('activity', value)} />
-        <MultiSelect label="Red Zone Events" values={draft.event} options={EVENTS} onChange={value => update('event', value)} />
+        <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} groupKey={option => option.split(' (')[0]} variantLabel={option => option.includes(' (') ? option.slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('activity', value)} />
+        <MultiSelect label="Red Zone Events" values={draft.event} options={EVENT_OPTIONS} groupKey={option => option.split(' (')[0]} variantLabel={option => option.includes(' (') ? option.slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('event', value)} />
         <MultiSelect label="Honors" values={honors} options={[]} onChange={setHonors} emptyMessage="No honors available yet" />
         <div className="actions"><button type="submit" disabled={busy}>Search records</button><button type="reset" className="secondary">Clear filters</button></div>
       </form>
@@ -138,9 +138,10 @@ function Select({ label, value, options, onChange }: { label: string; value: str
   return <label>{label}<select value={value} onChange={e => onChange(e.target.value)}><option value="">Any</option>{options.map(option => <option key={option}>{option}</option>)}</select></label>
 }
 
-function MultiSelect({ label, values, options, onChange, exclusiveKey, emptyMessage = 'No matching options' }: {
-  label: string; values: string[]; options: readonly string[]; onChange: (values: string[]) => void; exclusiveKey?: (option: string) => string; emptyMessage?: string
+function MultiSelect({ compact = false, label, values, options, onChange, exclusiveKey, groupKey, variantLabel, emptyMessage = 'No matching options' }: {
+  compact?: boolean; label: string; values: string[]; options: readonly string[]; onChange: (values: string[]) => void; exclusiveKey?: (option: string) => string; groupKey?: (option: string) => string; variantLabel?: (option: string) => string; emptyMessage?: string
 }) {
+  const grouping = groupKey ?? exclusiveKey
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
   const [text, setText] = useState('')
@@ -160,7 +161,7 @@ function MultiSelect({ label, values, options, onChange, exclusiveKey, emptyMess
     form?.addEventListener('reset', clear)
     return () => form?.removeEventListener('reset', clear)
   }, [])
-  return <div className="multi-select" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
+  return <div className={compact ? "multi-select compact-options" : "multi-select"} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false) }}>
     <label htmlFor={id}>{label}</label>
     <input ref={input} id={id} role="combobox" autoComplete="off" value={text} placeholder="Type or choose?"
       aria-expanded={open} aria-controls={`${id}-options`} aria-autocomplete="list"
@@ -180,15 +181,15 @@ function MultiSelect({ label, values, options, onChange, exclusiveKey, emptyMess
     <div className="selected-options">{values.map(value => <button type="button" className="secondary" key={value}
       aria-label={`Remove ${value} from ${label}`} onClick={() => onChange(values.filter(item => item !== value))}>{value}</button>)}</div>
     {open && <ul id={`${id}-options`} role="listbox" aria-label={`${label} options`} className="option-list">
-      {exclusiveKey ? [...new Set(matches.map(exclusiveKey))].map(level => <li key={level} role="presentation" className="level-choice">
+      {grouping ? [...new Set(matches.map(grouping))].map(level => <li key={level} role="presentation" className={groupKey ? "level-choice activity-year-choice" : "level-choice"}>
         <div role="group" aria-label={level}>
           <span className="level-name">{level}</span>
-          <div className="level-variants">{matches.filter(option => exclusiveKey(option) === level).map(option => {
+          <div className="level-variants">{matches.filter(option => grouping(option) === level).map(option => {
             const index = matches.indexOf(option)
             return <button type="button" role="option" tabIndex={-1} key={option} id={`${id}-option-${index}`}
               aria-label={option} aria-selected={index === active} aria-disabled={disabled(option)}
               onMouseDown={event => event.preventDefault()} onClick={() => add(option)}>
-              {option.endsWith(' (Advanced)') ? 'Advanced' : 'Regular'}
+              {variantLabel ? variantLabel(option) : option.endsWith(' (Advanced)') ? 'Advanced' : 'Regular'}
             </button>
           })}</div>
         </div>

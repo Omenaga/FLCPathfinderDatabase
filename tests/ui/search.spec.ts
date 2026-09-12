@@ -196,3 +196,38 @@ test('regular and Advanced versions are mutually exclusive and removal re-enable
   await page.getByRole('option', { name: 'Friend', exact: true }).click({ force: true })
   await expect(page.getByRole('button', { name: 'Remove Friend from Level Earned', exact: true })).toHaveCount(0)
 })
+
+
+test('activity years can be selected and typed together', async ({ page }) => {
+  await setup(page)
+  const input = page.getByRole('combobox', { name: 'Extracurricular', exact: true })
+  await input.fill('Drill')
+  await page.getByRole('option', { name: 'Drill (2024)', exact: true }).click()
+  await input.fill('Drill (2025)')
+  await input.press('Enter')
+  await input.fill('TLT (2025)')
+  await input.press('Enter')
+  const request = page.waitForRequest(r => r.url().includes('search_activity_years='))
+  await page.getByRole('button', { name: 'Search records' }).click()
+  expect(new URL((await request).url()).searchParams.get('search_activity_years')).toBe('cs.["Drill (2024)","Drill (2025)","TLT (2025)"]')
+  await expect(page.getByRole('button', { name: 'Remove Drill (2024) from Extracurricular', exact: true })).toBeVisible()
+})
+
+
+test('Red Zone events offer compact year choices and typed multi-year filtering', async ({ page }) => {
+ await setup(page)
+ const input=page.getByRole('combobox',{name:'Red Zone Events',exact:true})
+ await input.fill('Archery')
+ await page.getByRole('option',{name:'Archery (2024)',exact:true}).click()
+ await input.fill('Archery (2025)')
+ await input.press('Enter')
+ await input.fill('Knots Relay')
+ await input.press('Enter')
+ const request=page.waitForRequest(r=>r.url().includes('search_event_years='))
+ await page.getByRole('button',{name:'Search records'}).click()
+ const params=new URL((await request).url()).searchParams
+ expect(params.get('search_event_years')).toBe('cs.["Archery (2024)","Archery (2025)"]')
+ expect(params.get('red_zone_participation')).toBe('cs.["Knots Relay"]')
+ await page.getByRole('button',{name:'Clear filters'}).click()
+ await expect(page.getByRole('button',{name:/^Remove /})).toHaveCount(0)
+})

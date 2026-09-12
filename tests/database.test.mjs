@@ -51,6 +51,8 @@ before(async () => {
   assert.deepEqual((await db.query('select operations from tlt')).rows[0].operations,['Records','Teaching'])
   await db.exec('delete from tlt') // Synthetic fixture only; live TLT was verified empty.
   await db.exec(tltMigration)
+  await db.exec(await readFile(new URL('../supabase/migrations/20260911070000_activity_year_search.sql', import.meta.url), 'utf8'))
+  await db.exec(await readFile(new URL('../supabase/migrations/20260912000000_event_year_search.sql', import.meta.url), 'utf8'))
 
 })
 after(async () => { await db?.close() })
@@ -291,4 +293,37 @@ test('TLT calendar history accepts all valid operations per year and enforces ye
    const other=(await db.query("select id from pathfinders where name='No participation'")).rows[0].id
    await reject(`insert into tlt(pathfinder_id,history) values (${other},'[{"year":2017,"operations":[]}]')`)
  })
+})
+
+
+test('activity/year search matches linked histories and requires every pair', async () => {
+ await asRole('authenticated', editor, async () => {
+   const find = async pairs => (await db.query('select name from member_search where search_activity_years @> $1::jsonb',[JSON.stringify(pairs)])).rows
+   assert.deepEqual(await find(['Drill (2024)','Drums (2026)','PBE (2025)','TLT (2025)']),[{name:'Synthetic Member'}])
+   assert.deepEqual(await find(['Drill (2026)']),[])
+   assert.deepEqual(await find(['Drums (2024)','Drums (2026)']),[{name:'Synthetic Member'}])
+   const id=(await db.query("insert into pathfinders(name) values ('Current activity fixture') returning id")).rows[0].id
+   await db.query("insert into current_data(pathfinder_id,school_year,status,current_activities) values ($1,public.current_club_year(),'new','[\"Drill\",\"TLT\"]')",[id])
+   const year=(await db.query('select public.current_club_year() as year')).rows[0].year
+   assert.deepEqual(await find([`Drill (${year.split('-')[0]})`]),[{name:'Current activity fixture'}])
+   assert.ok(!(await find(['TLT (2026)'])).some(row=>row.name==='Current activity fixture'))
+   await db.query("update current_data set status='graduated' where pathfinder_id=$1",[id])
+   assert.deepEqual(await find([`Drill (${year.split('-')[0]})`]),[])
+ })
+})
+
+
+test('Red Zone search requires exact event/year pairs across every event table', async () => {
+ await asRole('authenticated', editor, async () => {
+   const find=async pairs=>(await db.query('select name from member_search where search_event_years @> $1::jsonb',[JSON.stringify(pairs)])).rows
+   for (const name of names) {
+     assert.deepEqual(await find([`${name} (2024)`,`${name} (2025)`]),[{name:'Synthetic Member'}])
+     assert.deepEqual(await find([`${name} (2026)`]),[])
+   }
+   assert.deepEqual(await find(['Archery (2024)','Knots Relay (2025)']),[{name:'Synthetic Member'}])
+   assert.deepEqual(await find(['Archery (2024)','Knots Relay (2026)']),[])
+   await db.query("insert into pathfinders(name,red_zone_participation) values ('Event without details','[\"Archery\"]')")
+   assert.deepEqual(await find(['Archery (2024)']),[{name:'Synthetic Member'}])
+ })
+ await asRole('authenticated',null,async()=>assert.equal((await db.query('select search_event_years from member_search')).rows.length,0))
 })

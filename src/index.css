@@ -65,7 +65,16 @@ li { padding: .25rem 0; line-height: 1.5; }
 .option-list li[aria-disabled="true"] { color: #7a8493; background: #f4f5f7; cursor: not-allowed; }
 
 .level-name { display: block; font-weight: 600; margin-bottom: .35rem; }
-.level-variants { display: flex; gap: .35rem; }
+.level-variants { display: flex; flex-wrap: wrap; gap: .35rem; }
 .level-variants button { flex: 1; padding: .35rem .45rem; font-size: .8rem; background: white; color: #244bab; border-color: #c0ccdf; }
 .level-variants button[aria-selected="true"] { background: #edf2fb; border-color: #244bab; }
 .level-variants button[aria-disabled="true"] { color: #7a8493; background: #f4f5f7; border-color: #d8e1ee; cursor: not-allowed; }
+
+/* Compact activity years without stretching each button to fill its row. */
+.option-list .activity-year-choice { padding: .3rem; }
+.activity-year-choice .level-name { font-size: .82rem; margin-bottom: .2rem; }
+.activity-year-choice .level-variants { gap: .2rem; }
+.activity-year-choice .level-variants button { flex: 0 0 auto; min-height: 24px; padding: .15rem .3rem; font-size: .75rem; line-height: 1.3; }
+
+.compact-options .option-list { display: flex; flex-wrap: wrap; align-content: flex-start; gap: .2rem; }
+.compact-options .option-list li[role="option"] { min-height: 24px; padding: .15rem .3rem; font-size: .75rem; line-height: 1.3; border: 1px solid #c0ccdf; border-radius: .5rem; color: #244bab; }
