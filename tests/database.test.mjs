@@ -53,6 +53,8 @@ before(async () => {
   await db.exec(tltMigration)
   await db.exec(await readFile(new URL('../supabase/migrations/20260911070000_activity_year_search.sql', import.meta.url), 'utf8'))
   await db.exec(await readFile(new URL('../supabase/migrations/20260912000000_event_year_search.sql', import.meta.url), 'utf8'))
+  await db.exec(await readFile(new URL('../supabase/migrations/20260912010000_detail_participation_search.sql', import.meta.url), 'utf8'))
+  await db.exec(await readFile(new URL('../supabase/migrations/20260912020000_remove_core_participation.sql', import.meta.url), 'utf8'))
 
 })
 after(async () => { await db?.close() })
@@ -80,7 +82,6 @@ test('validates level objects, unique options and consecutive school years', asy
     `years_active = '{}'`, `levels = '[{"name":"Friend"}]'`,
     `levels = '[{"name":"Friend","advanced":null}]'`, `levels = '[{"name":"Other","advanced":false}]'`,
     `levels = '[{"name":"Friend","advanced":false},{"name":"Friend","advanced":true}]'`,
-    `extracurriculars = '["Other"]'`, `red_zone_participation = '[2024]'`,
   ]) {
     await db.exec("insert into pathfinders(name) values ('Validation fixture')")
     await reject(`update pathfinders set ${expression} where name = 'Validation fixture'`)
@@ -91,9 +92,9 @@ test('validates level objects, unique options and consecutive school years', asy
 test('editor creates a member and paired activity and Red Zone histories', async () => {
   await asRole('authenticated', editor, async () => {
     assert.equal((await db.query('select public.current_staff_role() as role')).rows[0].role, 'editor')
-    await db.query(`insert into pathfinders(name,years_active,levels,extracurriculars,red_zone_participation)
-      values ('Synthetic Member', '["2024-2025","2025-2026"]', '[{"name":"Friend","advanced":true}]',
-      '["Drill","Drums","PBE","TLT"]', $1)`, [JSON.stringify(names)])
+    await db.query(`insert into pathfinders(name,years_active,levels)
+      values ('Synthetic Member', '["2024-2025","2025-2026"]', '[{"name":"Friend","advanced":true}]'
+      )`)
     const id = (await db.query("select id from pathfinders where name='Synthetic Member'")).rows[0].id
     await db.exec(`
       insert into drill values (${id}, '["2024-2025"]');
@@ -111,20 +112,14 @@ test('editor creates a member and paired activity and Red Zone histories', async
     }
     const { rows } = await db.query(`select name from pathfinders where name ilike '%synthetic%'
       and years_active @> '["2024-2025"]' and levels @> '[{"name":"Friend","advanced":true}]'
-      and extracurriculars @> '["Drums"]' and red_zone_participation @> '["Archery"]'`)
+      `)
     assert.equal(rows.length, 1)
     assert.deepEqual((await db.query('select year,placement from red_zone_archery order by year')).rows,
       [{ year: 2024, placement: '1st Place' }, { year: 2025, placement: '2nd Place' }])
     await reject(`insert into drum_corps(pathfinder_id,years,drum_played) values (${id}, '["2024-2025"]', 'Snare')`, '23505')
     await reject(`insert into red_zone_archery(pathfinder_id,year,placement) values (${id},2026,'Winner')`)
     await reject(`insert into red_zone_archery(pathfinder_id,year,placement) values (${id},2024,'3rd Place')`, '23505')
-    await reject(`update pathfinders set extracurriculars='[]' where id=${id}`)
-    await reject(`update pathfinders set red_zone_participation='[]' where id=${id}`)
     await db.exec("insert into pathfinders(name) values ('No participation')")
-    const other = (await db.query("select id from pathfinders where name='No participation'")).rows[0].id
-    await reject(`insert into drill values (${other}, '["2024-2025"]')`)
-    await reject(`update drum_corps set pathfinder_id=${other} where pathfinder_id=${id}`)
-    await reject(`insert into red_zone_archery(pathfinder_id,year,placement) values (${other},2024,'Participation')`)
     await reject(`insert into drill values (2147483647, '["2024-2025"]')`, '23503')
     await reject(`delete from pathfinders where id=${id}`, '42501')
   })
@@ -289,9 +284,6 @@ test('TLT calendar history accepts all valid operations per year and enforces ye
        [JSON.stringify(invalid),id]),error=>error.code==='23514')
    }
    await db.query('update tlt set history=$1 where pathfinder_id=$2',[JSON.stringify([{year:2017,operations:[]}]),id])
-   await reject(`update pathfinders set extracurriculars='["PBE"]' where id=${id}`)
-   const other=(await db.query("select id from pathfinders where name='No participation'")).rows[0].id
-   await reject(`insert into tlt(pathfinder_id,history) values (${other},'[{"year":2017,"operations":[]}]')`)
  })
 })
 
@@ -305,7 +297,7 @@ test('activity/year search matches linked histories and requires every pair', as
    const id=(await db.query("insert into pathfinders(name) values ('Current activity fixture') returning id")).rows[0].id
    await db.query("insert into current_data(pathfinder_id,school_year,status,current_activities) values ($1,public.current_club_year(),'new','[\"Drill\",\"TLT\"]')",[id])
    const year=(await db.query('select public.current_club_year() as year')).rows[0].year
-   assert.deepEqual(await find([`Drill (${year.split('-')[0]})`]),[{name:'Current activity fixture'}])
+   assert.deepEqual(await find([`Drill (${year.split('-')[0]})`]),[])
    assert.ok(!(await find(['TLT (2026)'])).some(row=>row.name==='Current activity fixture'))
    await db.query("update current_data set status='graduated' where pathfinder_id=$1",[id])
    assert.deepEqual(await find([`Drill (${year.split('-')[0]})`]),[])
@@ -322,8 +314,44 @@ test('Red Zone search requires exact event/year pairs across every event table',
    }
    assert.deepEqual(await find(['Archery (2024)','Knots Relay (2025)']),[{name:'Synthetic Member'}])
    assert.deepEqual(await find(['Archery (2024)','Knots Relay (2026)']),[])
-   await db.query("insert into pathfinders(name,red_zone_participation) values ('Event without details','[\"Archery\"]')")
+   await db.query("insert into pathfinders(name) values ('Event without details')")
    assert.deepEqual(await find(['Archery (2024)']),[{name:'Synthetic Member'}])
  })
  await asRole('authenticated',null,async()=>assert.equal((await db.query('select search_event_years from member_search')).rows.length,0))
+})
+
+
+test('detail records alone drive both dated and any-year participation filters', async () => {
+ await asRole('authenticated', editor, async () => {
+   const id=(await db.query("insert into pathfinders(name) values ('Detail-only member') returning id")).rows[0].id
+   await db.query("insert into drill values ($1,'[\"2013-2014\"]')",[id])
+   await db.query("insert into drum_corps(pathfinder_id,years,drum_played) values ($1,'[\"2014-2015\"]','Snare')",[id])
+   await db.query("insert into pbe(pathfinder_id,history) values ($1,'[{\"year\":\"2014-2015\",\"books\":[\"Matthew\"]}]')",[id])
+   await db.query("insert into tlt(pathfinder_id,history) values ($1,'[{\"year\":2017,\"operations\":[\"Teaching\"]}]')",[id])
+   for(const t of events) {
+     const named=['honor_evaluations','bible_events'].includes(t)
+     await db.query(`insert into red_zone_${t}(pathfinder_id,year,placement${named?',name':''}) values ($1,2014,'Participation'${named?",'Example'":''})`,[id])
+   }
+   const row=(await db.query('select * from member_search where id=$1',[id])).rows[0]
+   assert.deepEqual([...row.search_activities].sort(),['Drill','Drums','PBE','TLT'])
+   assert.deepEqual([...row.search_events].sort(),[...names].sort())
+   assert.ok(row.search_activity_years.includes('Drill (2013)'))
+   assert.ok(row.search_activity_years.includes('Drill (2014)'))
+   assert.ok(!row.search_activity_years.includes('Drill (2015)'))
+   assert.ok(row.search_event_years.includes('Burning Twine (2014)'))
+   assert.ok(!row.search_event_years.includes('Burning Twine (2015)'))
+   const legacy=(await db.query("insert into pathfinders(name) values ('Member without details') returning id")).rows[0].id
+   const empty=(await db.query('select search_activities,search_events from member_search where id=$1',[legacy])).rows[0]
+   assert.deepEqual(empty,{search_activities:[],search_events:[]})
+ })
+})
+
+
+test('level Any containment matches regular or advanced while preserving AND across levels', async () => {
+ const {rows}=await db.query(`with fixtures(name,levels) as (values
+ ('regular','[{"name":"Friend","advanced":false},{"name":"Companion","advanced":true}]'::jsonb),
+ ('advanced','[{"name":"Friend","advanced":true},{"name":"Companion","advanced":true}]'::jsonb),
+ ('missing','[{"name":"Friend","advanced":true}]'::jsonb))
+ select name from fixtures where levels @> '[{"name":"Friend"},{"name":"Companion","advanced":true}]' order by name`)
+ assert.deepEqual(rows,[{name:'advanced'},{name:'regular'}])
 })

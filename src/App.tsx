@@ -1,9 +1,9 @@
-import { useEffect, useId, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import flcLogo from './assets/FL_Logo.png'
 import { getSupabase } from './lib/supabase'
 import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
-  type Filters, type Pathfinder } from './lib/pathfinders'
+  getPathfinder, LEVELS, type PathfinderDetails, type Filters, type Pathfinder } from './lib/pathfinders'
 
 function message(error: unknown) {
   return error && typeof error === 'object' && 'message' in error ? String(error.message) : 'Unable to connect. Please try again.'
@@ -104,7 +104,7 @@ function Search() {
         <label className="name-filter">Name<input type="search" value={draft.name} onChange={e => update('name', e.target.value)} placeholder="Search by name" maxLength={200} /></label>
         <Select label="Status" value={draft.status} options={STATUSES} onChange={value => update('status', value)} />
         <MultiSelect label="Years Active" values={draft.year} options={YEARS} onChange={value => update('year', value)} />
-        <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} exclusiveKey={option => option.replace(/ \(Advanced\)$/, '')} onChange={value => update('level', value)} />
+        <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} exclusiveKey={option => option.replace(/ \((?:Advanced|Any)\)$/, '')} onChange={value => update('level', value)} />
         <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} groupKey={option => option.split(' (')[0]} variantLabel={option => option.includes(' (') ? option.slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('activity', value)} />
         <MultiSelect label="Red Zone Events" values={draft.event} options={EVENT_OPTIONS} groupKey={option => option.split(' (')[0]} variantLabel={option => option.includes(' (') ? option.slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('event', value)} />
         <MultiSelect label="Honors" values={honors} options={[]} onChange={setHonors} emptyMessage="No honors available yet" />
@@ -130,7 +130,7 @@ function Search() {
           <button className="secondary" disabled={(page + 1) * PAGE_SIZE >= count || busy} onClick={() => { beginSearch(); setPage(page + 1) }}>Next</button></div>
       </>}
     </section>
-    {selected !== null && <ProfileOverlay onClose={() => setSelected(null)} />}
+    {selected !== null && <ProfileOverlay key={selected} id={selected} status={members.find(member => member.id === selected)?.status ?? 'unregistered'} onClose={() => setSelected(null)} />}
   </>
 }
 
@@ -189,7 +189,7 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
             return <button type="button" role="option" tabIndex={-1} key={option} id={`${id}-option-${index}`}
               aria-label={option} aria-selected={index === active} aria-disabled={disabled(option)}
               onMouseDown={event => event.preventDefault()} onClick={() => add(option)}>
-              {variantLabel ? variantLabel(option) : option.endsWith(' (Advanced)') ? 'Advanced' : 'Regular'}
+              {variantLabel ? variantLabel(option) : option.endsWith(' (Any)') ? 'Any' : option.endsWith(' (Advanced)') ? 'Advanced' : 'Regular'}
             </button>
           })}</div>
         </div>
@@ -200,7 +200,7 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
   </div>
 }
 
-function ProfileOverlay({ onClose }: { onClose: () => void }) {
+function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
@@ -214,10 +214,45 @@ function ProfileOverlay({ onClose }: { onClose: () => void }) {
       opener?.focus()
     }
   }, [])
-  return <dialog ref={dialog} className="profile-overlay" aria-label="Member profile" onCancel={event => { event.preventDefault(); onClose() }}>
-    <button className="secondary" onClick={onClose} autoFocus>Close</button>
-    <p>WIP</p>
+  return <dialog ref={dialog} className="profile-overlay" aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose() }}>
+    <button className="secondary modal-close" onClick={onClose} autoFocus>Close</button>
+    {children}
   </dialog>
+}
+
+function ProfileOverlay({ id, status, onClose }: { id: number; status: string; onClose: () => void }) {
+  const [details, setDetails] = useState<PathfinderDetails | null>(null)
+  const [error, setError] = useState('')
+  const [attempt, setAttempt] = useState(0)
+  const [honorsOpen, setHonorsOpen] = useState(false)
+  useEffect(() => {
+    const controller = new AbortController()
+    getPathfinder(id, controller.signal).then(data => {
+      if (!controller.signal.aborted) setDetails(data)
+    }).catch(error => { if (!controller.signal.aborted) setError(message(error)) })
+    return () => controller.abort()
+  }, [id, attempt])
+  const years = [...new Set(details?.member.years_active ?? [])].sort()
+  const levels = [...(details?.member.levels ?? [])].sort((a, b) => LEVELS.indexOf(a.name as typeof LEVELS[number]) - LEVELS.indexOf(b.name as typeof LEVELS[number]))
+  return <Modal title="Member profile" onClose={onClose}>
+    {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { setError(''); setDetails(null); setAttempt(value => value + 1) }}>Try again</button></> : !details ? <p role="status">Loading profile?</p> : <>
+      <div className="profile-heading"><h2>{details.member.name}</h2><span className="profile-status">{status[0].toUpperCase() + status.slice(1)}</span></div>
+      <section className="profile-summary"><h3>Years Active</h3><p>{years.join(', ') || 'No years recorded'}</p>
+        <h3>Levels Earned</h3><p>{levels.map(level => level.name + (level.advanced ? ' (Advanced)' : '')).join(', ') || 'No levels recorded'}</p></section>
+      {details.activities.map(activity => <section className="profile-activity" key={activity.name}>
+        <h3>{activity.name === 'Drums' ? 'Drum' : activity.name}</h3>
+        <dl className="profile-records">{activity.records.flatMap(record => record.years.map(year => ({ year, detail: record.detail })))
+          .sort((a, b) => a.year.localeCompare(b.year) || a.detail.localeCompare(b.detail))
+          .map((record, index) => <div key={`${record.year}-${index}`}><dt>{record.year}</dt><dd>{record.detail || 'Details not recorded'}</dd></div>)}</dl>
+      </section>)}
+      {details.events.length > 0 && <section><h3>Red Zone Events</h3><div className="profile-events">
+        {details.events.map(event => <article key={event.name}><h4>{event.name}</h4><ul>{event.records.map((record, index) =>
+          <li key={`${record.year}-${index}`}><strong>{record.year}</strong>{record.name && <span>{record.name}</span>}<span>{record.placement}</span></li>)}</ul></article>)}
+      </div></section>}
+      <section className="profile-honors"><h3>Honors</h3><button className="secondary" onClick={() => setHonorsOpen(true)}>View Honors</button></section>
+    </>}
+    {honorsOpen && <Modal title="Honors" onClose={() => setHonorsOpen(false)}><h2>Honors</h2><p className="honors-wip">WIP</p></Modal>}
+  </Modal>
 }
 
 export default App

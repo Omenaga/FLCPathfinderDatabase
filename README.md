@@ -7,7 +7,7 @@ A web application for searching current and historical member records for the Fo
 - Supabase PostgreSQL database with 18 application tables in [the database schema](docs/database-schema.md).
 - Staff email/password sign-in: every Supabase Auth account has immediate staff access.
 - Search by name, active year, level (including Advanced), extracurricular, and Red Zone event. An active year of `2014` matches either `2013-2014` or `2014-2015`. Filters combine with AND; name search matches part of a name, ignoring case. Results are sorted by name with an internal ID tie-breaker in pages of 25. Member IDs are not displayed or offered as a search filter. Earned level filters still distinguish Advanced status.
-- Results show current Status, Grade, Current class, and Current activities. Unregistered and Graduated members show N/A for grade, current class, and current activities. Clicking a name opens a WIP modal with no profile data. Historical fields remain searchable.
+- Results show current Status, Grade, Current class, and Current activities. Unregistered and Graduated members show N/A for grade, current class, and current activities. Clicking a name opens a profile with name/status, recorded years, earned levels, extracurricular histories, and Red Zone results. Historical fields remain searchable.
 - Database constraints, foreign keys, participation validation, and row-level security support future add/edit screens. The current UI is for searching and viewing; administrators can enter records through Supabase now.
 
 The initial migration was applied to the linked hosted project on September 8, 2026. No member data or login credentials are seeded.
@@ -45,7 +45,7 @@ Use Supabase's Table Editor or SQL Editor as an administrator for now. Create th
 
 - Core member JSON arrays default to `[]`; PBE history requires at least one year/books entry. School years must be consecutive, such as `"2024-2025"`.
 - `levels` contains objects such as `[{"name":"Friend","advanced":true}]`, with one entry per level name.
-- Add an activity/event name to the member's core array before inserting its detail rows. The database rejects details without corresponding core participation and rejects removal of a core name while details remain.
+- Add activity/event history directly to its detail table using `pathfinder_id`. Both Any year and dated filters derive participation from those records.
 - Drums uses one row per member/instrument with all corresponding years. PBE uses one row per member with a `history` array pairing each year with its books. TLT also uses one `history` row, pairing integer calendar years with operations.
 - Drill has one row per member containing all Drill years.
 - Red Zone has one result per member/year in each event table. Honor Evaluations and Bible Events additionally distinguish results by `name`. `placement` belongs to the year in the same row and accepts `1st Place`, `2nd Place`, `3rd Place`, or `Participation`.
@@ -89,7 +89,7 @@ npm run build
 
 `npm test` executes the migration in PGlite (PostgreSQL in memory) and checks validation, paired histories, search predicates, foreign keys, and role permissions using a minimal Supabase Auth contract. It does not connect to or modify the hosted project.
 
-`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies sign-in, combined filters, the WIP overlay, empty/error states, retries, pagination, immediate authenticated access, and signed-out isolation. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
+`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies sign-in, combined filters, the history profile and nested Honors placeholder, empty/error states, retries, pagination, immediate authenticated access, and signed-out isolation. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
 
 ## Project context
 
@@ -101,7 +101,7 @@ The [Current Data schema](docs/database-schema.md#current-data) is implemented. 
 
 `public.current_club_year()` explicitly selects `2026-2027`. The `member_search` view left-joins that season's current data and applies underlying RLS. Members without current records appear as Unregistered unless marked Graduated. Graduation persists in `pathfinders.graduated`, independently of registration, and takes precedence in results. Single-year and activity filters include current enrollment as well as history; level/event filters retain their historical meaning. IDs and school year remain internal.
 
-The profile modal displays only WIP and Close, supports Escape and focus restoration, and fetches no history. Full profile content and annual rollover are future work.
+The profile loads historical records on demand, omits empty activity/event sections, and supports loading, retry, Escape, and focus restoration. Honors opens a separate WIP dialog without fetching honors data. Annual rollover remains future work.
 
 Status is searchable through `member_search.status`: New, Returning, Graduated, or Unregistered. Unregistered is derived from the absence of current-year data; graduation takes precedence. Existing current rows with an unknown status remain unclassified rather than being assumed inactive. The Status filter combines with historical filters using AND.
 
@@ -132,10 +132,15 @@ TLT also uses one row per Pathfinder, with a `history` array:
 
 TLT years are integers from 2017 through the current database year, with the upper limit advancing automatically. Any of Administrative, Outreach, Teaching, Activity, Records, and Counseling can be paired with any allowed year. Multiple operations per year are allowed; duplicate years and duplicate operations within a year are rejected. An empty operations array records participation with details unknown. The calendar-year migration requires legacy TLT rows to be explicitly mapped first; the live table was empty when it was applied.
 
-Keep the member's PBE/TLT extracurricular entry before adding details. Honor Evaluation and Bible Event catalogs remain at the design stage.
+PBE/TLT details can be added without setting a core extracurricular entry. Honor Evaluation and Bible Event catalogs remain at the design stage.
 
 
 Activity search supports Any year or specific calendar years for Drill, Drums, PBE, and TLT. Multiple selections require every activity/year pair. Drill, Drums, and PBE search both adjacent school years: 2024 matches 2023-2024 or 2024-2025 in that activity's history, without changing stored school years. Confirmed current activities also match their school year's calendar endpoints. TLT matches its recorded calendar year exactly (2017 through the current year); current registration alone does not imply a completed TLT operation in a calendar year. Other activity choices start at 2010. The security-invoker member_search view exposes search_activity_years for server-side filtering before pagination.
 
 
 Red Zone event filters offer Any year and calendar years from 2010 through the current year, grouped under each event with compact year buttons. Typing and multiple selections are supported. Every selected event/year must match an actual result in that event table; years match exactly. The security-invoker `member_search.search_event_years` field performs this filtering before pagination. Honor Evaluation and Bible Event name catalogs remain unchanged.
+
+
+Participation searches and profiles derive from activity/event detail tables through `pathfinder_id`. The obsolete core participation columns were removed by `20260912020000_remove_core_participation.sql`. `member_search` computes `search_activities`, `search_activity_years`, `search_events`, and `search_event_years` from detail records under RLS.
+
+Level Earned offers Any, Regular, and Advanced in one row per level. Any matches either achievement variant; only one choice per level can be selected. Different selected levels must all be earned.

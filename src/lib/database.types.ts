@@ -189,34 +189,28 @@ export type Database = {
       pathfinders: {
         Row: {
           created_at: string
-          extracurriculars: Json
           graduated: boolean
           id: number
           levels: Json
           name: string
-          red_zone_participation: Json
           updated_at: string
           years_active: Json
         }
         Insert: {
           created_at?: string
-          extracurriculars?: Json
           graduated?: boolean
           id?: never
           levels?: Json
           name: string
-          red_zone_participation?: Json
           updated_at?: string
           years_active?: Json
         }
         Update: {
           created_at?: string
-          extracurriculars?: Json
           graduated?: boolean
           id?: never
           levels?: Json
           name?: string
-          red_zone_participation?: Json
           updated_at?: string
           years_active?: Json
         }
@@ -676,16 +670,15 @@ export type Database = {
           class_level: string | null
           created_at: string | null
           current_activities: Json | null
-          extracurriculars: Json | null
           grade: number | null
           has_current_data: boolean | null
           id: number | null
           levels: Json | null
           name: string | null
-          red_zone_participation: Json | null
           search_activities: Json | null
           search_activity_years: Json | null
           search_event_years: Json | null
+          search_events: Json | null
           search_years: Json | null
           status: string | null
           updated_at: string | null

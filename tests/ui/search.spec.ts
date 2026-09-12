@@ -2,8 +2,7 @@ import { expect, test, type Page } from '@playwright/test'
 
 const fixture = {
   id: 42, name: 'Synthetic Pathfinder', has_current_data: true, status: 'returning', grade: 7, class_level: 'Explorer', current_activities: ['Drums'], years_active: ['2024-2025', '2025-2026'],
-  levels: [{ name: 'Friend', advanced: true }], extracurriculars: ['Drill', 'Drums', 'PBE', 'TLT'],
-  red_zone_participation: ['Archery', 'Knots Relay'],
+  levels: [{ name: 'Friend', advanced: true }],
   drill: { pathfinder_id: 42, years: ['2024-2025'] },
   drum_corps: [{ years: ['2024-2025'], drum_played: 'Snare' }, { years: ['2025-2026'], drum_played: 'Bass' }],
   pbe: { history: [{ year: '2024-2025', books: ['Romans'] }] }, tlt: { history: [{ year: 2025, operations: ['Teaching'] }] },
@@ -23,13 +22,14 @@ async function setup(page: Page) {
     const details = new URL(route.request().url()).searchParams.get('id') === 'eq.42'
     return route.fulfill({ json: details ? fixture : [fixture], headers: { 'access-control-expose-headers': 'content-range', 'content-range': '0-0/1' } })
   })
+  await page.route('http://127.0.0.1:54321/rest/v1/pathfinders?**', route => route.fulfill({ json: fixture }))
   await page.goto('/')
   await page.getByLabel('Email', { exact: true }).fill('staff@example.test')
   await page.getByLabel('Password', { exact: true }).fill('test-only-password')
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
 }
 
-test('combines historical filters and opens the WIP profile', async ({ page }) => {
+test('combines historical filters and opens the history profile', async ({ page }) => {
   await setup(page)
   await expect(page.getByRole('button', { name: 'Synthetic Pathfinder' })).toBeVisible()
   await page.getByLabel('Name', { exact: true }).fill('Synthetic')
@@ -48,12 +48,20 @@ test('combines historical filters and opens the WIP profile', async ({ page }) =
   expect(params.get('or')).toBe('(and(or(search_years.cs.["2023-2024"],search_years.cs.["2024-2025"])))')
   expect(params.get('levels')).toBe('cs.[{"name":"Friend","advanced":true}]')
   expect(params.get('search_activities')).toBe('cs.["Drums"]')
-  expect(params.get('red_zone_participation')).toBe('cs.["Archery"]')
+  expect(params.get('search_events')).toBe('cs.["Archery"]')
   await page.getByRole('button', { name: 'Synthetic Pathfinder' }).click()
   const details = page.getByRole('dialog', { name: 'Member profile' })
-  await expect(details.getByText('WIP', { exact: true })).toBeVisible()
-  await expect(details).not.toContainText('Synthetic Pathfinder')
-  await expect(details).not.toContainText('Snare')
+  await expect(details.getByRole('heading', { name: 'Synthetic Pathfinder' })).toBeVisible()
+  await expect(details).toContainText('Snare')
+  await expect(details).toContainText('Friend (Advanced)')
+  await expect(details).toContainText('Romans')
+  await expect(details.getByRole('heading', { name: 'Knots Relay', exact: true })).toHaveCount(0)
+  await details.getByRole('button', { name: 'View Honors' }).click()
+  const honors = page.getByRole('dialog', { name: 'Honors', exact: true })
+  await expect(honors.getByText('WIP', { exact: true })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(honors).toHaveCount(0)
+  await expect(details.getByRole('button', { name: 'View Honors' })).toBeFocused()
   await page.keyboard.press('Escape')
   await expect(details).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Synthetic Pathfinder' })).toBeFocused()
@@ -89,6 +97,7 @@ test('an Auth account immediately reaches search without an approval RPC', async
 test('signed-out visitors see login and make no member requests', async ({ page }) => {
   let memberRequests = 0
   page.on('request', request => { if (request.url().includes('/rest/v1/member_search')) memberRequests++ })
+  await page.route('http://127.0.0.1:54321/rest/v1/pathfinders?**', route => route.fulfill({ json: fixture }))
   await page.goto('/')
   await expect(page.getByRole('heading', { name: 'Staff sign in' })).toBeVisible()
   expect(memberRequests).toBe(0)
@@ -166,7 +175,7 @@ test('multi-select filters combine every option and support typing, removal and 
   const params = new URL((await request).url()).searchParams
   expect(params.get('levels')).toBe('cs.[{"name":"Friend","advanced":false},{"name":"Companion","advanced":true}]')
   expect(params.get('search_activities')).toBe('cs.["Drill","Drums"]')
-  expect(params.get('red_zone_participation')).toBe('cs.["Archery","Knots Relay"]')
+  expect(params.get('search_events')).toBe('cs.["Archery","Knots Relay"]')
   expect(params.get('or')).toBe('(and(or(search_years.cs.["2023-2024"],search_years.cs.["2024-2025"]),or(search_years.cs.["2024-2025"],search_years.cs.["2025-2026"])))')
   await page.getByRole('button', { name: 'Remove Friend from Level Earned', exact: true }).click()
   await expect(page.getByRole('button', { name: 'Remove Friend from Level Earned', exact: true })).toHaveCount(0)
@@ -227,7 +236,46 @@ test('Red Zone events offer compact year choices and typed multi-year filtering'
  await page.getByRole('button',{name:'Search records'}).click()
  const params=new URL((await request).url()).searchParams
  expect(params.get('search_event_years')).toBe('cs.["Archery (2024)","Archery (2025)"]')
- expect(params.get('red_zone_participation')).toBe('cs.["Knots Relay"]')
+ expect(params.get('search_events')).toBe('cs.["Knots Relay"]')
  await page.getByRole('button',{name:'Clear filters'}).click()
  await expect(page.getByRole('button',{name:/^Remove /})).toHaveCount(0)
+})
+
+
+test('profile retries failures and never requests honors data', async ({ page }) => {
+ await setup(page)
+ let requests=0
+ await page.route('http://127.0.0.1:54321/rest/v1/pathfinders?**', route => {
+   expect(new URL(route.request().url()).searchParams.get('select')).not.toContain('honors')
+   requests++
+   return requests===1 ? route.fulfill({status:500,json:{message:'Profile unavailable'}}) : route.fulfill({json:{...fixture,years_active:[],levels:[],drill:null,drum_corps:[],pbe:null,tlt:null}})
+ })
+ await page.getByRole('button',{name:'Synthetic Pathfinder'}).click()
+ const dialog=page.getByRole('dialog',{name:'Member profile'})
+ await expect(dialog.getByRole('alert')).toContainText('Profile unavailable')
+ await dialog.getByRole('button',{name:'Try again'}).click()
+ await expect(dialog).toContainText('No years recorded')
+ await expect(dialog).toContainText('No levels recorded')
+ await expect(dialog.getByRole('heading',{name:'Drum',exact:true})).toHaveCount(0)
+ await dialog.getByRole('button',{name:'View Honors'}).click()
+ await expect(page.getByRole('dialog',{name:'Honors',exact:true})).toContainText('WIP')
+ expect(requests).toBe(2)
+})
+
+
+test('level Any matches either variant and all three choices fit one row', async ({ page }) => {
+ await setup(page)
+ const input=page.getByRole('combobox',{name:'Level Earned',exact:true})
+ await input.fill('Friend')
+ const buttons=['Friend (Any)','Friend','Friend (Advanced)'].map(name=>page.getByRole('option',{name,exact:true}))
+ const boxes=await Promise.all(buttons.map(button=>button.boundingBox()))
+ expect(boxes.every(box=>box && Math.abs(box.y-boxes[0]!.y)<1)).toBe(true)
+ await buttons[0].click()
+ await input.fill('Friend')
+ await expect(buttons[1]).toHaveAttribute('aria-disabled','true')
+ await expect(buttons[2]).toHaveAttribute('aria-disabled','true')
+ await input.press('Escape')
+ const request=page.waitForRequest(r=>r.url().includes('levels='))
+ await page.getByRole('button',{name:'Search records'}).click()
+ expect(new URL((await request).url()).searchParams.get('levels')).toBe('cs.[{"name":"Friend"}]')
 })

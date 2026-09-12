@@ -17,13 +17,10 @@ Holds one row per individual Pathfinder.
 | `name`          | String  | Full name of the Pathfinder                       |
 | `years_active`  | JSON    | Array of active school years — e.g. `["2024-2025", "2025-2026"]` |
 | `levels`        | JSON    | Array of earned level objects with `name` and `advanced` — see [Levels Options](#levels-options) |
-| `extracurriculars` | JSON | Array of activity names — e.g. `["Drill", "Drums", "PBE", "TLT"]`; see [Extracurricular Names Options](#extracurricular-names-options) for linked detail tables |
-| `red_zone_participation` | JSON | Array of events participated in — e.g. `["Drill Performance", "Archery"]`; see [Red Zone Participation Links](#red-zone-participation-links) for linked event tables |
 | `graduated` | Boolean | Permanent graduation marker, default false. Preserves Graduated status without a current registration. |
 | `created_at` | Timestamp | Creation time, automatically set by the database |
 | `updated_at` | Timestamp | Most recent member-row update time, maintained by a database trigger |
 
-The extracurricular and Red Zone event arrays default to `[]` and contain unique values. Extracurricular membership is stored directly in `pathfinders.extracurriculars`, replacing the activity master list and membership junction table. Red Zone participation is stored directly in `pathfinders.red_zone_participation`, replacing the separate participation table.
 
 ---
 
@@ -51,7 +48,7 @@ Records when a Pathfinder earned an honor.
 
 ## Sub-Activity Tracking Tables
 
-Each table links to the member through `pathfinder_id`. Its activity name must appear in that member's `extracurriculars` array. Searching a member's activities resolves each name using [Extracurricular Names Options](#extracurricular-names-options), then returns all matching detail rows for that member, including their years and any associated instrument, Bible book, or TLT operation.
+Each table links to the member through `pathfinder_id`. Core participation arrays are no longer required; detail records are authoritative for activity/event searches. Searching a member's activities resolves each name using [Extracurricular Names Options](#extracurricular-names-options), then returns all matching detail rows for that member, including their years and any associated instrument, Bible book, or TLT operation.
 
 In `drum_corps`, the instrument in a row applies to every year in its `years` array. Keep one row per `(pathfinder_id, drum_played)` and add further years to that row for the same instrument.
 
@@ -130,7 +127,7 @@ Each object contains exactly `year` and `operations`. Calendar years must be JSO
 
 ## Special Event Tables
 
-Event names are stored in the core `pathfinders.red_zone_participation` array. Each name maps to a detail table through [Red Zone Participation Links](#red-zone-participation-links). Searching a member's Red Zone events returns the matching rows by `pathfinder_id`, including each year, its placement, and the evaluation/event name where applicable.
+Each Red Zone event maps to a detail table through [Red Zone Participation Links](#red-zone-participation-links). Records link to members through `pathfinder_id` and include year, placement, and an evaluation/event name where applicable.
 
 Each row stores one result: its `placement` belongs directly to its `year` (and `name`, where present). Store results from different years in separate rows so placements remain paired with the correct year. For example, Archery in 2024 with `1st Place` and Archery in 2025 with `2nd Place` are two rows for the same member. Use unique `(pathfinder_id, year)` pairs for unnamed events and unique `(pathfinder_id, year, name)` combinations for Honor Evaluations and Bible Events.
 
@@ -257,7 +254,7 @@ Valid level names:
 8. Navigator
 
 ### Extracurricular Names Options
-Valid values for the `extracurriculars` JSON array in `pathfinders`.
+Activity labels and their authoritative detail tables:
 Each maps to its respective detail table through `pathfinder_id`:
 
 1. **Drill** → [`drill`](#4-drill-drill-participation)
@@ -382,7 +379,7 @@ Valid values for the `placement` column in every Special Event table. The placem
 4. Participation
 
 ### Red Zone Participation Links
-The `pathfinders.red_zone_participation` JSON array contains the event names the member participated in, using these exact options and table mappings:
+Event labels and their authoritative detail tables:
 
 | Event name | Detail table |
 |------------|--------------|
@@ -403,13 +400,13 @@ All available options are:
 ["Drill Performance", "Drum Performance", "Honor Evaluations", "Bible Events", "Knots Relay", "Tents", "Jump Rope", "Archery", "Lashing", "Burning Twine"]
 ```
 
-Store only the events that the member actually participated in; use `[]` when there are none. Every event detail record links to `pathfinders.id` through `pathfinder_id`, and its mapped event name must appear in that member's array. Years and placements are stored together in the detail rows.
+Store only the events that the member actually participated in. Every event detail record links to `pathfinders.id` through `pathfinder_id`, with no duplicate membership list to maintain. Years and placements are stored together in the detail rows.
 
 Keep extracurricular and Red Zone arrays consistent with their detail records when adding, updating, or removing participation. JSON names are logical links resolved using the mappings above, rather than ordinary foreign keys. Enforce name membership through application validation or database triggers; the detail tables' `pathfinder_id` columns remain database foreign keys.
 
 ## Implementation and access
 
-The database validates JSON option values, unique array entries, consecutive school years, and level objects. Participation triggers reject a detail row unless its activity/event appears in the core array, and reject removal of a core name while matching details remain. Core participation can exist before details are recorded. Add the core name first, then the detail records.
+The database validates JSON option values, unique array entries, consecutive school years, and level objects. Detail records require a valid member foreign key but no core participation entry. Any year and dated activity/event filters both use detail records.
 
 All 17 application tables have row-level security. Every authenticated Supabase Auth account is trusted staff and may read, insert, and update through the API. Browser deletion remains disabled. There is no separate approval step. Administrators create accounts in Supabase Auth, and public signup must remain disabled.
 
@@ -482,21 +479,21 @@ Keep all existing filters: name, active year, earned level/Advanced status, extr
 
 - **Active year:** `2014` matches `2013-2014` or `2014-2015` in historical active years or the current enrollment school year. New/Returning rows represent current enrollment. unregistered/graduated rows remain searchable but their presence alone must not establish activity in that school year; retain confirmed active years and participation recorded before departure or graduation.
 - **Level earned:** searches completed levels only, never `class_level`. Display Advanced achievements as `Friend (Advanced)`.
-- **Extracurricular:** searches confirmed current participation or cumulative participation.
+- **Extracurricular:** searches the Drill, Drum, PBE, and TLT detail tables, with optional calendar-year matches.
 - **Red Zone event:** searches recorded participation/results.
 - Preserve the existing meaning of combined year/activity filters: a member must match both, but this does not imply that the activity took place during the searched year. A same-year participation filter would be a separate future feature.
 - Honor and detailed history search can be expanded later; this proposal preserves existing filter capabilities rather than implying those extra filters already exist.
 
-### Proposed past-data profile overlay
+### Implemented past-data profile overlay
 
-Design only: the implemented profile overlay continues to show only WIP. The following layout is for future implementation and does not change database tables.
+Implemented: clicking a member opens the history layout below. Honors remains a separate WIP dialog and does not fetch honor data. No database table changes are required.
 
 Clicking a member's name opens the profile over the search results. Preserve filters, results, and pagination while opening and closing it. Display content in this order:
 
 1. **Name and Status on one line.** Show the member's name and effective status: New, Returning, Graduated, or Unregistered. Use the same status rules as search results, including persistent graduation. Allow wrapping on narrow screens.
 2. **Years Active on the next line.** List the recorded school years, without duplicates and in chronological order. If none are recorded, show No years recorded.
 3. **Levels Earned on the next line.** List all earned levels in class progression order. Format Advanced achievements as `Friend (Advanced)`. If none are recorded, show No levels recorded. Do not infer achievements from current class enrollment.
-4. **Extracurricular history.** Give each activity with detail records its own full section, in the order Drill, Drum, PBE, TLT. Omit an activity's section when it has no detail rows, even if the cumulative participation array lists its name. Keep each value paired with its recorded years as described below; TLT uses calendar years.
+4. **Extracurricular history.** Give each activity with detail records its own full section, in the order Drill, Drum, PBE, TLT. Omit an activity's section when it has no detail rows. Keep each value paired with its recorded years as described below; TLT uses calendar years.
 5. **Red Zone Events.** Use a compact, separate area for each event with recorded results. Omit empty event areas. Keep each result's year, placement, and optional event/evaluation name together. Arrange these smaller areas in a responsive grid; do not combine different events into one undifferentiated list.
 6. **Honors.** Place an Honors area last with a View Honors button that opens a separate pop-up. That pop-up should initially display only WIP and a Close control, without listing honors or fetching their data. This leaves room for a large honors collection later.
 
@@ -555,7 +552,10 @@ The original array migration preserved member/year/detail associations, regenera
 The TLT calendar-year migration was applied while the live TLT table was empty. It stops without changing data if legacy school-year TLT rows exist, because assigning a completion calendar year requires staff input. TLT history validation permits 2017 through the current database year, without a year-specific operation catalog.
 
 
-Activity search supports Any year or specific calendar years for Drill, Drums, PBE, and TLT. Multiple selections require every activity/year pair. Drill, Drums, and PBE search both adjacent school years: 2024 matches 2023-2024 or 2024-2025 in that activity's history, without changing stored school years. Confirmed current activities also match their school year's calendar endpoints. TLT matches its recorded calendar year exactly (2017 through the current year); current registration alone does not imply a completed TLT operation in a calendar year. Other activity choices start at 2010. The security-invoker member_search view exposes search_activity_years for server-side filtering before pagination.
+Activity search supports Any year or specific calendar years for Drill, Drums, PBE, and TLT. Multiple selections require every activity/year pair. Drill, Drums, and PBE search both adjacent school years: 2024 matches 2023-2024 or 2024-2025 in that activity's history, without changing stored school years. Current registration alone does not satisfy activity-history filters. TLT matches its recorded calendar year exactly (2017 through the current year); current registration alone does not imply a completed TLT operation in a calendar year. Other activity choices start at 2010. The security-invoker member_search view exposes search_activity_years for server-side filtering before pagination.
 
 
 Red Zone event filters offer Any year and calendar years from 2010 through the current year, grouped under each event with compact year buttons. Typing and multiple selections are supported. Every selected event/year must match an actual result in that event table; years match exactly. The security-invoker `member_search.search_event_years` field performs this filtering before pagination. Honor Evaluation and Bible Event name catalogs remain unchanged.
+
+
+Participation searches and profiles derive from activity/event detail tables through `pathfinder_id`. The obsolete core participation columns were removed by `20260912020000_remove_core_participation.sql`. `member_search` computes `search_activities`, `search_activity_years`, `search_events`, and `search_event_years` from detail records under RLS.
