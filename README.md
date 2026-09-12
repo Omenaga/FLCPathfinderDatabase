@@ -43,10 +43,10 @@ The September 11 migration changes `current_staff_role()` to return `editor` for
 
 Use Supabase's Table Editor or SQL Editor as an administrator for now. Create the `pathfinders` row first. Identity IDs are generated automatically; duplicate names are allowed because different members may share a name.
 
-- JSON arrays default to `[]`. School years must be consecutive, such as `"2024-2025"`.
+- Core member JSON arrays default to `[]`; PBE history requires at least one year/books entry. School years must be consecutive, such as `"2024-2025"`.
 - `levels` contains objects such as `[{"name":"Friend","advanced":true}]`, with one entry per level name.
 - Add an activity/event name to the member's core array before inserting its detail rows. The database rejects details without corresponding core participation and rejects removal of a core name while details remain.
-- In Drums, PBE, and TLT, keep **one row per member and distinct string value**, with all corresponding years in that row's `years` array. For example, Snare and Bass use separate rows; additional Snare years extend the existing Snare row. A member can have multiple instruments/books/operations in one year.
+- Drums uses one row per member/instrument with all corresponding years. PBE uses one row per member with a `history` array pairing each year with its books. TLT also uses one `history` row, pairing integer calendar years with operations.
 - Drill has one row per member containing all Drill years.
 - Red Zone has one result per member/year in each event table. Honor Evaluations and Bible Events additionally distinguish results by `name`. `placement` belongs to the year in the same row and accepts `1st Place`, `2nd Place`, `3rd Place`, or `Participation`.
 - Participation may be listed before detailed years/results are entered; the UI labels those details as pending.
@@ -106,3 +106,30 @@ The profile modal displays only WIP and Close, supports Escape and focus restora
 Status is searchable through `member_search.status`: New, Returning, Graduated, or Unregistered. Unregistered is derived from the absence of current-year data; graduation takes precedence. Existing current rows with an unknown status remain unclassified rather than being assumed inactive. The Status filter combines with historical filters using AND.
 
 Active year, Level earned, Extracurricular, and Red Zone event support multiple selections with searchable dropdowns. Type to narrow options and press Enter to add; selected chips can be removed. Every selected value must match (AND), including across filter categories. Each selected calendar year matches either adjacent school year. Year choices run from 2010 through the current calendar year. The Level earned dropdown contains regular and Advanced options side by side (Friend, Friend (Advanced), Companion, Companion (Advanced), and so on). Each selection matches its exact Advanced status. Selected chips sit below the inputs in fixed-height scrollable areas to preserve alignment. Status remains a single-select filter.
+
+## PBE and TLT history
+
+PBE uses **one row per Pathfinder**. Enter a `history` JSON array in Supabase Table Editor:
+
+```json
+[
+  { "year": "2013-2014", "books": ["2 Samuel"] },
+  { "year": "2014-2015", "books": ["Matthew"] },
+  { "year": "2017-2018", "books": ["Daniel", "Esther"] }
+]
+```
+
+Add more years to the same array. Each book is a separate string, validated against that year's entries in `pbe_year_books`. Duplicate years, duplicate books, and additional PBE rows for the same member are rejected. Empty `books` arrays preserve participation with details not yet recorded.
+
+TLT also uses one row per Pathfinder, with a `history` array:
+
+```json
+[
+  { "year": 2017, "operations": ["Teaching", "Records"] },
+  { "year": 2026, "operations": ["Administrative", "Activity"] }
+]
+```
+
+TLT years are integers from 2017 through the current database year, with the upper limit advancing automatically. Any of Administrative, Outreach, Teaching, Activity, Records, and Counseling can be paired with any allowed year. Multiple operations per year are allowed; duplicate years and duplicate operations within a year are rejected. An empty operations array records participation with details unknown. The calendar-year migration requires legacy TLT rows to be explicitly mapped first; the live table was empty when it was applied.
+
+Keep the member's PBE/TLT extracurricular entry before adding details. Honor Evaluation and Bible Event catalogs remain at the design stage.

@@ -18,30 +18,30 @@ export type Database = {
         Row: {
           class_level: string | null
           created_at: string
-          current_activities: Json
+          current_activities: Json | null
           grade: number | null
           pathfinder_id: number
-          school_year: string
+          school_year: string | null
           status: string | null
           updated_at: string
         }
         Insert: {
           class_level?: string | null
           created_at?: string
-          current_activities?: Json
+          current_activities?: Json | null
           grade?: number | null
           pathfinder_id: number
-          school_year: string
+          school_year?: string | null
           status?: string | null
           updated_at?: string
         }
         Update: {
           class_level?: string | null
           created_at?: string
-          current_activities?: Json
+          current_activities?: Json | null
           grade?: number | null
           pathfinder_id?: number
-          school_year?: string
+          school_year?: string | null
           status?: string | null
           updated_at?: string
         }
@@ -224,39 +224,51 @@ export type Database = {
       }
       pbe: {
         Row: {
-          bible_book: string
+          history: Json
           id: number
           pathfinder_id: number
-          years: Json
         }
         Insert: {
-          bible_book: string
+          history: Json
           id?: never
           pathfinder_id: number
-          years: Json
         }
         Update: {
-          bible_book?: string
+          history?: Json
           id?: never
           pathfinder_id?: number
-          years?: Json
         }
         Relationships: [
           {
             foreignKeyName: "pbe_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "member_search"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pbe_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
         ]
+      }
+      pbe_year_books: {
+        Row: {
+          book_name: string
+          school_year: string
+        }
+        Insert: {
+          book_name: string
+          school_year: string
+        }
+        Update: {
+          book_name?: string
+          school_year?: string
+        }
+        Relationships: []
       }
       red_zone_archery: {
         Row: {
@@ -626,35 +638,32 @@ export type Database = {
       }
       tlt: {
         Row: {
+          history: Json
           id: number
           pathfinder_id: number
-          tlt_operation: string
-          years: Json
         }
         Insert: {
+          history: Json
           id?: never
           pathfinder_id: number
-          tlt_operation: string
-          years: Json
         }
         Update: {
+          history?: Json
           id?: never
           pathfinder_id?: number
-          tlt_operation?: string
-          years?: Json
         }
         Relationships: [
           {
             foreignKeyName: "tlt_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "member_search"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tlt_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },

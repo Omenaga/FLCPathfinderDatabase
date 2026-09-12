@@ -31,6 +31,27 @@ before(async () => {
   await db.exec(await readFile(new URL('../supabase/migrations/20260911010000_current_data.sql', import.meta.url), 'utf8'))
   await db.exec(await readFile(new URL('../supabase/migrations/20260911020000_registration_status.sql', import.meta.url), 'utf8'))
   await db.exec(await readFile(new URL('../supabase/migrations/20260911030000_searchable_status.sql', import.meta.url), 'utf8'))
+  await db.exec(`
+    insert into pathfinders(name,extracurriculars) values ('Migration fixture','["PBE","TLT"]');
+    insert into pbe(pathfinder_id,years,bible_book) select id,'["2021-2022"]','1 Kings' from pathfinders where name='Migration fixture';
+    insert into pbe(pathfinder_id,years,bible_book) select id,'["2021-2022"]','Ruth' from pathfinders where name='Migration fixture';
+    insert into tlt(pathfinder_id,years,tlt_operation) select id,'["2021-2022"]','Teaching' from pathfinders where name='Migration fixture';
+    insert into tlt(pathfinder_id,years,tlt_operation) select id,'["2021-2022"]','Records' from pathfinders where name='Migration fixture';
+  `)
+  await db.exec('begin')
+  await db.exec(await readFile(new URL('../supabase/migrations/20260911040000_pbe_tlt_arrays.sql', import.meta.url), 'utf8'))
+  await db.exec('commit')
+  await db.exec(`insert into pbe(pathfinder_id,years,bible_books)
+    select id,'["2013-2014","2014-2015"]','[]' from pathfinders where name='Migration fixture'`)
+  await db.exec(await readFile(new URL('../supabase/migrations/20260911050000_pbe_year_history.sql', import.meta.url), 'utf8'))
+  const tltMigration = await readFile(new URL('../supabase/migrations/20260911060000_tlt_year_history.sql', import.meta.url), 'utf8')
+  // Ambiguous legacy school years must stop the migration without deleting history.
+  await assert.rejects(db.exec(tltMigration), /explicitly map them to calendar years/)
+  await db.exec('rollback')
+  assert.deepEqual((await db.query('select operations from tlt')).rows[0].operations,['Records','Teaching'])
+  await db.exec('delete from tlt') // Synthetic fixture only; live TLT was verified empty.
+  await db.exec(tltMigration)
+
 })
 after(async () => { await db?.close() })
 
@@ -75,8 +96,8 @@ test('editor creates a member and paired activity and Red Zone histories', async
     await db.exec(`
       insert into drill values (${id}, '["2024-2025"]');
       insert into drum_corps(pathfinder_id,years,drum_played) values (${id}, '["2024-2025"]', 'Snare'), (${id}, '["2025-2026"]', 'Bass');
-      insert into pbe(pathfinder_id,years,bible_book) values (${id}, '["2024-2025"]', 'Exodus');
-      insert into tlt(pathfinder_id,years,tlt_operation) values (${id}, '["2025-2026"]', 'Teaching');
+      insert into pbe(pathfinder_id,history) values (${id}, '[{"year":"2024-2025","books":["Romans"]}]');
+      insert into tlt(pathfinder_id,history) values (${id}, '[{"year":2025,"operations":["Teaching"]}]');
       insert into honors(name) values ('Synthetic Honor');
       insert into honors_earned(pathfinder_id,honor_id,year_earned) select ${id},id,2025 from honors;
     `)
@@ -205,4 +226,69 @@ test('multiple selected values require all matches, with adjacent school-year al
       and activities @> '["Drill","Drums"]'
   `)
   assert.deepEqual(rows, [{ name: 'both' }])
+})
+
+
+test('PBE history preserves years and books in one row and validates each pair', async () => {
+ const id=(await db.query("select id from pathfinders where name='Migration fixture'")).rows[0].id
+ const rows=(await db.query('select history from pbe where pathfinder_id=$1',[id])).rows
+ assert.deepEqual(rows,[{history:[
+   {year:'2013-2014',books:[]}, {year:'2014-2015',books:[]},
+   {year:'2021-2022',books:['1 Kings','Ruth']},
+ ]}])
+ await asRole('authenticated', editor, async () => {
+   const history=[{year:'2013-2014',books:['2 Samuel']},{year:'2014-2015',books:['Matthew']},
+     {year:'2021-2022',books:['1 Kings','Ruth']},{year:'2010-2011',books:[]}]
+   await db.query('update pbe set history=$1 where pathfinder_id=$2',[JSON.stringify(history),id])
+   assert.deepEqual((await db.query('select history from pbe where pathfinder_id=$1',[id])).rows[0].history,history)
+   for(const invalid of [null, [], {}, [null], ['2013-2014'],
+     [{year:'2013-2014',books:['Matthew']}],
+     [{year:'2013-2014',books:['2 Samuel','2 Samuel']}],
+     [{year:'2013-2014',books:['2 Samuel, Matthew']}],
+     [{year:'2010-2011',books:['Ruth']}],
+     [{year:'2013-2015',books:[]}],
+     [{year:'2013-2014',books:[]},{year:'2013-2014',books:[]}],
+     [{year:'2013-2014'}], [{year:null,books:[]}], [{year:'2013-2014',books:null}],
+     [{year:'2013-2014',books:[1]}], [{year:'2013-2014',books:[],extra:true}],
+   ]) {
+     await assert.rejects(db.query('update pbe set history=$1 where pathfinder_id=$2',
+       [JSON.stringify(invalid),id]),error=>error.code==='23514')
+   }
+   await reject(`insert into pbe(pathfinder_id,history) values (${id},'[{"year":"2022-2023","books":["John"]}]')`,'23505')
+   assert.ok((await db.query('select * from pbe_year_books')).rows.length>0)
+   await reject("insert into pbe_year_books values ('2021-2022','John')",'42501')
+ })
+ await reject("delete from pbe_year_books where school_year='2021-2022' and book_name='Ruth'",'23503')
+ await reject("update pbe_year_books set book_name='Other' where school_year='2014-2015' and book_name='Matthew'",'23503')
+ await asRole('anon',null,()=>reject('select * from pbe_year_books','42501'))
+})
+
+
+test('TLT calendar history accepts all valid operations per year and enforces year bounds', async () => {
+ const id=(await db.query("select id from pathfinders where name='Migration fixture'")).rows[0].id
+ const currentYear=(await db.query('select extract(year from current_date)::integer as year')).rows[0].year
+ const operations=['Administrative','Outreach','Teaching','Activity','Records','Counseling']
+ const history=[{year:2017,operations},{year:currentYear,operations}]
+ await asRole('authenticated', editor, async () => {
+   await db.query('insert into tlt(pathfinder_id,history) values ($1,$2)',[id,JSON.stringify(history)])
+   assert.deepEqual((await db.query('select history from tlt where pathfinder_id=$1',[id])).rows[0].history,history)
+   await reject(`insert into tlt(pathfinder_id,history) values (${id},'[{"year":2018,"operations":[]}]')`,'23505')
+   for(const invalid of [null,[],{},[null],[2017],
+     [{year:2016,operations:[]}], [{year:currentYear+1,operations:[]}],
+     [{year:'2017',operations:[]}], [{year:'2017-2018',operations:[]}],
+     [{year:2017.5,operations:[]}], [{year:1e20,operations:[]}],
+     [{year:2017,operations:['Other']}], [{year:2017,operations:['Teaching','Teaching']}],
+     [{year:2017,operations:['Teaching, Records']}], [{year:2017,operations:[1]}],
+     [{year:2017,operations:[]},{year:2017,operations:['Records']}],
+     [{year:2017}], [{year:null,operations:[]}], [{year:2017,operations:null}],
+     [{year:2017,operations:[],extra:true}],
+   ]) {
+     await assert.rejects(db.query('update tlt set history=$1 where pathfinder_id=$2',
+       [JSON.stringify(invalid),id]),error=>error.code==='23514')
+   }
+   await db.query('update tlt set history=$1 where pathfinder_id=$2',[JSON.stringify([{year:2017,operations:[]}]),id])
+   await reject(`update pathfinders set extracurriculars='["PBE"]' where id=${id}`)
+   const other=(await db.query("select id from pathfinders where name='No participation'")).rows[0].id
+   await reject(`insert into tlt(pathfinder_id,history) values (${other},'[{"year":2017,"operations":[]}]')`)
+ })
 })

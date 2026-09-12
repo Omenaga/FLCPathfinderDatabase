@@ -53,9 +53,13 @@ Records when a Pathfinder earned an honor.
 
 Each table links to the member through `pathfinder_id`. Its activity name must appear in that member's `extracurriculars` array. Searching a member's activities resolves each name using [Extracurricular Names Options](#extracurricular-names-options), then returns all matching detail rows for that member, including their years and any associated instrument, Bible book, or TLT operation.
 
-In `drum_corps`, `pbe`, and `tlt`, the string value in a row applies to **every year in that same row's `years` array**. Store another row for a different string value; do not combine years with unrelated details. Multiple values in the same year are represented by separate rows whose year arrays include that year. Require nonempty arrays of unique school years and prevent duplicate member/year/string combinations across rows.
+In `drum_corps`, the instrument in a row applies to every year in its `years` array. Keep one row per `(pathfinder_id, drum_played)` and add further years to that row for the same instrument.
 
-The implementation groups all years for the same member/string value in one row, enforced by unique `(pathfinder_id, drum_played)`, `(pathfinder_id, bible_book)`, and `(pathfinder_id, tlt_operation)` constraints. Add further years to the existing row when the string is unchanged. This prevents duplicate member/year/string combinations without parallel arrays.
+**Implemented PBE/TLT change:** PBE now has one row per Pathfinder with a required `history jsonb` array of `{ "year": "YYYY-YYYY", "books": ["Book"] }` objects. Each year appears once and has its own book array. The latest migration is `20260911050000_pbe_year_history.sql`; it replaces PBE's separate `years` and `bible_books` columns and consolidates existing rows without inventing missing details.
+
+TLT now also uses one row per Pathfinder with a required `history jsonb` array, pairing each calendar `year` with an `operations` array. Years are integers from 2017 through the database's current year (2026 today); the upper limit advances automatically. Any valid operation may be paired with any allowed year, and multiple different operations may be recorded in one year. Empty book/operation arrays preserve participation with details not yet recorded. Implemented in `20260911060000_tlt_year_history.sql`.
+
+PBE enforces a unique `pathfinder_id` and unique years within `history`. TLT likewise enforces a unique `pathfinder_id` and unique years within `history`. Array ordering does not determine uniqueness or meaning. Historical scalar values were preserved with their recorded member/year associations.
 
 For example, a member who played Snare in 2024-2025 and Bass in 2025-2026 has two `drum_corps` rows:
 
@@ -64,7 +68,7 @@ For example, a member who played Snare in 2024-2025 and Bass in 2025-2026 has tw
 | 1 | `["2024-2025"]` | Snare |
 | 1 | `["2025-2026"]` | Bass |
 
-If the same instrument was played in both years, one row can contain both years. The same rule pairs `bible_book` and `tlt_operation` with their respective year arrays.
+If the same instrument was played in both years, one drum row can contain both years. PBE pairs each year with books inside one history row. TLT pairs each calendar year with its operations inside one history row.
 
 ### 4. `drill` (Drill Participation)
 Tracks years of Drill participation, with one row per Pathfinder.
@@ -86,25 +90,41 @@ See [Drums Played Options](#drums-played-options) for valid instruments.
 | `drum_played`   | String  | Instrument for every year in this row — see [Drums Played Options](#drums-played-options)                     |
 
 ### 6. `pbe` (Pathfinder Bible Experience)
-Tracks PBE years and linked Bible books.
+Tracks all PBE years and their linked Bible books in **one row per Pathfinder**.
 
-| Column          | Type    | Description / Example                              |
-|-----------------|---------|----------------------------------------------------|
-| `id`            | Integer | Primary key                                        |
-| `pathfinder_id` | Integer | FK → `pathfinders.id`                              |
-| `years`         | JSON    | Array of school years — e.g. `["2024-2025", "2025-2026"]` |
-| `bible_book`    | String  | Bible book for every year in this row — e.g. "Exodus", "Luke"          |
+| Column | Type | Description / Example |
+|---|---|---|
+| `id` | Integer | Generated primary key |
+| `pathfinder_id` | Integer | Unique FK to `pathfinders.id`; one PBE row per member |
+| `history` | JSONB | Required nonempty array of year/books objects; see below |
+
+```json
+[
+  { "year": "2013-2014", "books": ["2 Samuel"] },
+  { "year": "2014-2015", "books": ["Matthew"] }
+]
+```
+
+Each object must contain exactly `year` and `books`. Years cannot repeat. Books must be separate strings, not one comma-separated string, and must match that specific year's `pbe_year_books` entries. An empty `books` array is allowed when details are unknown. To add another year, extend the same row's `history` array.
 
 ### 7. `tlt` (Teaching Leadership Training)
-Tracks TLT years and linked operations.
+Tracks all TLT calendar years and linked operations in **one row per Pathfinder**.
 See [TLT Operation Options](#tlt-operation-options) for valid operations.
 
-| Column          | Type    | Description / Example                              |
-|-----------------|---------|----------------------------------------------------|
-| `id`            | Integer | Primary key                                        |
-| `pathfinder_id` | Integer | FK → `pathfinders.id`                              |
-| `years`         | JSON    | Array of school years — e.g. `["2024-2025", "2025-2026"]` |
-| `tlt_operation`         | String  | TLT operation for every year in this row — see [TLT Operation Options](#tlt-operation-options)                      |
+| Column | Type | Description / Example |
+|---|---|---|
+| `id` | Integer | Generated primary key |
+| `pathfinder_id` | Integer | Unique FK to `pathfinders.id` |
+| `history` | JSONB | Required nonempty array of year/operations objects |
+
+```json
+[
+  { "year": 2017, "operations": ["Teaching", "Records"] },
+  { "year": 2026, "operations": ["Administrative", "Activity", "Counseling"] }
+]
+```
+
+Each object contains exactly `year` and `operations`. Calendar years must be JSON integers, not quoted strings or school-year ranges, from 2017 through the current year. Each year appears once. Any combination of valid operations is allowed for any year, including repeating an operation in different years. Operations must be unique within each year's array; `[]` means details are not yet recorded. Extend the same row's `history` to add years.
 
 ---
 
@@ -254,8 +274,40 @@ Valid values for the `drum_played` column in the `drum_corps` table.
 4. Tenor
 5. Cymbol
 
+### Bible Book Options
+
+**Implemented year-linked catalog: `public.pbe_year_books`.** The following school-year/book assignments were supplied by the user. These are allowed combinations, not one global book list. Preserve the names and chapter qualifications as written.
+
+| School year | Allowed Bible books |
+|---|---|
+| `2011-2012` | 1 Samuel, Mark |
+| `2012-2013` | Acts, 1 Thessalonians, 2 Thessalonians |
+| `2013-2014` | 2 Samuel |
+| `2014-2015` | Matthew |
+| `2015-2016` | Exodus |
+| `2016-2017` | Galatians, Ephesians, Philippians, Colossians, 1 Timothy, 2 Timothy |
+| `2017-2018` | Daniel, Esther |
+| `2018-2019` | Luke |
+| `2019-2020` | Ezra, Nehemiah, Hosea, Amos, Jonah, Micah |
+| `2020-2021` | Hebrews, James, 1 Peter, 2 Peter |
+| `2021-2022` | 1 Kings, Ruth |
+| `2022-2023` | John |
+| `2023-2024` | Joshua, Judges |
+| `2024-2025` | Romans, 1 Corinthians, 2 Corinthians |
+| `2025-2026` | Isaiah (Chapters 1–33) |
+| `2026-2027` | Mark, 1 Peter, 2 Peter, 1 John, 2 John, 3 John |
+
+#### PBE year/book validation
+
+- Each book in a `history` entry must be allowed for that entry's `year`. For `2021-2022`, only `1 Kings` and `Ruth` are allowed; either or both may be recorded. John belongs to `2022-2023`.
+- Different entries in the same row can have different book sets. The year/book relationship is explicit and does not depend on matching positions in separate arrays.
+- Years missing from the catalog are unconfigured. Their `books` arrays must remain empty until an administrator configures allowed books.
+- Future entry controls should offer only the selected year's allowed books. The database validates every year/book pair on insert/update.
+- Reference table: `pbe_year_books(school_year text, book_name text)`, with composite primary key `(school_year, book_name)`, populated from the mapping above. A trigger validates JSON entries against it.
+- Catalog edits cannot remove or rename year/book pairs used in saved history.
+
 ### TLT Operation Options
-Valid values for the `tlt_operation` column in the `tlt` table.
+Allowed string entries in each `tlt.history` object's `operations` JSON array. Entries must be unique; use these exact values:
 
 1. Administrative
 2. Outreach
@@ -263,6 +315,63 @@ Valid values for the `tlt_operation` column in the `tlt` table.
 4. Activity
 5. Records
 6. Counseling
+
+### Honor Evaluation Names by Year
+
+**To be filled in by the user.** List the allowed evaluation names for each Red Zone calendar year below. These are integer event years (e.g. `2022`), not PBE school-year strings. Add or remove year rows as needed. TBD means not yet configured; it is not an allowed name.
+
+| Event year | Allowed Honor Evaluation names |
+|---|---|
+| 2010 | TBD |
+| 2011 | TBD |
+| 2012 | TBD |
+| 2013 | TBD |
+| 2014 | TBD |
+| 2015 | TBD |
+| 2016 | TBD |
+| 2017 | TBD |
+| 2018 | TBD |
+| 2019 | TBD |
+| 2020 | TBD |
+| 2021 | TBD |
+| 2022 | TBD |
+| 2023 | TBD |
+| 2024 | TBD |
+| 2025 | TBD |
+| 2026 | TBD |
+
+### Bible Event Names by Year
+
+**To be filled in by the user.** List the allowed Bible Event names for each Red Zone calendar year. This catalog is independent of PBE Bible books and Honor Evaluation names. Add or remove year rows as needed. TBD is a placeholder, not an allowed name.
+
+| Event year | Allowed Bible Event names |
+|---|---|
+| 2010 | TBD |
+| 2011 | TBD |
+| 2012 | TBD |
+| 2013 | TBD |
+| 2014 | TBD |
+| 2015 | TBD |
+| 2016 | TBD |
+| 2017 | TBD |
+| 2018 | TBD |
+| 2019 | TBD |
+| 2020 | TBD |
+| 2021 | TBD |
+| 2022 | TBD |
+| 2023 | TBD |
+| 2024 | TBD |
+| 2025 | TBD |
+| 2026 | TBD |
+
+#### Named Red Zone event validation
+
+- Each `red_zone_honor_evaluations` result must use a `(year, name)` pair from the Honor Evaluation catalog; each `red_zone_bible_events` result must use a pair from the Bible Event catalog. A name allowed in one year is not automatically allowed in another.
+- Proposed reference tables: `honor_evaluation_options(year integer, name text)` and `bible_event_options(year integer, name text)`, each with composite primary key `(year, name)`. Each result table will reference its matching catalog with a composite foreign key on `(year, name)`.
+- Keep existing unique `(pathfinder_id, year, name)` constraints. Placement remains attached to that result row; catalogs describe available events, not a member's participation or outcome.
+- Future forms filter names by the chosen event year. Unconfigured years must not silently accept arbitrary names or the literal TBD. Changing the year requires revalidating the name.
+- Before enabling these constraints, complete the catalogs for existing results and review any unmatched records. Preserve history; do not delete records to make a constraint pass. Referenced catalog pairs cannot be removed or changed while results still depend on them.
+- Honor Evaluation and Bible Event reference tables and constraints remain planned only. PBE validation is implemented separately as described above.
 
 ### Placement Options
 Valid values for the `placement` column in every Special Event table. The placement always describes the year in the same row.
@@ -378,21 +487,39 @@ Keep all existing filters: name, active year, earned level/Advanced status, extr
 - Preserve the existing meaning of combined year/activity filters: a member must match both, but this does not imply that the activity took place during the searched year. A same-year participation filter would be a separate future feature.
 - Honor and detailed history search can be expanded later; this proposal preserves existing filter capabilities rather than implying those extra filters already exist.
 
-### Proposed member profile overlay
+### Proposed past-data profile overlay
 
-Clicking a name opens a modal profile over the existing results instead of the current inline detail panel. Preserve search filters, results, and pagination when opening or closing it.
+Design only: the implemented profile overlay continues to show only WIP. The following layout is for future implementation and does not change database tables.
 
-Future profile contents (not rendered or fetched by the current WIP overlay):
+Clicking a member's name opens the profile over the search results. Preserve filters, results, and pagination while opening and closing it. Display content in this order:
 
-1. Member name and current enrollment summary.
-2. Status (New/Returning/unregistered/graduated). Show grade, current class, and confirmed current activities only when a current registration exists and the member is not Graduated; omit those fields entirely from the current profile summary for unregistered/graduated members. The current `school_year` stays internal; historical years remain visible in history sections.
-3. Historical active years and earned levels.
-4. Existing extracurricular history, with instrument/book/operation paired with the correct school years.
-5. Existing Red Zone history, with each event year paired with its placement.
-6. Honors earned and their years.
-7. Archived registration snapshots when rollover is implemented.
+1. **Name and Status on one line.** Show the member's name and effective status: New, Returning, Graduated, or Unregistered. Use the same status rules as search results, including persistent graduation. Allow wrapping on narrow screens.
+2. **Years Active on the next line.** List the recorded school years, without duplicates and in chronological order. If none are recorded, show No years recorded.
+3. **Levels Earned on the next line.** List all earned levels in class progression order. Format Advanced achievements as `Friend (Advanced)`. If none are recorded, show No levels recorded. Do not infer achievements from current class enrollment.
+4. **Extracurricular history.** Give each activity with detail records its own full section, in the order Drill, Drum, PBE, TLT. Omit an activity's section when it has no detail rows, even if the cumulative participation array lists its name. Keep each value paired with its recorded years as described below; TLT uses calendar years.
+5. **Red Zone Events.** Use a compact, separate area for each event with recorded results. Omit empty event areas. Keep each result's year, placement, and optional event/evaluation name together. Arrange these smaller areas in a responsive grid; do not combine different events into one undifferentiated list.
+6. **Honors.** Place an Honors area last with a View Honors button that opens a separate pop-up. That pop-up should initially display only WIP and a Close control, without listing honors or fetching their data. This leaves room for a large honors collection later.
 
-The future modal should have a visible Close button, Escape-to-close behavior, focus containment, focus return to the clicked name, an accessible title, and a scrollable mobile layout. Include loading/error/retry states and prevent an older request from displaying the wrong person's profile. Member IDs remain internal.
+#### Extracurricular sections
+
+| Profile section | Historical source | Display |
+|---|---|---|
+| Drill | `drill` | All recorded participation school years |
+| Drum | `drum_corps` | School year and instrument for each participation record; expand each row's year array while keeping its instrument attached |
+| PBE | `pbe` | Each `history` entry's `year` and `books`, kept together |
+| TLT | `tlt` | Each `history` entry's calendar `year` and `operations`, kept together |
+
+Drum is the profile section label; the existing stored activity name remains `Drums`. No table or option renaming is required. Sort activity histories by school year, retaining all associated details.
+
+#### Red Zone mini sections
+
+Each existing Red Zone event maps to its own mini section: Drill Performance, Drum Performance, Honor Evaluations, Bible Events, Knots Relay, Tents, Jump Rope, Archery, Lashing, and Burning Twine. Display only sections with actual detail rows. Within each section, show results newest first. Honor Evaluations and Bible Events also show each result's `name` so multiple results in the same year remain distinguishable.
+
+#### Overlay behavior
+
+Both pop-ups need a visible Close control, Escape-to-close behavior, an accessible title, focus containment, and scrollable mobile layouts. Opening Honors preserves the underlying profile and its scroll position. Closing Honors returns focus to View Honors and leaves the profile open; Escape closes only the topmost pop-up. Closing the profile returns focus to the member name in search results.
+
+When the full profile is implemented, include loading/error/retry states and prevent stale requests from displaying the wrong member's history. Keep member IDs internal. Current grade, current class, current activities, and registration archive snapshots are not additional rows in this past-data layout; the current-data results and future rollover design remain separate.
 
 ### Future annual rollover (not implemented)
 
@@ -404,7 +531,7 @@ Rollover should:
 
 1. Select and validate the outgoing/incoming club years explicitly.
 2. Archive outgoing rows with their status, grade, class, activities, and internal school year.
-3. Merge confirmed active years and participation into existing historical structures without duplicates. Merge further years into existing member/instrument, member/book, and member/operation rows. Preserve event-year/placement pairs and honor records.
+3. Merge confirmed active years and participation into existing historical structures without duplicates. Merge further years into existing member/instrument rows. For PBE, merge books into the matching year entry in the member's single `history` row. For TLT, record operations under the calendar year they were completed, merging into that year's entry without duplicates. Do not automatically convert a school-year range to a calendar year. Preserve event-year/placement pairs and honor records.
 4. Transfer only verified achievements/results. A current class is not an earned level, and a blank result is not a Participation award. Current-year detailed results can already reside in the year-specific history tables; do not reinsert them blindly.
 5. Complete the archive and related updates in one transaction before clearing/replacing the current rows. Repeating the operation must not duplicate history or overwrite an existing archive silently.
 6. Create new current rows from the new year's registrations. Keep historical members searchable even when they do not return. Do not automatically carry forward grade, class, participation, or status; use the new registration to establish these values.
@@ -418,3 +545,11 @@ The `20260911020000_registration_status.sql` migration removes Left as an accept
 Status is searchable through `member_search.status`: New, Returning, Graduated, or Unregistered. Unregistered is derived from the absence of current-year data; graduation takes precedence. Existing current rows with an unknown status remain unclassified rather than being assumed inactive. The Status filter combines with historical filters using AND.
 
 Active year, Level earned, Extracurricular, and Red Zone event support multiple selections with searchable dropdowns. Type to narrow options and press Enter to add; selected chips can be removed. Every selected value must match (AND), including across filter categories. Each selected calendar year matches either adjacent school year. Year choices run from 2010 through the current calendar year. The Level earned dropdown contains regular and Advanced options side by side (Friend, Friend (Advanced), Companion, Companion (Advanced), and so on). Each selection matches its exact Advanced status. Selected chips sit below the inputs in fixed-height scrollable areas to preserve alignment. Status remains a single-select filter.
+
+### PBE/TLT implementation and manual entry
+
+PBE uses one row per member with a required `history` array. In Supabase Table Editor, paste JSON like the example in the PBE table section. Each year has its own `books` array. TLT also uses one `history` row, with calendar years paired with `operations` (e.g. `{"year":2026,"operations":["Teaching","Records"]}`). The known six TLT operations are enforced, and PBE books must match their associated year in `pbe_year_books`.
+
+The original array migration preserved member/year/detail associations, regenerating internal PBE/TLT row IDs. The subsequent PBE history migration consolidates rows per member and retains the smallest existing PBE row ID. Missing book details remain empty arrays; catalog books are never automatically assigned as participation. Permanent member IDs and other histories are unchanged. Catalog modifications are administrator-only and cannot invalidate saved history.
+
+The TLT calendar-year migration was applied while the live TLT table was empty. It stops without changing data if legacy school-year TLT rows exist, because assigning a completion calendar year requires staff input. TLT history validation permits 2017 through the current database year, without a year-specific operation catalog.

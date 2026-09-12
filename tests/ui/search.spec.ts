@@ -6,7 +6,7 @@ const fixture = {
   red_zone_participation: ['Archery', 'Knots Relay'],
   drill: { pathfinder_id: 42, years: ['2024-2025'] },
   drum_corps: [{ years: ['2024-2025'], drum_played: 'Snare' }, { years: ['2025-2026'], drum_played: 'Bass' }],
-  pbe: [{ years: ['2024-2025'], bible_book: 'Exodus' }], tlt: [{ years: ['2025-2026'], tlt_operation: 'Teaching' }],
+  pbe: { history: [{ year: '2024-2025', books: ['Romans'] }] }, tlt: { history: [{ year: 2025, operations: ['Teaching'] }] },
   honors_earned: [{ year_earned: 2025, honors: { name: 'Synthetic Honor' } }],
   red_zone_archery: [{ year: 2024, placement: '1st Place' }, { year: 2025, placement: '2nd Place' }],
   red_zone_knots: [], red_zone_drill_performance: [], red_zone_drum_performance: [],

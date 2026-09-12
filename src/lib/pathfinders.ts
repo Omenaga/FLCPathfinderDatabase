@@ -56,8 +56,8 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
   const activities = [
     { name: 'Drill', records: data.drill ? [{ years: data.drill.years as string[], detail: 'Participation' }] : [] },
     { name: 'Drums', records: data.drum_corps.map(r => ({ years: r.years as string[], detail: r.drum_played })) },
-    { name: 'PBE', records: data.pbe.map(r => ({ years: r.years as string[], detail: r.bible_book })) },
-    { name: 'TLT', records: data.tlt.map(r => ({ years: r.years as string[], detail: r.tlt_operation })) },
+    { name: 'PBE', records: ((data.pbe?.history ?? []) as { year: string; books: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.books.join(', ') })) },
+    { name: 'TLT', records: ((data.tlt?.history ?? []) as { year: number; operations: string[] }[]).map(entry => ({ years: [String(entry.year)], detail: entry.operations.join(', ') })) },
   ].filter(group => (data.extracurriculars as string[]).includes(group.name))
   const eventRows = [data.red_zone_drill_performance, data.red_zone_drum_performance,
     data.red_zone_honor_evaluations, data.red_zone_bible_events, data.red_zone_knots,
