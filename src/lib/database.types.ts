@@ -18,7 +18,7 @@ export type Database = {
         Row: {
           created_at: string
           current_activities: Json | null
-          current_title: string | null
+          current_title: Json | null
           pathfinder_id: number
           school_year: string | null
           status: string
@@ -27,7 +27,7 @@ export type Database = {
         Insert: {
           created_at?: string
           current_activities?: Json | null
-          current_title?: string | null
+          current_title?: Json | null
           pathfinder_id: number
           school_year?: string | null
           status?: string
@@ -36,7 +36,7 @@ export type Database = {
         Update: {
           created_at?: string
           current_activities?: Json | null
-          current_title?: string | null
+          current_title?: Json | null
           pathfinder_id?: number
           school_year?: string | null
           status?: string
@@ -765,7 +765,7 @@ export type Database = {
         Row: {
           created_at: string | null
           current_activities: Json | null
-          current_title: string | null
+          current_title: Json | null
           first_name: string | null
           has_current_data: boolean | null
           id: number | null

@@ -31,6 +31,7 @@ test('member revision preserves history and enforces roles, ranges and access',a
   insert into drum_corps(pathfinder_id,years,drum_played,history_role) values
    (1,'["2023-24","2024-25"]','Snare','pathfinder'),(1,'["2023-24"]','Bass','pathfinder'),(1,'["2025-26"]','Tenor','staff');`)
  }
+ if(file==='20260915130000_current_title_json.sql') await db.exec(`update current_data set current_title='Club Director',current_activities='["Drill"]' where pathfinder_id=1`)
  const sql=await readFile(new URL(file,folder),'utf8')
  if(!/^begin;/m.test(sql)) await db.exec('begin')
  await db.exec(sql)
@@ -38,6 +39,8 @@ test('member revision preserves history and enforces roles, ranges and access',a
  }
  const row=(await db.query('select * from member_search where id=1')).rows[0]
  assert.equal((await db.query('select school_year from current_data where pathfinder_id=1')).rows[0].school_year,'2026-27')
+ assert.deepEqual(row.current_title,['Club Director'])
+ assert.deepEqual(row.current_activities,['N/A'])
  assert.equal(row.first_name,'Justin'); assert.equal(row.last_name,'Wu');assert.equal(row.status,'staff')
  assert.deepEqual(row.years_active,['2023-24'])
  assert.deepEqual(row.levels,[{name:'Friend',outcome:'advanced',year:null}])
@@ -70,10 +73,16 @@ test('member revision preserves history and enforces roles, ranges and access',a
  await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);`)
  await db.exec(`update pathfinders set notes=E'One sentence.\nAnother paragraph.',birth_date='2000-01-02' where id=1;
  insert into drill(pathfinder_id,team,years,history_role) values (1,'Adult','["2025-26"]','staff');`)
- await assert.rejects(db.exec(`update current_data set current_title='Friend' where pathfinder_id=1`),e=>e.code==='23514')
- await db.exec(`update current_data set current_title='Counselor' where pathfinder_id=1`)
+ await assert.rejects(db.exec(`update current_data set current_title='["Friend"]' where pathfinder_id=1`),e=>e.code==='23514')
+ await db.exec(`update current_data set current_title='["Counselor"]' where pathfinder_id=1`)
  await db.exec(`update staff_history set history=history || '[{"year":"2025-26","titles":["Counselor"]}]' where pathfinder_id=1`)
- await db.exec(`update current_data set status='pathfinder',current_title='Friend' where pathfinder_id=1`)
+ await db.exec(`update current_data set current_title='["Club Director","Drill Instructor"]',current_activities='["Drums"]' where pathfinder_id=1`)
+ assert.deepEqual((await db.query('select current_activities from current_data where pathfinder_id=1')).rows[0].current_activities,['N/A'])
+ for(const title of ['"Club Director"','["Club Director","Club Director"]','["Unknown"]','{}','null']) {
+  await assert.rejects(db.query('update current_data set current_title=$1 where pathfinder_id=1',[title]),e=>e.code==='23514')
+ }
+ await db.exec(`update current_data set status='pathfinder',current_title='["Friend"]' where pathfinder_id=1`)
+ assert.deepEqual((await db.query('select current_activities from current_data where pathfinder_id=1')).rows[0].current_activities,[])
  await assert.rejects(db.exec(`update current_data set status='parent' where pathfinder_id=1`),e=>e.code==='23514')
  await assert.rejects(db.exec(`update pathfinders set years_active='["2023-25"]' where id=1`),e=>e.code==='23514')
  await assert.rejects(db.exec(`update pbe set history='[{"year":"2021-22","books":["John"]}]'`),e=>e.code==='23514')

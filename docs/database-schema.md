@@ -30,11 +30,11 @@ At most one row per person. `current_club_year()` selects `2026-27`; this change
 | `pathfinder_id` | integer PK/FK | References the permanent person |
 | `school_year` | text | Required `YYYY-YY` range; defaults to current_club_year() for new rows; internal club-season selection |
 | `status` | text | Pathfinder (`pathfinder`), Staff (`staff`), Parent (`parent`), Not Active (`not_active`); default Not Active |
-| `current_title` | text, nullable | Single column for a Pathfinder class or Staff title |
-| `current_activities` | jsonb | Unique array of Drill, Drums, PBE, TLT; confirmed current participation |
+| `current_title` | jsonb, nullable | Unique array of Pathfinder classes or Staff titles, validated against status |
+| `current_activities` | jsonb | Staff: `["N/A"]` automatically; otherwise a unique array of Drill, Drums, PBE, TLT |
 | `created_at`, `updated_at` | timestamptz | Maintained timestamps |
 
-Grade is removed. For Pathfinder, current_title must be one of the eight level names. For Staff, it must come from `staff_titles`; the catalog is seeded with the titles below. Unknown titles remain null. Parent/Not Active must have null titles. Changing status requires a compatible title or clearing it. Current classes do not imply earned achievements.
+Grade is removed. For Pathfinder, each current_title entry must be one of the eight level names. For Staff, each title must come from `staff_titles`; the catalog is seeded with the titles below. Multiple titles/classes may be stored, e.g. `["Club Director", "Drill Instructor"]` for Staff. Unknown titles remain null or an empty array. Staff activities are normalized to `["N/A"]`; moving away from Staff clears that marker to `[]` unless replacement activities are supplied. Original current data is retained in administrator-only `private.current_title_json_backup`. Parent/Not Active must have null titles. Changing status requires a compatible title or clearing it. Current classes do not imply earned achievements.
 
 ### `staff_titles` and `staff_history`
 

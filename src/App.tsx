@@ -114,15 +114,15 @@ function Search() {
     <section className="panel" aria-busy={busy}><div className="section-heading"><h2>Members</h2><span role="status">{busy ? 'Searching…' : `${count} ${count === 1 ? 'member' : 'members'} found`}</span></div>
       {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { beginSearch(); setAttempt(attempt + 1) }}>Try again</button></> : !busy && members.length === 0 ?
         <p>No members found. Try fewer filters. If this is a new database, add the first records through Supabase.</p> : members.length > 0 && <>
-        <div className="table-scroll"><table><thead><tr><th>First</th><th>Last</th><th>Status</th><th>Title</th><th>Current activities</th></tr></thead><tbody>
+        <div className="table-scroll"><table><thead><tr><th>First Name</th><th>Last Name</th><th>Status</th><th>Class/Titles</th><th>Current activities</th></tr></thead><tbody>
           {members.map(member => {
             const inactive = !member.has_current_data || member.status === 'not_active'
             const hasTitle = member.status === 'pathfinder' || member.status === 'staff'
             return <tr key={member.id}>
               <td><button className="member-link" aria-label={`Open profile for ${member.name}`} aria-haspopup="dialog" onClick={() => setSelected(member.id)}>{member.first_name}</button></td>
               <td>{member.last_name || 'Not recorded'}</td><td>{statusLabel(member.status)}</td>
-              <td>{hasTitle ? member.current_title ?? 'Not recorded' : 'N/A'}</td>
-              <td>{inactive ? 'N/A' : (member.current_activities as string[] | null)?.join(', ') || 'None recorded'}</td></tr>
+              <td>{hasTitle ? (member.current_title as string[] | null)?.join(', ') || 'Not recorded' : 'N/A'}</td>
+              <td>{inactive || member.status === 'staff' ? 'N/A' : (member.current_activities as string[] | null)?.join(', ') || 'None recorded'}</td></tr>
           })}
         </tbody></table></div>
         <div className="pagination"><button className="secondary" disabled={page === 0 || busy} onClick={() => { beginSearch(); setPage(page - 1) }}>Previous</button>
@@ -218,7 +218,7 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
   </div>
 }
 
-function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+function Modal({ title, header, children, onClose }: { title: string; header?: ReactNode; children: ReactNode; onClose: () => void }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
@@ -233,7 +233,10 @@ function Modal({ title, children, onClose }: { title: string; children: ReactNod
     }
   }, [])
   return <dialog ref={dialog} className="profile-overlay" aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose() }}>
-    <button className="secondary modal-close" onClick={onClose} autoFocus>Close</button>
+    <header className="modal-header">
+      {header}
+      <button className="secondary modal-close" onClick={onClose} autoFocus>Close</button>
+    </header>
     {children}
   </dialog>
 }
@@ -262,14 +265,13 @@ function ProfileOverlay({ id, status, onClose }: { id: number; status: string; o
   const years = [...new Set(details?.member.years_active ?? [])].sort()
   const levels = [...(details?.member.levels ?? [])].sort((a, b) => LEVELS.indexOf(a.name as typeof LEVELS[number]) - LEVELS.indexOf(b.name as typeof LEVELS[number]) || (a.year ?? '').localeCompare(b.year ?? ''))
   const birthday = details?.member.birth_date
-  return <Modal title="Member profile" onClose={onClose}>
+  return <Modal title="Member profile" onClose={onClose} header={details && <div className="profile-heading"><h2>{[details.member.first_name, details.member.last_name].filter(Boolean).join(' ')}</h2><span className="profile-status">{statusLabel(status)}</span></div>}>
     {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { setError(''); setDetails(null); setAttempt(value => value + 1) }}>Try again</button></> : !details ? <p role="status">Loading profile...</p> : <>
-      <div className="profile-heading"><h2>{[details.member.first_name, details.member.last_name].filter(Boolean).join(' ')}</h2><span className="profile-status">{statusLabel(status)}</span></div>
       <section className="profile-summary"><h3>Birthday</h3><p>{birthday ? `${birthday.slice(5,7)}/${birthday.slice(8,10)}/${birthday.slice(0,4)}` : 'Not recorded'}</p></section>
+      <section className="profile-summary"><h3>Years Active</h3><p>{years.join(', ') || 'No years recorded'}</p></section>
       {details.roles.map(group => <section className="profile-role" key={group.role} aria-label={`${group.role === 'staff' ? 'Staff' : 'Pathfinder'} history`}>
         <h3 className="role-heading">{group.role === 'staff' ? 'Staff History' : 'Pathfinder History'}</h3>
-        {group.role === 'pathfinder' ? <section className="profile-summary"><h4>Years Active</h4><p>{years.join(', ') || 'No years recorded'}</p>
-          <h4>Levels</h4>{levels.length ? <ul>{levels.map((level,index) => <li key={index}>{level.name} ({statusLabel(level.outcome)}) - {level.year ?? 'Year unknown'}</li>)}</ul> : <p>No levels recorded</p>}</section>
+        {group.role === 'pathfinder' ? <section className="profile-summary"><h4>Levels</h4>{levels.length ? <ul>{levels.map((level,index) => <li key={index}>{level.name} ({statusLabel(level.outcome)}) - {level.year ?? 'Year unknown'}</li>)}</ul> : <p>No levels recorded</p>}</section>
         : <section className="profile-summary"><h4>Years and Titles</h4>{details.staffHistory.length ? <dl className="profile-records">{details.staffHistory.map(record => <div key={record.year}><dt>{record.year}</dt><dd>{record.titles.join(', ') || 'Title not recorded'}</dd></div>)}</dl> : <p>No staff years or titles recorded</p>}</section>}
         {group.activities.map(activity => <section className="profile-activity" key={activity.name}>
           <h4>{activity.name === 'Drums' ? 'Drum' : activity.name}</h4>
@@ -281,8 +283,8 @@ function ProfileOverlay({ id, status, onClose }: { id: number; status: string; o
           {group.events.map(event => <article key={event.name}><h5>{event.name}</h5><ul>{event.records.map((record, index) =>
             <li key={`${record.year}-${index}`}><strong>{record.year}</strong>{record.name && <span>{record.name}</span>}<span>{record.placement}</span></li>)}</ul></article>)}
         </div></section>}
-        {group.role === 'pathfinder' && <section className="profile-honors"><h4>Honors</h4><button className="secondary" onClick={() => setHonorsOpen(true)}>View Honors</button></section>}
       </section>)}
+      <section className="profile-honors"><h3>Honors</h3><button className="secondary" onClick={() => setHonorsOpen(true)}>View Honors</button></section>
       <NotesEditor id={id} initialNotes={details.member.notes ?? ''} />
     </>}
     {honorsOpen && <Modal title="Honors" onClose={() => setHonorsOpen(false)}><h2>Honors</h2><p className="honors-wip">WIP</p></Modal>}

@@ -23,9 +23,10 @@ async function setup(page:Page) {
 
 test('current results expose First Last Status Title and activities only',async({page})=>{
  await setup(page)
- await expect(page.getByRole('columnheader')).toHaveText(['First','Last','Status','Title','Current activities'])
+ await expect(page.getByRole('columnheader')).toHaveText(['First Name','Last Name','Status','Class/Titles','Current activities'])
  await expect(page.getByRole('row').last()).toContainText('Staff')
  await expect(page.getByRole('row').last()).toContainText('Not recorded')
+ await expect(page.getByRole('row').last().getByRole('cell').last()).toHaveText('N/A')
  const status=page.getByRole('combobox',{name:'Status',exact:true})
  await expect(status.locator('option')).toHaveText(['Any','Pathfinder','Staff','Parent','Not Active'])
  const request=page.waitForRequest(r=>r.url().includes('status=eq.not_active'))
