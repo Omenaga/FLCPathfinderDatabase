@@ -1,10 +1,11 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { detailKind } from '../lib/format'
 
-export default function MultiSelect({ compact = false, label, values, options, onChange, exclusiveKey, groupKey, variantLabel, detailOptions, emptyMessage = 'No matching options' }: {
+export default function MultiSelect({ compact = false, label, values, options, onChange, exclusiveKey, groupKey, optionGroup, variantLabel, detailOptions, emptyMessage = 'No matching options' }: {
+  optionGroup?: (option: string) => string;
   detailOptions?: Record<string, readonly string[]>; compact?: boolean; label: string; values: string[]; options: readonly string[]; onChange: (values: string[]) => void; exclusiveKey?: (option: string) => string; groupKey?: (option: string) => string; variantLabel?: (option: string) => string; emptyMessage?: string
 }) {
-  const grouping = groupKey ?? exclusiveKey
+  const grouping = groupKey ?? exclusiveKey ?? optionGroup
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
   const [detailSelections, setDetailSelections] = useState<Record<string, string>>({})

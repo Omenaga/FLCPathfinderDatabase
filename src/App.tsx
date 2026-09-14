@@ -4,6 +4,7 @@ import flcLogo from './assets/FL_Logo.png'
 import { getSupabase } from './lib/supabase'
 import { message } from './lib/errors'
 import Search from './features/search/Search'
+import AddRecords from './features/add/AddRecords'
 
 function App() {
   try { getSupabase() } catch {
@@ -21,6 +22,7 @@ function Header() {
 }
 
 function ConnectedApp() {
+  const [page, setPage] = useState<'search' | 'records'>('search')
   const [session, setSession] = useState<Session | null>()
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
@@ -58,7 +60,12 @@ function ConnectedApp() {
     {error && <p role="alert" className="error">{error}</p>}
     {session === undefined ? <p role="status">Checking your session…</p> : session ? <>
       <div className="session"><span>{session.user.email}</span><button className="secondary" disabled={pending} onClick={signOut}>Sign out</button></div>
-      <Search key={session.user.id} />
+      <nav className="page-tabs" aria-label="Member pages">
+        <button className={page === 'search' ? '' : 'secondary'} aria-current={page === 'search' ? 'page' : undefined} onClick={() => setPage('search')}>Search</button>
+        <button className={page === 'records' ? '' : 'secondary'} aria-current={page === 'records' ? 'page' : undefined} onClick={() => setPage('records')}>Add / Edit Profiles</button>
+      </nav>
+      <div hidden={page !== 'search'}><Search key={session.user.id} /></div>
+      {page === 'records' && <AddRecords key={session.user.id} />}
     </> : <section className="panel login"><h2>Staff sign in</h2><p>Use your staff account to search member records.</p>
       <form onSubmit={signIn}><label>Email<input name="email" type="email" autoComplete="username" required /></label>
       <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>

@@ -1,4 +1,20 @@
 ﻿:root { font-family: system-ui, sans-serif; color: #172d52; background: #f0f4fa; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+.page-tabs { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
+.records-placeholder { margin-top: 2rem; padding-top: .5rem; border-top: 1px solid #d8e1ee; }
+.form-preview { padding: .75rem 1rem; background: #edf2fb; border-radius: .5rem; }
+.record-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.record-fields small { font-weight: 400; font-size: .8rem; }
+.staff-title-select .level-choice .level-variants { display: flex; flex-wrap: wrap; gap: .35rem; }
+.staff-title-select .level-choice .level-variants button { flex: 0 1 auto; white-space: normal; font-size: .8rem; padding: .35rem .45rem; }
+.record-fields input[readonly] { background: #f0f4fa; }
+.record-form .option-list { position: static; margin-top: .5rem; }
+.record-form .selected-options { height: auto; min-height: 1rem; }
+.record-form .selected-options button { font-size: .8rem; padding: .3rem .5rem; }
+.record-footer { border-top: 1px solid #d8e1ee; margin-top: 1.5rem; padding-top: 1rem; }
+.record-footer p { margin-top: 0; }
+.record-footer .actions { justify-content: flex-end; }
+.modal-header > h2 { margin: 0; }
+@media (max-width: 550px) { .record-fields { grid-template-columns: 1fr; } }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
 button, input, select { font: inherit; }
