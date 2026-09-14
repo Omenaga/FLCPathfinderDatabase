@@ -279,3 +279,35 @@ test('level Any matches either variant and all three choices fit one row', async
  await page.getByRole('button',{name:'Search records'}).click()
  expect(new URL((await request).url()).searchParams.get('levels')).toBe('cs.[{"name":"Friend"}]')
 })
+
+
+test('detail choices pair with years and compact bubbles share rows', async ({ page }) => {
+ await page.setViewportSize({width:1440,height:1000})
+ await setup(page)
+ const activity=page.getByRole('combobox',{name:'Extracurricular',exact:true})
+ await activity.fill('Drums')
+ await page.getByLabel('Drums instrument',{exact:true}).selectOption('Snare')
+ await page.getByRole('option',{name:'Drums (2019) / Snare',exact:true}).click()
+ await activity.fill('TLT')
+ await page.getByLabel('TLT operation',{exact:true}).selectOption('Teaching')
+ await page.getByRole('option',{name:'TLT (2020) / Teaching',exact:true}).click()
+ const event=page.getByRole('combobox',{name:'Red Zone Events',exact:true})
+ await event.fill('Archery')
+ await page.getByLabel('Archery placement',{exact:true}).selectOption('1st Place')
+ await page.getByRole('option',{name:'Archery (2024) / 1st Place',exact:true}).click()
+ await event.press('Escape')
+ const request=page.waitForRequest(r=>r.url().includes('search_event_details='))
+ await page.getByRole('button',{name:'Search records'}).click()
+ const params=new URL((await request).url()).searchParams
+ expect(params.get('search_activity_details')).toBe('cs.[{"name":"Drums","year":2019,"detail":"Snare"},{"name":"TLT","year":2020,"detail":"Teaching"}]')
+ expect(params.get('search_event_details')).toBe('cs.[{"name":"Archery","year":2024,"detail":"1st Place"}]')
+ await page.getByRole('button',{name:'Clear filters'}).click()
+ for(const year of [2018,2019,2020]) { await activity.fill(`Drums (${year})`); await activity.press('Enter') }
+ await activity.press('Escape')
+ const drums=await Promise.all([2018,2019,2020].map(year=>page.getByRole('button',{name:`Remove Drums (${year}) from Extracurricular`,exact:true}).boundingBox()))
+ expect(drums.every(box=>box && box.y===drums[0]!.y)).toBe(true)
+ for(const year of [2016,2017]) { await event.fill(`Drill Performance (${year})`); await event.press('Enter') }
+ await event.press('Escape')
+ const events=await Promise.all([2016,2017].map(year=>page.getByRole('button',{name:`Remove Drill Performance (${year}) from Red Zone Events`,exact:true}).boundingBox()))
+ expect(events[0]!.y).toBe(events[1]!.y)
+})

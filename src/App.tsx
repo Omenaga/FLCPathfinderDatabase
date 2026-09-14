@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import type { Session } from '@supabase/supabase-js'
 import flcLogo from './assets/FL_Logo.png'
 import { getSupabase } from './lib/supabase'
-import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
+import { ACTIVITY_OPTIONS, ACTIVITY_DETAILS, EVENT_DETAILS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
   getPathfinder, LEVELS, type PathfinderDetails, type Filters, type Pathfinder } from './lib/pathfinders'
 
 function message(error: unknown) {
@@ -105,8 +105,8 @@ function Search() {
         <Select label="Status" value={draft.status} options={STATUSES} onChange={value => update('status', value)} />
         <MultiSelect label="Years Active" values={draft.year} options={YEARS} onChange={value => update('year', value)} />
         <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} exclusiveKey={option => option.replace(/ \((?:Advanced|Any)\)$/, '')} onChange={value => update('level', value)} />
-        <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} groupKey={option => option.split(' (')[0]} variantLabel={option => option.includes(' (') ? option.slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('activity', value)} />
-        <MultiSelect label="Red Zone Events" values={draft.event} options={EVENT_OPTIONS} groupKey={option => option.split(' (')[0]} variantLabel={option => option.includes(' (') ? option.slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('event', value)} />
+        <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} detailOptions={ACTIVITY_DETAILS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[0].includes(' (') ? option.split(' / ')[0].slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('activity', value)} />
+        <MultiSelect label="Red Zone Events" values={draft.event} options={EVENT_OPTIONS} detailOptions={EVENT_DETAILS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[0].includes(' (') ? option.split(' / ')[0].slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('event', value)} />
         <MultiSelect label="Honors" values={honors} options={[]} onChange={setHonors} emptyMessage="No honors available yet" />
         <div className="actions"><button type="submit" disabled={busy}>Search records</button><button type="reset" className="secondary">Clear filters</button></div>
       </form>
@@ -138,16 +138,22 @@ function Select({ label, value, options, onChange }: { label: string; value: str
   return <label>{label}<select value={value} onChange={e => onChange(e.target.value)}><option value="">Any</option>{options.map(option => <option key={option}>{option}</option>)}</select></label>
 }
 
-function MultiSelect({ compact = false, label, values, options, onChange, exclusiveKey, groupKey, variantLabel, emptyMessage = 'No matching options' }: {
-  compact?: boolean; label: string; values: string[]; options: readonly string[]; onChange: (values: string[]) => void; exclusiveKey?: (option: string) => string; groupKey?: (option: string) => string; variantLabel?: (option: string) => string; emptyMessage?: string
+function MultiSelect({ compact = false, label, values, options, onChange, exclusiveKey, groupKey, variantLabel, detailOptions, emptyMessage = 'No matching options' }: {
+  detailOptions?: Record<string, readonly string[]>; compact?: boolean; label: string; values: string[]; options: readonly string[]; onChange: (values: string[]) => void; exclusiveKey?: (option: string) => string; groupKey?: (option: string) => string; variantLabel?: (option: string) => string; emptyMessage?: string
 }) {
   const grouping = groupKey ?? exclusiveKey
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
+  const [detailSelections, setDetailSelections] = useState<Record<string, string>>({})
   const [text, setText] = useState('')
   const [open, setOpen] = useState(false)
   const [active, setActive] = useState(0)
-  const matches = options.filter(option => !values.includes(option) && option.toLowerCase().includes(text.trim().toLowerCase()))
+  const matches = options.filter(option => {
+    const detail = option.split(' / ')[1] ?? ''
+    const group = groupKey?.(option) ?? ''
+    const typedDetail = detailOptions && Object.values(detailOptions).flat().some(value => text.toLowerCase().includes(value.toLowerCase()))
+    return (!detailOptions || typedDetail || detail === (detailSelections[group] ?? '')) && !values.includes(option) && option.toLowerCase().includes(text.trim().toLowerCase())
+  })
   function disabled(option: string) {
     return values.includes(option) || !!exclusiveKey && values.some(value => exclusiveKey(value) === exclusiveKey(option))
   }
@@ -157,7 +163,7 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
   }
   useEffect(() => {
     const form = input.current?.form
-    const clear = () => { setText(''); setOpen(false); setActive(0) }
+    const clear = () => { setDetailSelections({}); setText(''); setOpen(false); setActive(0) }
     form?.addEventListener('reset', clear)
     return () => form?.removeEventListener('reset', clear)
   }, [])
@@ -184,6 +190,11 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
       {grouping ? [...new Set(matches.map(grouping))].map(level => <li key={level} role="presentation" className={groupKey ? "level-choice activity-year-choice" : "level-choice"}>
         <div role="group" aria-label={level}>
           <span className="level-name">{level}</span>
+          {detailOptions?.[level] && <select className="history-detail-select" aria-label={`${level} ${level === 'Drums' ? 'instrument' : level === 'TLT' ? 'operation' : 'placement'}`}
+            value={detailSelections[level] ?? ''} onChange={event => { setDetailSelections(current => ({ ...current, [level]: event.target.value })); setActive(0) }}>
+            <option value="">{level === 'Drums' ? 'Any instrument' : level === 'TLT' ? 'Any operation' : 'Any placement'}</option>
+            {detailOptions[level].map(detail => <option key={detail}>{detail}</option>)}
+          </select>}
           <div className="level-variants">{matches.filter(option => grouping(option) === level).map(option => {
             const index = matches.indexOf(option)
             return <button type="button" role="option" tabIndex={-1} key={option} id={`${id}-option-${index}`}

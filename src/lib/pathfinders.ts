@@ -7,10 +7,24 @@ export const ACTIVITIES = ['Drill', 'Drums', 'PBE', 'TLT'] as const
 export const EVENTS = ['Drill Performance', 'Drum Performance', 'Honor Evaluations', 'Bible Events', 'Knots Relay', 'Tents', 'Jump Rope', 'Archery', 'Lashing', 'Burning Twine'] as const
 export const STATUSES = ['New', 'Returning', 'Graduated', 'Unregistered'] as const
 export const YEARS = Array.from({ length: Math.max(0, new Date().getFullYear() - 2009) }, (_, index) => String(2010 + index))
-export const ACTIVITY_OPTIONS = ACTIVITIES.flatMap(activity => [activity, ...YEARS
-  .filter(year => activity !== 'TLT' || Number(year) >= 2017)
-  .map(year => `${activity} (${year})`)])
-export const EVENT_OPTIONS = EVENTS.flatMap(event => [event, ...YEARS.map(year => `${event} (${year})`)])
+export const DRUMS = ['Snare', 'Quad', 'Bass', 'Tenor', 'Cymbol'] as const
+export const OPERATIONS = ['Administrative', 'Outreach', 'Teaching', 'Activity', 'Records', 'Counseling'] as const
+export const PLACEMENTS = ['1st Place', '2nd Place', '3rd Place', 'Participation'] as const
+export const ACTIVITY_DETAILS: Record<string, readonly string[]> = { Drums: DRUMS, TLT: OPERATIONS }
+export const EVENT_DETAILS: Record<string, readonly string[]> = Object.fromEntries(EVENTS.map(event => [event, PLACEMENTS]))
+function historyOptions(names: readonly string[], details: Record<string, readonly string[]>) {
+  return names.flatMap(name => ['', ...YEARS.filter(year => name !== 'TLT' || Number(year) >= 2017)].flatMap(year => {
+    const base = name + (year ? ` (${year})` : '')
+    return [base, ...(details[name] ?? []).map(detail => `${base} / ${detail}`)]
+  }))
+}
+export const ACTIVITY_OPTIONS = historyOptions(ACTIVITIES, ACTIVITY_DETAILS)
+export const EVENT_OPTIONS = historyOptions(EVENTS, EVENT_DETAILS)
+export function historyFilter(option: string) {
+  const [base, detail] = option.split(' / ')
+  const match = /^(.*?)(?: \((\d{4})\))?$/.exec(base)!
+  return { name: match[1], ...(match[2] ? { year: Number(match[2]) } : {}), ...(detail ? { detail } : {}) }
+}
 export const PAGE_SIZE = 25
 type EarnedLevel = { name: string; advanced: boolean }
 type MemberRow = Database['public']['Tables']['pathfinders']['Row']
@@ -42,15 +56,19 @@ export async function searchPathfinders(filters: Filters, page: number, signal: 
     ...(option.endsWith(' (Any)') ? {} : { advanced: option.endsWith(' (Advanced)') }),
   }))))
   if (filters.activity.some(option => !ACTIVITY_OPTIONS.includes(option))) throw new Error('Select a valid activity and year.')
-  const anyYear = filters.activity.filter(option => !option.includes(' ('))
-  const dated = filters.activity.filter(option => option.includes(' ('))
+  const anyYear = filters.activity.filter(option => !option.includes(' (') && !option.includes(' / '))
+  const dated = filters.activity.filter(option => option.includes(' (') && !option.includes(' / '))
   if (anyYear.length) query = query.contains('search_activities', JSON.stringify(anyYear))
   if (dated.length) query = query.contains('search_activity_years', JSON.stringify(dated))
+  const activityDetails = filters.activity.filter(option => option.includes(' / '))
+  if (activityDetails.length) query = query.contains('search_activity_details', JSON.stringify(activityDetails.map(historyFilter)))
   if (filters.event.some(option => !EVENT_OPTIONS.includes(option))) throw new Error('Select a valid event and year.')
-  const anyEventYear = filters.event.filter(option => !option.includes(' ('))
-  const datedEvents = filters.event.filter(option => option.includes(' ('))
+  const anyEventYear = filters.event.filter(option => !option.includes(' (') && !option.includes(' / '))
+  const datedEvents = filters.event.filter(option => option.includes(' (') && !option.includes(' / '))
   if (anyEventYear.length) query = query.contains('search_events', JSON.stringify(anyEventYear))
   if (datedEvents.length) query = query.contains('search_event_years', JSON.stringify(datedEvents))
+  const eventDetails = filters.event.filter(option => option.includes(' / '))
+  if (eventDetails.length) query = query.contains('search_event_details', JSON.stringify(eventDetails.map(historyFilter)))
   const { data, count, error } = await query.order('name').order('id')
     .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1).abortSignal(signal)
   if (error) throw error

@@ -144,3 +144,6 @@ Red Zone event filters offer Any year and calendar years from 2010 through the c
 Participation searches and profiles derive from activity/event detail tables through `pathfinder_id`. The obsolete core participation columns were removed by `20260912020000_remove_core_participation.sql`. `member_search` computes `search_activities`, `search_activity_years`, `search_events`, and `search_event_years` from detail records under RLS.
 
 Level Earned offers Any, Regular, and Advanced in one row per level. Any matches either achievement variant; only one choice per level can be selected. Different selected levels must all be earned.
+
+
+History filter refinements: Drums offers Snare, Quad, Bass, Tenor, and Cymbol; TLT offers Administrative, Outreach, Teaching, Activity, Records, and Counseling. Every Red Zone event offers 1st Place, 2nd Place, 3rd Place, and Participation. Choose a refinement, then a calendar year or Any year. Any instrument/operation/placement preserves broad participation matching. Typed full selections are also supported, such as `Drums (2019) / Snare`. Each selected name/year/detail combination must match the same detail record; multiple selections require all combinations. Computed JSON fields `search_activity_details` and `search_event_details` enforce these associations before pagination.

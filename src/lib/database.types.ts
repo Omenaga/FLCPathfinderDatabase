@@ -676,7 +676,9 @@ export type Database = {
           levels: Json | null
           name: string | null
           search_activities: Json | null
+          search_activity_details: Json | null
           search_activity_years: Json | null
+          search_event_details: Json | null
           search_event_years: Json | null
           search_events: Json | null
           search_years: Json | null

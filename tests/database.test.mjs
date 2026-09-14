@@ -55,6 +55,7 @@ before(async () => {
   await db.exec(await readFile(new URL('../supabase/migrations/20260912000000_event_year_search.sql', import.meta.url), 'utf8'))
   await db.exec(await readFile(new URL('../supabase/migrations/20260912010000_detail_participation_search.sql', import.meta.url), 'utf8'))
   await db.exec(await readFile(new URL('../supabase/migrations/20260912020000_remove_core_participation.sql', import.meta.url), 'utf8'))
+  await db.exec(await readFile(new URL('../supabase/migrations/20260912030000_history_detail_filters.sql', import.meta.url), 'utf8'))
 
 })
 after(async () => { await db?.close() })
@@ -354,4 +355,20 @@ test('level Any containment matches regular or advanced while preserving AND acr
  ('missing','[{"name":"Friend","advanced":true}]'::jsonb))
  select name from fixtures where levels @> '[{"name":"Friend"},{"name":"Companion","advanced":true}]' order by name`)
  assert.deepEqual(rows,[{name:'advanced'},{name:'regular'}])
+})
+
+
+test('instrument, operation and placement filters stay paired with their actual year', async () => {
+ await asRole('authenticated', editor, async () => {
+ const find=async (column,filters)=>(await db.query(`select name from member_search where name='Synthetic Member' and ${column} @> $1::jsonb`,[JSON.stringify(filters)])).rows
+ assert.equal((await find('search_activity_details',[{name:'Drums',year:2024,detail:'Snare'}])).length,1)
+ assert.equal((await find('search_activity_details',[{name:'Drums',year:2024,detail:'Bass'}])).length,0)
+ assert.equal((await find('search_activity_details',[{name:'Drums',detail:'Bass'},{name:'TLT',year:2025,detail:'Teaching'}])).length,1)
+ assert.equal((await find('search_activity_details',[{name:'TLT',year:2024,detail:'Teaching'}])).length,0)
+ for (const name of names) {
+  assert.equal((await find('search_event_details',[{name,year:2024,detail:'1st Place'},{name,year:2025,detail:'2nd Place'}])).length,1)
+  assert.equal((await find('search_event_details',[{name,year:2024,detail:'2nd Place'}])).length,0)
+  assert.equal((await find('search_event_details',[{name,detail:'1st Place'}])).length,1)
+ }
+ })
 })
