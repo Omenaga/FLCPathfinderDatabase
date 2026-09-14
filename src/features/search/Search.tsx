@@ -1,0 +1,70 @@
+import { useEffect, useState, type FormEvent } from 'react'
+import Select from '../../components/Select'
+import MultiSelect from '../../components/MultiSelect'
+import ProfileOverlay from '../profile/ProfileOverlay'
+import { message } from '../../lib/errors'
+import { statusLabel } from '../../lib/format'
+import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, PERIODS, STATUSES, PAGE_SIZE, searchPathfinders,
+  type Filters, type Pathfinder } from '../../lib/pathfinders'
+
+export default function Search() {
+  // Honors are a UI placeholder until the catalog and search integration are added.
+  const [honors, setHonors] = useState<string[]>([])
+  const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
+  const [page, setPage] = useState(0)
+  const [members, setMembers] = useState<Pathfinder[]>([])
+  const [count, setCount] = useState(0)
+  const [busy, setBusy] = useState(true)
+  const [error, setError] = useState('')
+  const [selected, setSelected] = useState<number | null>(null)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    const controller = new AbortController()
+    searchPathfinders(filters, page, controller.signal).then(result => {
+      if (!controller.signal.aborted) { setMembers(result.members); setCount(result.count) }
+    }).catch(error => { if (!controller.signal.aborted) setError(message(error)) })
+      .finally(() => { if (!controller.signal.aborted) setBusy(false) })
+    return () => controller.abort()
+  }, [filters, page, attempt])
+  function update<K extends keyof Filters>(key: K, value: Filters[K]) {
+    setDraft(current => ({ ...current, [key]: value }))
+  }
+  function beginSearch() { setBusy(true); setError(''); setMembers([]); setCount(0); setSelected(null) }
+  function submit(event: FormEvent) { event.preventDefault(); beginSearch(); setFilters({ ...draft }); setPage(0) }
+  function reset() { setHonors([]); beginSearch(); setDraft(EMPTY_FILTERS); setFilters({ ...EMPTY_FILTERS }); setPage(0) }
+  return <>
+    <section className="panel"><h2>Find a Pathfinder</h2><p className="muted">Select one or more options, or type and press Enter to add them. Match any bubble within each category, and every selected category. Years apply to all selected history categories. Leave filters blank to browse all members.</p>
+      <form onSubmit={submit} onReset={reset} className="filters">
+        <label className="name-filter">Name<input type="search" value={draft.name} onChange={e => update('name', e.target.value)} placeholder="Search by name" maxLength={200} /></label>
+        <Select label="Status" value={draft.status} options={STATUSES} onChange={value => update('status', value)} />
+        <MultiSelect label="Years" values={draft.year} options={[...PERIODS]} onChange={value => update('year', value)} />
+        <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('level', value)} />
+        <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('activity', value)} />
+        <MultiSelect label="Red Zone Events" values={draft.event} options={EVENT_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('event', value)} />
+        <MultiSelect label="Honors" values={honors} options={[]} onChange={setHonors} emptyMessage="No honors available yet" />
+        <div className="actions"><button type="submit" disabled={busy}>Search records</button><button type="reset" className="secondary">Clear filters</button></div>
+      </form>
+    </section>
+    <section className="panel" aria-busy={busy}><div className="section-heading"><h2>Members</h2><span role="status">{busy ? 'Searching…' : `${count} ${count === 1 ? 'member' : 'members'} found`}</span></div>
+      {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { beginSearch(); setAttempt(attempt + 1) }}>Try again</button></> : !busy && members.length === 0 ?
+        <p>No members found. Try fewer filters. If this is a new database, add the first records through Supabase.</p> : members.length > 0 && <>
+        <div className="table-scroll"><table><thead><tr><th>First Name</th><th>Last Name</th><th>Status</th><th>Class/Titles</th><th>Current activities</th></tr></thead><tbody>
+          {members.map(member => {
+            const inactive = !member.has_current_data || member.status === 'not_active'
+            const hasTitle = member.status === 'pathfinder' || member.status === 'staff'
+            return <tr key={member.id}>
+              <td><button className="member-link" aria-label={`Open profile for ${member.name}`} aria-haspopup="dialog" onClick={() => setSelected(member.id)}>{member.first_name}</button></td>
+              <td>{member.last_name || 'Not recorded'}</td><td>{statusLabel(member.status)}</td>
+              <td>{hasTitle ? (member.current_title as string[] | null)?.join(', ') || 'Not recorded' : 'N/A'}</td>
+              <td>{inactive || member.status === 'staff' ? 'N/A' : (member.current_activities as string[] | null)?.join(', ') || 'None recorded'}</td></tr>
+          })}
+        </tbody></table></div>
+        <div className="pagination"><button className="secondary" disabled={page === 0 || busy} onClick={() => { beginSearch(); setPage(page - 1) }}>Previous</button>
+          <span>Page {page + 1} of {Math.max(1, Math.ceil(count / PAGE_SIZE))}</span>
+          <button className="secondary" disabled={(page + 1) * PAGE_SIZE >= count || busy} onClick={() => { beginSearch(); setPage(page + 1) }}>Next</button></div>
+      </>}
+    </section>
+    {selected !== null && <ProfileOverlay key={selected} id={selected} status={members.find(member => member.id === selected)?.status ?? 'not_active'} onClose={() => setSelected(null)} />}
+  </>
+}

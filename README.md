@@ -90,6 +90,16 @@ npm run build
 
 ## Project context
 
+### Frontend structure
+
+- `src/App.tsx`: application shell, sign-in, session lifecycle, and feature entry point.
+- `src/features/search/Search.tsx`: search filters, results, pagination, and opening member profiles.
+- `src/features/profile/`: member history popup and Notes editor.
+- `src/components/`: shared Select, MultiSelect, and Modal components.
+- `src/lib/`: Supabase access, database types, data functions, and shared formatting/error helpers.
+
+Future Add and Edit screens can live in `src/features/add/` and `src/features/edit/`, alongside Search. Connect their navigation in `App.tsx` and reuse shared controls and data functions. These screens are not implemented yet.
+
 Read [the project context](docs/project-context.md) for ministry background, source links, and terminology. The implemented data model follows [the database schema](docs/database-schema.md); preliminary ideas in the context document are not additional implemented features.
 
 
