@@ -97,7 +97,31 @@ test('member revision preserves history and enforces roles, ranges and access',a
  and search_event_details @> '[{"name":"Burning Twine","year":"2023-24","detail":"1st Place"}]'`)).rows
  assert.deepEqual(inclusive,[{id:1}])
  assert.equal((await db.query(`select id from member_search where search_event_details @> '[{"name":"Burning Twine","year":"2024-25","detail":"1st Place"}]'`)).rows.length,0)
+ // Add Record creates both rows, leaves history empty, and retries safely.
+ const request='10000000-0000-0000-0000-000000000001'
+ const create=(key,first,status,title,year='2026-27')=>db.query(
+  'select public.add_member_record($1,$2,$3,$4,$5,$6,$7) as id',
+  [key,first,' Example ','2001-02-03',status,title,year])
+ const created=(await create(request,' New ','staff','["Club Director","Drill Instructor"]')).rows[0].id
+ assert.equal((await create(request,' New ','staff','["Club Director","Drill Instructor"]')).rows[0].id,created)
+ const added=(await db.query('select * from member_search where id=$1',[created])).rows[0]
+ assert.equal(added.first_name,'New'); assert.equal(added.last_name,'Example'); assert.equal(added.status,'staff')
+ assert.deepEqual(added.current_title,['Club Director','Drill Instructor'])
+ assert.deepEqual(added.current_activities,['N/A'])
+ assert.deepEqual(added.years_active,[]); assert.deepEqual(added.levels,[])
+ await assert.rejects(create(request,'Changed','staff','["Club Director"]'),e=>e.code==='22023')
+ const before=(await db.query('select count(*) as n from pathfinders')).rows[0].n
+ for (const [status,title,year] of [['staff','["Friend"]','2026-27'],['parent','["Friend"]','2026-27'],['unknown',null,'2026-27'],['pathfinder','["Friend"]','2025-26']]) {
+  await assert.rejects(create('10000000-0000-0000-0000-000000000002','Rollback',status,title,year))
+  assert.equal((await db.query('select count(*) as n from pathfinders')).rows[0].n,before)
+ }
+ await assert.rejects(create('10000000-0000-0000-0000-000000000002','   ','parent',null))
+ for (const [index,status,title] of [[3,'pathfinder','["Friend","Companion"]'],[4,'parent',null],[5,'not_active',null]]) {
+  const id=(await create(`10000000-0000-0000-0000-00000000000${index}`,'Valid',status,title)).rows[0].id
+  assert.equal((await db.query('select status from current_data where pathfinder_id=$1',[id])).rows[0].status,status)
+ }
  await db.exec('reset role; set role anon;')
+ await assert.rejects(create('10000000-0000-0000-0000-000000000006','Denied','parent',null),e=>e.code==='42501')
  await assert.rejects(db.exec('select * from member_search'),e=>e.code==='42501')
  } finally {await db.close()}
 })

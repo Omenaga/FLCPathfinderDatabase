@@ -22,6 +22,7 @@ function Header() {
 }
 
 function ConnectedApp() {
+  const [recordsVersion, setRecordsVersion] = useState(0)
   const [page, setPage] = useState<'search' | 'records'>('search')
   const [session, setSession] = useState<Session | null>()
   const [error, setError] = useState('')
@@ -64,8 +65,8 @@ function ConnectedApp() {
         <button className={page === 'search' ? '' : 'secondary'} aria-current={page === 'search' ? 'page' : undefined} onClick={() => setPage('search')}>Search</button>
         <button className={page === 'records' ? '' : 'secondary'} aria-current={page === 'records' ? 'page' : undefined} onClick={() => setPage('records')}>Add / Edit Profiles</button>
       </nav>
-      <div hidden={page !== 'search'}><Search key={session.user.id} /></div>
-      {page === 'records' && <AddRecords key={session.user.id} />}
+      <div hidden={page !== 'search'}><Search key={session.user.id} recordsVersion={recordsVersion} /></div>
+      {page === 'records' && <AddRecords key={session.user.id} onAdded={() => setRecordsVersion(value => value + 1)} />}
     </> : <section className="panel login"><h2>Staff sign in</h2><p>Use your staff account to search member records.</p>
       <form onSubmit={signIn}><label>Email<input name="email" type="email" autoComplete="username" required /></label>
       <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>

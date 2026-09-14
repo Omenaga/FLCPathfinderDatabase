@@ -4,6 +4,7 @@
 .form-preview { padding: .75rem 1rem; background: #edf2fb; border-radius: .5rem; }
 .record-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
 .record-fields small { font-weight: 400; font-size: .8rem; }
+.record-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
 .staff-title-select .level-choice .level-variants { display: flex; flex-wrap: wrap; gap: .35rem; }
 .staff-title-select .level-choice .level-variants button { flex: 0 1 auto; white-space: normal; font-size: .8rem; padding: .35rem .45rem; }
 .record-fields input[readonly] { background: #f0f4fa; }

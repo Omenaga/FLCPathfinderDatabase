@@ -1,5 +1,19 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from './database.types'
+import type { Database as GeneratedDatabase } from './database.types'
+
+// PostgreSQL function argument nullability is absent from generated types.
+// The creation RPC deliberately accepts a null birthday for unknown dates.
+type Functions = GeneratedDatabase['public']['Functions']
+type Database = Omit<GeneratedDatabase, 'public'> & {
+  public: Omit<GeneratedDatabase['public'], 'Functions'> & {
+    Functions: Omit<Functions, 'add_member_record'> & {
+      add_member_record: {
+        Args: Omit<Functions['add_member_record']['Args'], 'p_birth_date'> & { p_birth_date: string | null }
+        Returns: Functions['add_member_record']['Returns']
+      }
+    }
+  }
+}
 
 let client: SupabaseClient<Database> | undefined
 

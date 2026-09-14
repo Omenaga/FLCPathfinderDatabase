@@ -20,7 +20,7 @@ export type Database = {
           current_activities: Json | null
           current_title: Json | null
           pathfinder_id: number
-          school_year: string | null
+          school_year: string
           status: string
           updated_at: string
         }
@@ -29,7 +29,7 @@ export type Database = {
           current_activities?: Json | null
           current_title?: Json | null
           pathfinder_id: number
-          school_year?: string | null
+          school_year?: string
           status?: string
           updated_at?: string
         }
@@ -38,7 +38,7 @@ export type Database = {
           current_activities?: Json | null
           current_title?: Json | null
           pathfinder_id?: number
-          school_year?: string | null
+          school_year?: string
           status?: string
           updated_at?: string
         }
@@ -100,22 +100,22 @@ export type Database = {
       }
       drum_corps: {
         Row: {
+          history: Json
           history_role: string
           id: number
           pathfinder_id: number
-          history: Json
         }
         Insert: {
+          history: Json
           history_role?: string
           id?: never
           pathfinder_id: number
-          history: Json
         }
         Update: {
+          history?: Json
           history_role?: string
           id?: never
           pathfinder_id?: number
-          history?: Json
         }
         Relationships: [
           {
@@ -199,6 +199,7 @@ export type Database = {
         Row: {
           birth_date: string | null
           created_at: string
+          creation_request_id: string | null
           first_name: string
           id: number
           last_name: string
@@ -210,6 +211,7 @@ export type Database = {
         Insert: {
           birth_date?: string | null
           created_at?: string
+          creation_request_id?: string | null
           first_name: string
           id?: never
           last_name?: string
@@ -221,6 +223,7 @@ export type Database = {
         Update: {
           birth_date?: string | null
           created_at?: string
+          creation_request_id?: string | null
           first_name?: string
           id?: never
           last_name?: string
@@ -680,19 +683,19 @@ export type Database = {
       }
       staff_history: {
         Row: {
+          history: Json
           id: number
           pathfinder_id: number
-          history: Json
         }
         Insert: {
+          history: Json
           id?: never
           pathfinder_id: number
-          history: Json
         }
         Update: {
+          history?: Json
           id?: never
           pathfinder_id?: number
-          history?: Json
         }
         Relationships: [
           {
@@ -787,6 +790,18 @@ export type Database = {
       }
     }
     Functions: {
+      add_member_record: {
+        Args: {
+          p_birth_date: string
+          p_current_title: Json
+          p_first_name: string
+          p_last_name: string
+          p_request_id: string
+          p_school_year: string
+          p_status: string
+        }
+        Returns: number
+      }
       current_club_year: { Args: never; Returns: string }
       current_staff_role: { Args: never; Returns: string }
     }

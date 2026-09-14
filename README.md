@@ -34,7 +34,7 @@ Only put a publishable key in the frontend. `VITE_` values are bundled into the 
 
 ## Staff accounts
 
-Create staff accounts in Supabase **Authentication > Users**, then sign in through the app. No allowlist entry, SQL grant, or separate approval is needed. All authenticated accounts can read, insert, and update through the API; the interface supports searching, profiles, and saving Notes. Browser deletion remains disabled.
+Create staff accounts in Supabase **Authentication > Users**, then sign in through the app. No allowlist entry, SQL grant, or separate approval is needed. All authenticated accounts can read, insert, and update through the API; the interface supports searching, adding records, profiles, and saving Notes. Browser deletion remains disabled.
 
 Keep **Allow new users to sign up** disabled in hosted Supabase Auth settings, and anonymous sign-ins disabled. Accounts are provisioned by administrators. Local `supabase/config.toml` also disables signup. Configure hosted Auth before applying the access migration; changing the local file alone does not update hosted settings.
 
@@ -42,7 +42,7 @@ The September 11 migration changes `current_staff_role()` to return `editor` for
 
 ## Entering records
 
-Use Supabase Table Editor for member, current, and historical records. The app currently edits Notes; other data entry remains in Supabase. Create the person with first_name and last_name, then link detail rows with pathfinder_id. IDs remain internal. Do not commit member records or credentials.
+Use **Add / Edit Profiles > Add Record** to create a person and current registration together. Enter names, Status, optional Birthday and Class/Title; Current Year comes from the configured club year. Click Add, then Confirm within five seconds. Record Added shows the saved profile summary. Failed saves preserve your inputs for retry. Historical data and edits other than Notes remain in Supabase Table Editor. IDs remain internal. Do not commit member records or credentials.
 
 Current Data uses one `current_title` field validated against status. Pathfinder titles use the eight levels. Staff titles come from `staff_titles`, which is intentionally empty until supplied. Parent/Not Active titles are null.
 
@@ -98,7 +98,7 @@ npm run build
 - `src/components/`: shared Select, MultiSelect, and Modal components.
 - `src/lib/`: Supabase access, database types, data functions, and shared formatting/error helpers.
 
-Future Add and Edit screens can live in `src/features/add/` and `src/features/edit/`, alongside Search. Connect their navigation in `App.tsx` and reuse shared controls and data functions. These screens are not implemented yet.
+`src/features/add/` contains the Add Record form and saved profile summary. `App.tsx` connects the page navigation and refreshes Search after creation without discarding its filters. The `add_member_record` Supabase function saves both rows atomically and prevents duplicate creation on retries from the same form. Apply `20260915140000_add_record.sql` before using this frontend. A future Edit screen can live in `src/features/edit/`.
 
 Read [the project context](docs/project-context.md) for ministry background, source links, and terminology. The implemented data model follows [the database schema](docs/database-schema.md); preliminary ideas in the context document are not additional implemented features.
 

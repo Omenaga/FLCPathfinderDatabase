@@ -1,7 +1,8 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 
-export default function Modal({ title, header, children, onClose }: { title: string; header?: ReactNode; children: ReactNode; onClose: () => void }) {
+export default function Modal({ title, header, children, onClose, closeDisabled = false }: { title: string; header?: ReactNode; children: ReactNode; onClose: () => void; closeDisabled?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  useEffect(() => { dialog.current?.querySelector<HTMLButtonElement>('.modal-close')?.focus() }, [title])
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
     const element = dialog.current!
@@ -14,10 +15,10 @@ export default function Modal({ title, header, children, onClose }: { title: str
       opener?.focus()
     }
   }, [])
-  return <dialog ref={dialog} className="profile-overlay" aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); onClose() }}>
+  return <dialog ref={dialog} className="profile-overlay" aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (!closeDisabled) onClose() }}>
     <header className="modal-header">
       {header}
-      <button className="secondary modal-close" onClick={onClose} autoFocus>Close</button>
+      <button className="secondary modal-close" disabled={closeDisabled} onClick={onClose} autoFocus>Close</button>
     </header>
     {children}
   </dialog>

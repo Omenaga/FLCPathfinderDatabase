@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import Modal from '../../components/Modal'
 import MultiSelect from '../../components/MultiSelect'
 import { LEVELS, STATUSES } from '../../lib/pathfinders'
@@ -16,18 +16,18 @@ function staffTitleLabel(title: string) {
   return title.replace(/ (Counselor|Instructor|Leader)$/, '').replace(/^Drum Corps$|^Drum$/, 'Drums')
 }
 
-export default function AddRecords() {
+export default function AddRecords({ onAdded }: { onAdded: () => void }) {
   const [open, setOpen] = useState(false)
   return <section className="panel">
-    <div className="section-heading"><h2>Add / Edit Profiles</h2><span>Form preview</span></div>
+    <div className="section-heading"><h2>Add / Edit Profiles</h2></div>
     <p>Create a member profile with their personal details and current registration.</p>
     <button onClick={() => setOpen(true)}>Add Record</button>
     <div className="records-placeholder"><h3>Edit profiles</h3><p className="muted">Profile editing is coming later. You can already update notes from a member’s search profile.</p></div>
-    {open && <AddRecordModal onClose={() => setOpen(false)} />}
+    {open && <AddRecordModal onClose={() => setOpen(false)} onAdded={onAdded} />}
   </section>
 }
 
-function AddRecordModal({ onClose }: { onClose: () => void }) {
+function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
   const [status, setStatus] = useState('')
   const [titles, setTitles] = useState<string[]>([])
   const [year, setYear] = useState('')
@@ -37,7 +37,11 @@ function AddRecordModal({ onClose }: { onClose: () => void }) {
   const [attempt, setAttempt] = useState(0)
   const [deadline, setDeadline] = useState<number | null>(null)
   const [seconds, setSeconds] = useState(5)
-  const [previewed, setPreviewed] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [requestId] = useState(() => crypto.randomUUID())
+  const submitting = useRef(false)
   const [summary, setSummary] = useState<{ firstName: string; lastName: string; birthday: string } | null>(null)
   useEffect(() => {
     const controller = new AbortController()
@@ -68,16 +72,31 @@ function AddRecordModal({ onClose }: { onClose: () => void }) {
     }, 100)
     return () => window.clearInterval(timer)
   }, [deadline])
-  function resetConfirmation() { setDeadline(null); setPreviewed(false) }
-  function submit(event: FormEvent<HTMLFormElement>) {
+  function resetConfirmation() { setDeadline(null); setSaveError('') }
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (loading || error) return
+    if (loading || error || submitting.current) return
     if (deadline !== null && Date.now() < deadline) {
       const fields = new FormData(event.currentTarget)
-      setSummary({ firstName: String(fields.get('first_name') ?? '').trim(), lastName: String(fields.get('last_name') ?? '').trim(), birthday: String(fields.get('birth_date') ?? '') })
-      setDeadline(null); setPreviewed(true)
+      const details = { firstName: String(fields.get('first_name') ?? '').trim(), lastName: String(fields.get('last_name') ?? '').trim(), birthday: String(fields.get('birth_date') ?? '') }
+      setDeadline(null); setSaveError(''); setSaving(true); submitting.current = true
+      try {
+        const { data, error } = await getSupabase().rpc('add_member_record', {
+          p_request_id: requestId,
+          p_first_name: details.firstName,
+          p_last_name: details.lastName,
+          p_birth_date: details.birthday || null,
+          p_status: status.toLowerCase().replaceAll(' ', '_'),
+          p_current_title: (status === 'Pathfinder' || status === 'Staff') && titles.length ? titles : null,
+          p_school_year: year,
+        })
+        if (error) throw error
+        if (!Number.isInteger(data)) throw new Error('Could not confirm the save. Retry with the same details.')
+        setSummary(details); setSaved(true); onAdded()
+      } catch (error) { setSaveError(message(error)) }
+      finally { setSaving(false); submitting.current = false }
     } else {
-      setPreviewed(false); setSeconds(5); setDeadline(Date.now() + 5000)
+      setSaveError(''); setSeconds(5); setDeadline(Date.now() + 5000)
     }
   }
   const hasTitle = status === 'Pathfinder' || status === 'Staff'
@@ -85,8 +104,8 @@ function AddRecordModal({ onClose }: { onClose: () => void }) {
   const orderedStaffTitles = [...staffTitles].sort((a, b) =>
     groups.indexOf(staffTitleGroup(a)) - groups.indexOf(staffTitleGroup(b)))
   const displayYear = year ? `${year.slice(0, 4)}-${Number(year.slice(0, 4)) + 1}` : 'Not recorded'
-  if (previewed && summary) return <Modal key="record-added" title="Record Added" header={<h2>Record Added</h2>} onClose={onClose}>
-    <p className="form-preview">Preview only. No record has been saved to the database yet.</p>
+  if (saved && summary) return <Modal title="Record Added" header={<h2>Record Added</h2>} onClose={onClose}>
+    <p role="status">The new profile has been saved.</p>
     <section className="profile-summary" aria-label="New profile summary">
       <h3>{[summary.firstName, summary.lastName].filter(Boolean).join(' ')}</h3>
       <dl className="profile-records">
@@ -99,10 +118,11 @@ function AddRecordModal({ onClose }: { onClose: () => void }) {
       </dl>
     </section>
   </Modal>
-  return <Modal title="Add Record" header={<h2>Add Record</h2>} onClose={onClose}>
-    <p className="form-preview">Preview the new registration form. Records are not saved yet.</p>
+  return <Modal title="Add Record" header={<h2>Add Record</h2>} onClose={onClose} closeDisabled={saving}>
+    <p>Enter the member’s details and current registration.</p>
     {error && <div role="alert"><p className="error">{error}</p><button type="button" className="secondary" onClick={() => { setError(''); setLoading(true); setAttempt(value => value + 1) }}>Retry form options</button></div>}
-    <form className="record-form" onSubmit={submit} onChange={resetConfirmation}>
+    <form className="record-form" onSubmit={submit} onChange={resetConfirmation} aria-busy={saving}>
+      <fieldset disabled={saving} className="record-fieldset">
       <div className="record-fields">
         <label>First Name<input name="first_name" required maxLength={200} pattern={'.*\\S.*'} autoComplete="given-name" /></label>
         <label>Last Name<input name="last_name" maxLength={200} autoComplete="family-name" /><small className="muted">Leave blank if unknown.</small></label>
@@ -111,13 +131,16 @@ function AddRecordModal({ onClose }: { onClose: () => void }) {
         <label>Current Year<input readOnly value={year ? `${year.slice(0, 4)}-${Number(year.slice(0, 4)) + 1}` : ''} placeholder={loading ? 'Loading current year…' : 'Unavailable'} /><small className="muted">Current club school year.</small></label>
         <div className={status === 'Staff' ? 'staff-title-select' : undefined}>{hasTitle && !loading && !error ? <MultiSelect key={status} label="Class/Title" values={titles} options={status === 'Pathfinder' ? LEVELS : orderedStaffTitles}
           optionGroup={status === 'Staff' ? staffTitleGroup : undefined} variantLabel={status === 'Staff' ? staffTitleLabel : undefined}
-          emptyMessage="No titles available" onChange={values => { setTitles(values); resetConfirmation() }} /> : <label>Class/Title<select disabled><option>{loading ? 'Loading options…' : hasTitle ? 'Options unavailable' : status ? 'N/A' : 'Select a status first'}</option></select></label>}
+          emptyMessage="No titles available" onChange={values => { if (!submitting.current) { setTitles(values); resetConfirmation() } }} /> : <label>Class/Title<select disabled><option>{loading ? 'Loading options…' : hasTitle ? 'Options unavailable' : status ? 'N/A' : 'Select a status first'}</option></select></label>}
           {hasTitle && <small className="muted">Choose one or more, or leave blank if unknown.</small>}</div>
       </div>
-      <div className="record-footer">
-        <p role="status">{previewed ? 'Preview complete. No record was saved.' : deadline !== null ? 'Ready to add this profile? Click Confirm before the timer expires.' : 'Review the details, then click Add to confirm.'}</p>
-        <div className="actions"><button type="submit" disabled={loading || !!error}>{deadline !== null ? `Confirm (${seconds}s)` : 'Add'}</button><button type="button" className="secondary" onClick={onClose}>Cancel</button></div>
+      {/* Keep the inline choices from collapsing between pointer down and click. */}
+      <div className="record-footer" onMouseDown={event => { if ((event.target as HTMLElement).closest('button')) event.preventDefault() }}>
+        <p role="status">{saving ? 'Saving record…' : deadline !== null ? 'Ready to add this profile? Click Confirm before the timer expires.' : 'Review the details, then click Add to confirm.'}</p>
+        {saveError && <p role="alert" className="error">{saveError}</p>}
+        <div className="actions"><button type="submit" disabled={loading || !!error || saving}>{saving ? 'Saving…' : deadline !== null ? `Confirm (${seconds}s)` : 'Add'}</button><button type="button" className="secondary" onClick={onClose} disabled={saving}>Cancel</button></div>
       </div>
+      </fieldset>
     </form>
   </Modal>
 }

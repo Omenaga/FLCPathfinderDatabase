@@ -7,7 +7,7 @@ import { statusLabel } from '../../lib/format'
 import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, PERIODS, STATUSES, PAGE_SIZE, searchPathfinders,
   type Filters, type Pathfinder } from '../../lib/pathfinders'
 
-export default function Search() {
+export default function Search({ recordsVersion = 0 }: { recordsVersion?: number }) {
   // Honors are a UI placeholder until the catalog and search integration are added.
   const [honors, setHonors] = useState<string[]>([])
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
@@ -22,11 +22,11 @@ export default function Search() {
   useEffect(() => {
     const controller = new AbortController()
     searchPathfinders(filters, page, controller.signal).then(result => {
-      if (!controller.signal.aborted) { setMembers(result.members); setCount(result.count) }
+      if (!controller.signal.aborted) { setMembers(result.members); setCount(result.count); setError('') }
     }).catch(error => { if (!controller.signal.aborted) setError(message(error)) })
       .finally(() => { if (!controller.signal.aborted) setBusy(false) })
     return () => controller.abort()
-  }, [filters, page, attempt])
+  }, [filters, page, attempt, recordsVersion])
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
     setDraft(current => ({ ...current, [key]: value }))
   }

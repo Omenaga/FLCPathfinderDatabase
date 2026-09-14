@@ -17,6 +17,7 @@ One permanent row per person, including Pathfinder, Staff, Parent, and inactive 
 | `levels` | jsonb | Level/outcome/year entries described below |
 | `birth_date` | date, nullable | Birthday; display MM/DD/YYYY without timezone conversion |
 | `notes` | text, nullable | Multiline plain text; editable through Save Notes in the profile |
+| `creation_request_id` | uuid, nullable, unique | Internal Add Record request identifier; prevents duplicate creation when the same form is retried |
 | `created_at`, `updated_at` | timestamptz | Creation and automatically updated modification time |
 
 The old name, graduated, extracurriculars, and red_zone_participation columns are removed. Full display/search names are derived from first and last names. Historical participation comes from detail tables.
@@ -232,9 +233,9 @@ Both role sections remain identifiable, with empty messages when their summary h
 
 The overlay preserves filters/results/pagination, supports loading/retry and mobile scrolling, prevents stale requests from rendering, and returns focus to its opener. Honors preserves the underlying profile and closes independently with Escape or Close.
 
-## Add Record flow (frontend preview implemented)
+## Add Record flow
 
-The frontend now includes the Add / Edit Profiles page and Add Record modal, with status-dependent choices, the configured current year, and a five-second confirmation countdown. Confirm completes a preview only: no member records are written. Transactional saving and profile editing remain unimplemented. The requirements below describe the complete intended flow.
+The Add / Edit Profiles page includes the Add Record modal, with status-dependent choices, the configured current year, and a five-second confirmation countdown. Confirm calls `add_member_record` in Supabase and shows Record Added only after saving succeeds. Profile editing remains future work.
 
 Add a tab alongside **Search** that opens a page for adding and, eventually, editing profiles. The initial implementation focuses on adding records; editing and any later separation into pages remain future work. An **Add Record** button on this page opens a modal form.
 
@@ -265,11 +266,13 @@ The configured club year is the source of truth for autofill. Follow the existin
 2. Once valid, request confirmation in the same modal and change the button to **Confirm (5s)**. Count down the remaining seconds on the button. Five seconds is the initial confirmation window.
 3. Clicking Confirm within that window submits the record. Expiration restores **Add** without submitting or clearing the entered values. The timeout never submits automatically.
 4. Any field change cancels confirmation and restores Add, so confirmation always applies to the values reviewed. Closing the modal cancels its timer and discards the unsaved form.
-5. While saving, disable repeat submission and show a pending state. On success, replace the form in the modal with **Record Added** and a quick summary of First Name, Last Name, Status, Birthday, Class/Title, and Current Year. Close returns to the Add / Edit Profiles page; the new record should be available in subsequent Search results. On failure, preserve the inputs, display the error, and return to Add for a fresh confirmation. The frontend preview currently shows this summary after Confirm with an explicit notice that no database record has been saved.
+5. While saving, disable the form, repeat submission, and modal closing, and show a pending state. On success, replace the form in the modal with **Record Added** and a quick summary of First Name, Last Name, Status, Birthday, Class/Title, and Current Year. Close returns to the Add / Edit Profiles page. Search refreshes using its existing filters and page, so a new record appears when it matches those filters. On failure, preserve the inputs, display the error, and return to Add for a fresh confirmation.
 
 ### Persistence requirements
 
-Create one `pathfinders` row and its linked `current_data` row using the generated person ID. Save both atomically so a failed registration cannot leave a partially created profile. Use authenticated access with the existing permission model. Existing columns cover the six form fields; implementation may require a migration for a transactional creation function, but no new member columns are planned.
+`add_member_record(p_request_id, p_first_name, p_last_name, p_birth_date, p_status, p_current_title, p_school_year)` returns the generated integer person ID. It creates one `pathfinders` row and its linked `current_data` row in one transaction, so a failed registration cannot leave a partially created profile. The security-invoker function requires an authenticated user and respects existing RLS and validation. It trims names and rejects a stale school year.
+
+The migration `20260915140000_add_record.sql` adds this function and the nullable unique `pathfinders.creation_request_id` column; existing people remain unchanged. The form keeps a random request UUID across retries. Transaction-level locking serializes identical requests; a successful retry with identical details returns the existing ID. Reusing that request with different details is rejected with a prompt to check Search. This protects retries within the same open form; a new form is a new request, and names are not unique identifiers.
 
 Fields outside this form use existing database defaults and validation, including Staff current activities normalized to `["N/A"]`. Do not infer historical participation, earned levels, or activity/event records from this current registration form.
 
