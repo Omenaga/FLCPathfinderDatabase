@@ -263,7 +263,7 @@ function ProfileOverlay({ id, status, onClose }: { id: number; status: string; o
     return () => controller.abort()
   }, [id, attempt])
   const years = [...new Set(details?.member.years_active ?? [])].sort()
-  const levels = [...(details?.member.levels ?? [])].sort((a, b) => LEVELS.indexOf(a.name as typeof LEVELS[number]) - LEVELS.indexOf(b.name as typeof LEVELS[number]) || (a.year ?? '').localeCompare(b.year ?? ''))
+  const levels = [...(details?.member.levels ?? [])].sort((a, b) => (a.year ?? '9999').localeCompare(b.year ?? '9999') || LEVELS.indexOf(a.name as typeof LEVELS[number]) - LEVELS.indexOf(b.name as typeof LEVELS[number]))
   const birthday = details?.member.birth_date
   return <Modal title="Member profile" onClose={onClose} header={details && <div className="profile-heading"><h2>{[details.member.first_name, details.member.last_name].filter(Boolean).join(' ')}</h2><span className="profile-status">{statusLabel(status)}</span></div>}>
     {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { setError(''); setDetails(null); setAttempt(value => value + 1) }}>Try again</button></> : !details ? <p role="status">Loading profile...</p> : <>
@@ -271,7 +271,7 @@ function ProfileOverlay({ id, status, onClose }: { id: number; status: string; o
       <section className="profile-summary"><h3>Years Active</h3><p>{years.join(', ') || 'No years recorded'}</p></section>
       {details.roles.map(group => <section className="profile-role" key={group.role} aria-label={`${group.role === 'staff' ? 'Staff' : 'Pathfinder'} history`}>
         <h3 className="role-heading">{group.role === 'staff' ? 'Staff History' : 'Pathfinder History'}</h3>
-        {group.role === 'pathfinder' ? <section className="profile-summary"><h4>Levels</h4>{levels.length ? <ul>{levels.map((level,index) => <li key={index}>{level.name} ({statusLabel(level.outcome)}) - {level.year ?? 'Year unknown'}</li>)}</ul> : <p>No levels recorded</p>}</section>
+        {group.role === 'pathfinder' ? <section className="profile-summary"><h4>Levels</h4>{levels.length ? <dl className="profile-records">{levels.map((level,index) => <div key={index}><dt>{level.year ?? 'Year unknown'}</dt><dd>{level.name} ({statusLabel(level.outcome)})</dd></div>)}</dl> : <p>No levels recorded</p>}</section>
         : <section className="profile-summary"><h4>Years and Titles</h4>{details.staffHistory.length ? <dl className="profile-records">{details.staffHistory.map(record => <div key={record.year}><dt>{record.year}</dt><dd>{record.titles.join(', ') || 'Title not recorded'}</dd></div>)}</dl> : <p>No staff years or titles recorded</p>}</section>}
         {group.activities.map(activity => <section className="profile-activity" key={activity.name}>
           <h4>{activity.name === 'Drums' ? 'Drum' : activity.name}</h4>
