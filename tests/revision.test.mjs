@@ -24,6 +24,13 @@ test('member revision preserves history and enforces roles, ranges and access',a
   // Reproduce the live schema drift and blank season that hid the Staff row.
   await db.exec('alter table current_data alter column school_year drop not null; alter table current_data drop constraint current_data_school_year_check; update current_data set school_year=null')
  }
+ if(file==='20260915120000_staff_drum_history.sql') {
+  await db.exec(`insert into staff_titles values ('Director'),('Deputy');
+  insert into staff_history(pathfinder_id,years,title) values
+   (1,'["2023-24","2024-25"]','Director'),(1,'["2023-24"]','Deputy'),(1,'["2022-23"]',null);
+  insert into drum_corps(pathfinder_id,years,drum_played,history_role) values
+   (1,'["2023-24","2024-25"]','Snare','pathfinder'),(1,'["2023-24"]','Bass','pathfinder'),(1,'["2025-26"]','Tenor','staff');`)
+ }
  const sql=await readFile(new URL(file,folder),'utf8')
  if(!/^begin;/m.test(sql)) await db.exec('begin')
  await db.exec(sql)
@@ -40,6 +47,23 @@ test('member revision preserves history and enforces roles, ranges and access',a
  assert.ok(row.search_activity_years.includes('TLT (2023-24)'))
  assert.ok(row.search_activity_details.some(r=>r.name==='TLT' && r.year==='2023-24' && r.detail==='Teaching'))
  assert.ok(row.search_event_details.some(r=>r.name==='Burning Twine' && r.year==='2023-24' && r.detail==='1st Place'))
+ assert.deepEqual((await db.query('select history from staff_history where pathfinder_id=1')).rows[0].history,
+  [{year:'2022-23',titles:[]},{year:'2023-24',titles:['Deputy','Director']},{year:'2024-25',titles:['Director']}])
+ assert.deepEqual((await db.query("select history from drum_corps where pathfinder_id=1 and history_role='pathfinder'")).rows[0].history,
+  [{year:'2023-24',drums:['Bass','Snare']},{year:'2024-25',drums:['Snare']}])
+ assert.deepEqual((await db.query("select history from drum_corps where history_role='staff'")).rows[0].history,[{year:'2025-26',drums:['Tenor']}])
+ assert.equal((await db.query("select count(*)::int as n from staff_titles where title in ('Club Director','Friend Counselor','Master Guide','Trailer')")).rows[0].n,4)
+ assert.ok(row.search_years.includes('2022-23'))
+ assert.ok(row.search_activity_details.some(r=>r.name==='Drums' && r.year==='2023-24' && r.detail==='Bass'))
+ assert.ok(!row.search_activity_details.some(r=>r.name==='Drums' && r.year==='2024-25' && r.detail==='Bass'))
+ assert.equal((await db.query('select count(*)::int as n from private.staff_drum_history_backup')).rows[0].n,6)
+ await assert.rejects(db.exec("delete from staff_titles where title='Director'"),e=>e.code==='23503')
+ await assert.rejects(db.exec("update staff_titles set title='Renamed' where title='Deputy'"),e=>e.code==='23503')
+ for(const [table,key,invalid] of [['staff_history','titles','Unknown'],['drum_corps','drums','Piano']]) {
+  for(const history of [[],[{year:'2023-25',[key]:[]}],[{year:'2023-24',[key]:[invalid]}],[{year:'2023-24',[key]:[]},{year:'2023-24',[key]:[]}],[{year:'2023-24',[key]:null}],[{year:'2023-24',[key]:[],extra:true}]]) {
+   await assert.rejects(db.query(`update ${table} set history=$1 where pathfinder_id=1`,[JSON.stringify(history)]),e=>e.code==='23514')
+  }
+ }
  await db.exec("insert into staff_titles values ('Counselor')")
  assert.equal((await db.query('select history from pbe')).rows[0].history[0].year,'2021-22')
  assert.equal((await db.query('select year from red_zone_burning_twine')).rows[0].year,'2023-24')
@@ -48,7 +72,7 @@ test('member revision preserves history and enforces roles, ranges and access',a
  insert into drill(pathfinder_id,team,years,history_role) values (1,'Adult','["2025-26"]','staff');`)
  await assert.rejects(db.exec(`update current_data set current_title='Friend' where pathfinder_id=1`),e=>e.code==='23514')
  await db.exec(`update current_data set current_title='Counselor' where pathfinder_id=1`)
- await db.exec(`insert into staff_history(pathfinder_id,years,title) values (1,'["2025-26"]','Counselor')`)
+ await db.exec(`update staff_history set history=history || '[{"year":"2025-26","titles":["Counselor"]}]' where pathfinder_id=1`)
  await db.exec(`update current_data set status='pathfinder',current_title='Friend' where pathfinder_id=1`)
  await assert.rejects(db.exec(`update current_data set status='parent' where pathfinder_id=1`),e=>e.code==='23514')
  await assert.rejects(db.exec(`update pathfinders set years_active='["2023-25"]' where id=1`),e=>e.code==='23514')

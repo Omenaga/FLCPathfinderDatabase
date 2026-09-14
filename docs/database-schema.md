@@ -34,23 +34,63 @@ At most one row per person. `current_club_year()` selects `2026-27`; this change
 | `current_activities` | jsonb | Unique array of Drill, Drums, PBE, TLT; confirmed current participation |
 | `created_at`, `updated_at` | timestamptz | Maintained timestamps |
 
-Grade is removed. For Pathfinder, current_title must be one of the eight level names. For Staff, it must come from `staff_titles`; this catalog starts empty pending the user's choices. Unknown titles remain null. Parent/Not Active must have null titles. Changing status requires a compatible title or clearing it. Current classes do not imply earned achievements.
+Grade is removed. For Pathfinder, current_title must be one of the eight level names. For Staff, it must come from `staff_titles`; the catalog is seeded with the titles below. Unknown titles remain null. Parent/Not Active must have null titles. Changing status requires a compatible title or clearing it. Current classes do not imply earned achievements.
 
 ### `staff_titles` and `staff_history`
 
 `staff_titles(title text primary key)` holds allowed staff titles; authenticated users may read the catalog, and administrators configure it. Referenced titles cannot be removed in a way that invalidates saved current or historical data. No placeholder title is stored.
 
-`staff_history` contains `id` (identity primary key), `pathfinder_id` (FK), `years` (nonempty unique range array), and nullable `title` (FK to staff_titles). One row per member/title, including at most one unknown-title row; group all that title's periods in `years`. Staff years are included in Years Active search.
+1. Club Director
+2. Friend Counselor
+3. Companion Counselor
+4. Explorer Counselor
+5. Ranger Counselor
+6. Voyager Counselor
+7. Guide Counselor
+8. Pioneer Counselor
+9. Navigator Counselor
+10. Master Guide Leader
+11. PBE Leader
+12. Drum Corps Leader
+13. Drill Leader
+14. TLT Leader
+15. PBE Instructor
+16. Drum Instructor
+17. Drill Instructor
+18. TLT Instructor
+19. Associate Director
+20. Treasurer
+21. Administrative Assistant
+22. Equipment
+23. Trailer
+24. Camping
+25. IT
+26. Audio/Visual
+27. Medical
+28. Security
+29. Social Media
+30. Photography
+31. Junior Staff
+32. Master Guide
+
+`staff_history` contains `id` (identity primary key), `pathfinder_id` (unique FK), and `history` (nonempty JSON array). One row per member, with one entry per unique period and multiple titles allowed per period. Titles come from `staff_titles` but are not restricted to particular years. Empty title arrays preserve participation with an unknown title. Validation and catalog-protection triggers prevent invalid references. Staff years are included in Years Active search.
+
+```json
+[
+  { "year": "2023-24", "titles": ["Friend Counselor", "Drill Instructor"] },
+  { "year": "2024-25", "titles": [] }
+]
+```
 
 ## Year ranges and migration
 
 All stored participation/achievement years use consecutive `YYYY-YY` ranges, e.g. `2012-13`, `2023-24`, `2026-27`. The four-digit start year must be at least 1900; the suffix must be the last two digits of the following year. `1999-00` is valid. Birthday is still a full date, and audit timestamps remain timestamps.
 
-This applies to Years Active, levels, current school_year, Drill/Drum years, PBE/TLT history, all RZE results, honors earned, staff_history, and year-linked catalogs. Sort by the full starting year. Duplicate ranges in a single years array are rejected.
+This applies to Years Active, levels, current school_year, Drill years, Drums/PBE/TLT history, all RZE results, honors earned, staff_history, and year-linked catalogs. Sort by the full starting year. Duplicate ranges in a single years array are rejected.
 
 The user-approved migration maps standalone 2024 to `2023-24`; long ranges such as `2023-2024` shorten to `2023-24`. Existing undated levels retain null years and display Year unknown. Existing history was classified as Pathfinder history; current status does not reclassify the past. Unknown Drill teams remain null. The existing person's first/last names and Staff status were explicitly confirmed before conversion.
 
-`private.member_revision_backup` retains the pre-migration records for administrator review and is inaccessible to browser users. Migration history remains intact; future changes use new migrations.
+`private.member_revision_backup` retains the pre-migration records for administrator review and is inaccessible to browser users. Migration history remains intact; future changes use new migrations. The staff/drum history migration preserves period/detail associations and retains original rows in administrator-only `private.staff_drum_history_backup`.
 
 ## Levels
 
@@ -75,13 +115,20 @@ Every detail table references `pathfinders.id` using `pathfinder_id`. Each has `
 | Table | Columns besides pathfinder_id/history_role | Uniqueness / behavior |
 |---|---|---|
 | `drill` | id identity PK, team nullable text, years jsonb | One row per member/team/role, including an unknown team; nonempty years |
-| `drum_corps` | id identity PK, drum_played text, years jsonb | One row per member/instrument/role; nonempty years |
+| `drum_corps` | id identity PK, history jsonb | One row per member/role; each range paired with its instruments |
 | `pbe` | id identity PK, history jsonb | One row per member/role; each range paired with its books |
 | `tlt` | id identity PK, history jsonb | One row per member/role; each range paired with its operations |
 
 Drill teams: **Precision, Freestyle, Adult**. Adult is a team, not automatic evidence of a Staff role.
 
-Drum instruments: **Snare, Quad, Bass, Tenor, Cymbol** (retaining the supplied spelling).
+Drum instruments: **Snare, Quad, Bass, Tenor, Cymbol** (retaining the supplied spelling). Multiple instruments may accompany any valid period, without a year-specific catalog.
+
+```json
+[
+  { "year": "2023-24", "drums": ["Snare", "Bass"] },
+  { "year": "2024-25", "drums": ["Tenor"] }
+]
+```
 
 TLT operations: **Administrative, Outreach, Teaching, Activity, Records, Counseling**. Any allowed operation can accompany any valid TLT period. Starting years range from 2016 (the converted 2017 calendar-year minimum) through the current calendar year. Multiple different operations per period are allowed.
 
@@ -101,7 +148,7 @@ PBE example:
 ]
 ```
 
-PBE/TLT histories are required nonempty arrays, with one object per unique period. Book/operation arrays contain unique valid strings; empty arrays preserve participation with unknown details. Do not combine multiple names into one comma-separated string.
+Staff/Drums/PBE/TLT histories are required nonempty arrays, with one object per unique period. Title/instrument/book/operation arrays contain unique valid strings; empty arrays preserve participation with unknown details. Do not combine multiple names into one comma-separated string.
 
 ### `pbe_year_books`
 
@@ -178,7 +225,7 @@ Computed view fields `search_activities`, `search_activity_years`, `search_event
 1. Full name and current Status.
 2. Birthday displayed MM/DD/YYYY, or Not recorded.
 3. **Pathfinder History**: Years Active, Levels with outcome and period, activity sections with linked details, separate RZE mini cards, and View Honors.
-4. **Staff History**: staff_history years/titles, and activity/RZE records explicitly marked staff.
+4. **Staff History**: staff_history period/title entries, and activity/RZE records explicitly marked staff.
 5. **Notes**: multiline plain-text editor with Save Notes, pending/success/error states, and an unsaved-changes notice. Closing does not automatically save.
 
 Both role sections remain identifiable, with empty messages when their summary history is unknown. Activity/event subsections without records are omitted. Current Staff status never hides past Pathfinder records. Staff titles can be supplied later without assigning guessed titles now.

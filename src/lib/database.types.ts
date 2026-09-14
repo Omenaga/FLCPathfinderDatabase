@@ -100,25 +100,22 @@ export type Database = {
       }
       drum_corps: {
         Row: {
-          drum_played: string
           history_role: string
           id: number
           pathfinder_id: number
-          years: Json
+          history: Json
         }
         Insert: {
-          drum_played: string
           history_role?: string
           id?: never
           pathfinder_id: number
-          years: Json
+          history: Json
         }
         Update: {
-          drum_played?: string
           history_role?: string
           id?: never
           pathfinder_id?: number
-          years?: Json
+          history?: Json
         }
         Relationships: [
           {
@@ -685,42 +682,32 @@ export type Database = {
         Row: {
           id: number
           pathfinder_id: number
-          title: string | null
-          years: Json
+          history: Json
         }
         Insert: {
           id?: never
           pathfinder_id: number
-          title?: string | null
-          years: Json
+          history: Json
         }
         Update: {
           id?: never
           pathfinder_id?: number
-          title?: string | null
-          years?: Json
+          history?: Json
         }
         Relationships: [
           {
             foreignKeyName: "staff_history_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "member_search"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "staff_history_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "staff_history_title_fkey"
-            columns: ["title"]
-            isOneToOne: false
-            referencedRelation: "staff_titles"
-            referencedColumns: ["title"]
           },
         ]
       }

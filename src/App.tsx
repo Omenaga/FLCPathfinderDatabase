@@ -155,11 +155,12 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
     return (!detailOptions || typedDetail || detail === (detailSelections[group] ?? '')) && !values.includes(option) && option.toLowerCase().includes(text.trim().toLowerCase())
   })
   function disabled(option: string) {
-    return values.includes(option) || !!exclusiveKey && values.some(value => exclusiveKey(value) === exclusiveKey(option))
+    return values.includes(option) || !!groupKey && values.includes(groupKey(option)) || !!exclusiveKey && values.some(value => exclusiveKey(value) === exclusiveKey(option))
   }
   function add(option: string) {
     if (disabled(option)) return
-    onChange([...values, option]); setText(''); setActive(0); input.current?.focus()
+    const remaining = groupKey && option === groupKey(option) ? values.filter(value => groupKey(value) !== option) : values
+    onChange([...remaining, option]); setText(''); setActive(0); input.current?.focus()
   }
   useEffect(() => {
     const form = input.current?.form
@@ -193,10 +194,10 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
         <div role="group" aria-label={level}>
           {groupKey ? <button type="button" className="level-name group-select" role="option" aria-label={level}
             id={matches.includes(level) ? `${id}-option-${matches.indexOf(level)}` : undefined}
-            aria-selected={matches.indexOf(level) === active} aria-disabled={disabled(level)}
+            aria-selected={matches.indexOf(level) === active} aria-disabled={disabled(level)} disabled={disabled(level)}
             onMouseDown={event => event.preventDefault()} onClick={() => add(level)}>{level}</button>
             : <span className="level-name">{level}</span>}
-          {detailOptions?.[level] && <select className="history-detail-select" aria-label={`${level} ${detailKind(level)}`}
+          {detailOptions?.[level] && <select className="history-detail-select" aria-label={`${level} ${detailKind(level)}`} disabled={disabled(level)}
             value={detailSelections[level] ?? ''} onChange={event => { setDetailSelections(current => ({ ...current, [level]: event.target.value })); setActive(0) }}>
             <option value="">{`Any ${detailKind(level)}`}</option>
             {detailOptions[level].map(detail => <option key={detail}>{detail}</option>)}
@@ -204,7 +205,7 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
           <div className="level-variants">{matches.filter(option => grouping(option) === level && (!groupKey || option !== level)).map(option => {
             const index = matches.indexOf(option)
             return <button type="button" role="option" tabIndex={-1} key={option} id={`${id}-option-${index}`}
-              aria-label={option} aria-selected={index === active} aria-disabled={disabled(option)}
+              aria-label={option} aria-selected={index === active} aria-disabled={disabled(option)} disabled={disabled(option)}
               onMouseDown={event => event.preventDefault()} onClick={() => add(option)}>
               {variantLabel ? variantLabel(option) : option.endsWith(' (Any)') ? 'Any' : option.endsWith(' (Advanced)') ? 'Advanced' : 'Basic'}
             </button>
@@ -269,7 +270,7 @@ function ProfileOverlay({ id, status, onClose }: { id: number; status: string; o
         <h3 className="role-heading">{group.role === 'staff' ? 'Staff History' : 'Pathfinder History'}</h3>
         {group.role === 'pathfinder' ? <section className="profile-summary"><h4>Years Active</h4><p>{years.join(', ') || 'No years recorded'}</p>
           <h4>Levels</h4>{levels.length ? <ul>{levels.map((level,index) => <li key={index}>{level.name} ({statusLabel(level.outcome)}) - {level.year ?? 'Year unknown'}</li>)}</ul> : <p>No levels recorded</p>}</section>
-        : <section className="profile-summary"><h4>Years and Titles</h4>{details.staffHistory.length ? <dl className="profile-records">{details.staffHistory.map(record => <div key={record.id}><dt>{(record.years as string[]).join(', ')}</dt><dd>{record.title ?? 'Title not recorded'}</dd></div>)}</dl> : <p>No staff years or titles recorded</p>}</section>}
+        : <section className="profile-summary"><h4>Years and Titles</h4>{details.staffHistory.length ? <dl className="profile-records">{details.staffHistory.map(record => <div key={record.year}><dt>{record.year}</dt><dd>{record.titles.join(', ') || 'Title not recorded'}</dd></div>)}</dl> : <p>No staff years or titles recorded</p>}</section>}
         {group.activities.map(activity => <section className="profile-activity" key={activity.name}>
           <h4>{activity.name === 'Drums' ? 'Drum' : activity.name}</h4>
           <dl className="profile-records">{activity.records.flatMap(record => record.years.map(year => ({ year, detail: record.detail })))

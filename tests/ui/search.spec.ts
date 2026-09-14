@@ -2,9 +2,9 @@ import { expect, test, type Page } from '@playwright/test'
 
 const member = { id: 2, first_name: 'Justin', last_name: 'Wu', name: 'Justin Wu', status: 'staff', has_current_data: true, current_title: null, current_activities: ['Drill'],
  years_active: ['2023-24'], levels: [{name:'Friend',outcome:'basic',year:'2023-24'},{name:'Companion',outcome:'incomplete',year:null}], birth_date:'2000-01-02',notes:'Existing notes' }
-const fixture = {...member,staff_history:[{id:1,pathfinder_id:2,years:['2025-26'],title:'Counselor'}],
+const fixture = {...member,staff_history:{id:1,pathfinder_id:2,history:[{year:'2025-26',titles:['Friend Counselor','Drill Instructor']}]},
  drill:[{id:1,years:['2023-24'],team:'Precision',history_role:'pathfinder'},{id:2,years:['2025-26'],team:'Adult',history_role:'staff'}],
- drum_corps:[{years:['2023-24'],drum_played:'Snare',history_role:'pathfinder'}],
+ drum_corps:[{history:[{year:'2023-24',drums:['Snare']}],history_role:'pathfinder'}],
  pbe:[{history:[{year:'2021-22',books:['1 Kings','Ruth']}],history_role:'pathfinder'}],
  tlt:[{history:[{year:'2023-24',operations:['Teaching']}],history_role:'pathfinder'}],
  red_zone_drill_performance:[],red_zone_drum_performance:[],red_zone_honor_evaluations:[],red_zone_bible_events:[],red_zone_knots:[],red_zone_tents:[],red_zone_jump_rope:[],red_zone_archery:[],red_zone_lashing:[],
@@ -47,7 +47,7 @@ test('role histories retain year detail links and nested honors focus',async({pa
  await expect(pf).toContainText('Precision')
  await expect(pf).not.toContainText('Adult')
  await expect(staff).toContainText('Adult')
- await expect(staff).toContainText('Counselor')
+ await expect(staff).toContainText('Friend Counselor, Drill Instructor')
  await profile.getByRole('button',{name:'View Honors'}).click()
  await expect(page.getByRole('dialog',{name:'Honors',exact:true})).toContainText('WIP')
  await page.keyboard.press('Escape')
@@ -110,7 +110,7 @@ test('profile handles missing data and retries failed loads',async({page})=>{
  await page.route('**/rest/v1/pathfinders?**',route=>{
  expect(new URL(route.request().url()).searchParams.get('select')).not.toContain('honors')
  attempts++
- return attempts===1?route.fulfill({status:500,json:{message:'Profile unavailable'}}):route.fulfill({json:{...fixture,levels:[],years_active:[],staff_history:[],birth_date:null}})
+ return attempts===1?route.fulfill({status:500,json:{message:'Profile unavailable'}}):route.fulfill({json:{...fixture,levels:[],years_active:[],staff_history:null,birth_date:null}})
  })
  await page.getByRole('button',{name:'Open profile for Justin Wu'}).click()
  await expect(page.getByRole('alert')).toContainText('Profile unavailable')

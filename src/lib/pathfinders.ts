@@ -94,7 +94,7 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
   const roles = (['pathfinder', 'staff'] as const).map(role => {
     const activities = [
       { name: 'Drill', records: data.drill.filter(r => r.history_role === role).map(r => ({ years: r.years as string[], detail: r.team ?? 'Team not recorded' })) },
-      { name: 'Drums', records: data.drum_corps.filter(r => r.history_role === role).map(r => ({ years: r.years as string[], detail: r.drum_played })) },
+      { name: 'Drums', records: data.drum_corps.filter(r => r.history_role === role).flatMap(r => (r.history as { year: string; drums: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.drums.join(', ') || 'Instrument not recorded' }))) },
       { name: 'PBE', records: data.pbe.filter(r => r.history_role === role).flatMap(r => (r.history as { year: string; books: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.books.join(', ') }))) },
       { name: 'TLT', records: data.tlt.filter(r => r.history_role === role).flatMap(r => (r.history as { year: string; operations: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.operations.join(', ') }))) },
     ].filter(group => group.records.length > 0)
@@ -107,7 +107,7 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
     })).sort((a, b) => b.year.localeCompare(a.year)) })).filter(group => group.records.length > 0)
     return { role, activities, events }
   })
-  return { member: member(data), roles, staffHistory: data.staff_history }
+  return { member: member(data), roles, staffHistory: (data.staff_history?.history ?? []) as { year: string; titles: string[] }[] }
 }
 export async function saveProfileNotes(id: number, notes: string, signal: AbortSignal) {
   const { data, error } = await getSupabase().from('pathfinders').update({ notes }).eq('id', id).select('id').abortSignal(signal).single()
