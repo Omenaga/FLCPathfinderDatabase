@@ -265,7 +265,7 @@ The configured club year is the source of truth for autofill. Follow the existin
 2. Once valid, request confirmation in the same modal and change the button to **Confirm (5s)**. Count down the remaining seconds on the button. Five seconds is the initial confirmation window.
 3. Clicking Confirm within that window submits the record. Expiration restores **Add** without submitting or clearing the entered values. The timeout never submits automatically.
 4. Any field change cancels confirmation and restores Add, so confirmation always applies to the values reviewed. Closing the modal cancels its timer and discards the unsaved form.
-5. While saving, disable repeat submission and show a pending state. On success, close the modal, show a success message, and ensure the new record is available in subsequent Search results. On failure, preserve the inputs, display the error, and return to Add for a fresh confirmation.
+5. While saving, disable repeat submission and show a pending state. On success, replace the form in the modal with **Record Added** and a quick summary of First Name, Last Name, Status, Birthday, Class/Title, and Current Year. Close returns to the Add / Edit Profiles page; the new record should be available in subsequent Search results. On failure, preserve the inputs, display the error, and return to Add for a fresh confirmation. The frontend preview currently shows this summary after Confirm with an explicit notice that no database record has been saved.
 
 ### Persistence requirements
 

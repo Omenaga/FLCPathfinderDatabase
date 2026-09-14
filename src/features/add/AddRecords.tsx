@@ -38,6 +38,7 @@ function AddRecordModal({ onClose }: { onClose: () => void }) {
   const [deadline, setDeadline] = useState<number | null>(null)
   const [seconds, setSeconds] = useState(5)
   const [previewed, setPreviewed] = useState(false)
+  const [summary, setSummary] = useState<{ firstName: string; lastName: string; birthday: string } | null>(null)
   useEffect(() => {
     const controller = new AbortController()
     async function load() {
@@ -72,6 +73,8 @@ function AddRecordModal({ onClose }: { onClose: () => void }) {
     event.preventDefault()
     if (loading || error) return
     if (deadline !== null && Date.now() < deadline) {
+      const fields = new FormData(event.currentTarget)
+      setSummary({ firstName: String(fields.get('first_name') ?? '').trim(), lastName: String(fields.get('last_name') ?? '').trim(), birthday: String(fields.get('birth_date') ?? '') })
       setDeadline(null); setPreviewed(true)
     } else {
       setPreviewed(false); setSeconds(5); setDeadline(Date.now() + 5000)
@@ -81,6 +84,21 @@ function AddRecordModal({ onClose }: { onClose: () => void }) {
   const groups = ['Counselor', 'Instructor', 'Leader', 'Other']
   const orderedStaffTitles = [...staffTitles].sort((a, b) =>
     groups.indexOf(staffTitleGroup(a)) - groups.indexOf(staffTitleGroup(b)))
+  const displayYear = year ? `${year.slice(0, 4)}-${Number(year.slice(0, 4)) + 1}` : 'Not recorded'
+  if (previewed && summary) return <Modal key="record-added" title="Record Added" header={<h2>Record Added</h2>} onClose={onClose}>
+    <p className="form-preview">Preview only. No record has been saved to the database yet.</p>
+    <section className="profile-summary" aria-label="New profile summary">
+      <h3>{[summary.firstName, summary.lastName].filter(Boolean).join(' ')}</h3>
+      <dl className="profile-records">
+        <div><dt>First Name</dt><dd>{summary.firstName}</dd></div>
+        <div><dt>Last Name</dt><dd>{summary.lastName || 'Not recorded'}</dd></div>
+        <div><dt>Status</dt><dd>{status}</dd></div>
+        <div><dt>Birthday</dt><dd>{summary.birthday ? `${summary.birthday.slice(5, 7)}/${summary.birthday.slice(8, 10)}/${summary.birthday.slice(0, 4)}` : 'Not recorded'}</dd></div>
+        <div><dt>Class/Title</dt><dd>{hasTitle ? titles.join(', ') || 'Not recorded' : 'N/A'}</dd></div>
+        <div><dt>Current Year</dt><dd>{displayYear}</dd></div>
+      </dl>
+    </section>
+  </Modal>
   return <Modal title="Add Record" header={<h2>Add Record</h2>} onClose={onClose}>
     <p className="form-preview">Preview the new registration form. Records are not saved yet.</p>
     {error && <div role="alert"><p className="error">{error}</p><button type="button" className="secondary" onClick={() => { setError(''); setLoading(true); setAttempt(value => value + 1) }}>Retry form options</button></div>}
