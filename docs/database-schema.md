@@ -28,7 +28,7 @@ At most one row per person. `current_club_year()` selects `2026-27`; this change
 | Column | Type | Meaning |
 |---|---|---|
 | `pathfinder_id` | integer PK/FK | References the permanent person |
-| `school_year` | text | Required `YYYY-YY` range; internal club-season selection |
+| `school_year` | text | Required `YYYY-YY` range; defaults to current_club_year() for new rows; internal club-season selection |
 | `status` | text | Pathfinder (`pathfinder`), Staff (`staff`), Parent (`parent`), Not Active (`not_active`); default Not Active |
 | `current_title` | text, nullable | Single column for a Pathfinder class or Staff title |
 | `current_activities` | jsonb | Unique array of Drill, Drums, PBE, TLT; confirmed current participation |
@@ -195,3 +195,5 @@ Automatic rollover is not implemented. A future role-aware registration archive 
 The **Years** control now applies to Levels, Extracurricular, and Red Zone Events together. Category dropdowns contain only the names and their outcome/team/instrument/operation/placement choices, never years. For example, Years = 2023-24, Levels = Basic or Advanced Friend, and Extracurricular = Snare or Teaching finds people with either selected Friend outcome AND either activity detail, each recorded in 2023-24. Multiple years match any selected year. Without years, the selected categories search all history. With only years selected, browse participation years. Calendar-year selections retain adjacent-period matching. Unknown level years cannot match a specific year.
 
 Honors is still an empty placeholder; its future implementation must use the same shared years and within-category OR behavior. No honors records are fetched or falsely matched by the placeholder today.
+
+Category headings and the surrounding group area select the broad level/activity/event option. Inner buttons select specific outcomes or details; there is no separate Any button.

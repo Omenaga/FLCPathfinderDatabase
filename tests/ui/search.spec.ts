@@ -131,3 +131,23 @@ test('profile remains scrollable on mobile',async({page})=>{
  await page.setViewportSize({width:1440,height:1000})
  await page.screenshot({path:'test-results/profile-desktop.png'})
 })
+
+
+test('group headings and outer areas replace Any without swallowing detail clicks',async({page})=>{
+ await setup(page)
+ const input=page.getByRole('combobox',{name:'Extracurricular',exact:true})
+ await input.fill('Drums')
+ await expect(page.getByRole('listbox',{name:'Extracurricular options'}).getByRole('option',{name:'Any',exact:true})).toHaveCount(0)
+ await page.getByRole('option',{name:'Drums / Snare',exact:true}).click()
+ await expect(page.getByRole('button',{name:'Remove Drums from Extracurricular',exact:true})).toHaveCount(0)
+ await input.fill('Drums')
+ await page.getByRole('option',{name:'Drums',exact:true}).click()
+ await expect(page.getByRole('button',{name:'Remove Drums from Extracurricular',exact:true})).toBeVisible()
+ const level=page.getByRole('combobox',{name:'Level Earned',exact:true})
+ await level.fill('Friend'); await level.press('Enter')
+ await expect(page.getByRole('button',{name:'Remove Friend from Level Earned',exact:true})).toBeVisible()
+ const event=page.getByRole('combobox',{name:'Red Zone Events',exact:true})
+ await event.fill('Archery')
+ await page.getByRole('group',{name:'Archery',exact:true}).locator('..').click({position:{x:2,y:2}})
+ await expect(page.getByRole('button',{name:'Remove Archery from Red Zone Events',exact:true})).toBeVisible()
+})

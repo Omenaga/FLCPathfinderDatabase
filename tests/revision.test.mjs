@@ -20,12 +20,17 @@ test('member revision preserves history and enforces roles, ranges and access',a
  insert into tlt(pathfinder_id,history) values (1,'[{"year":2024,"operations":["Teaching"]}]');
  insert into red_zone_burning_twine(pathfinder_id,year,placement) values (1,2024,'1st Place');`)
  }
+ if(file==='20260915110000_current_season_default.sql') {
+  // Reproduce the live schema drift and blank season that hid the Staff row.
+  await db.exec('alter table current_data alter column school_year drop not null; alter table current_data drop constraint current_data_school_year_check; update current_data set school_year=null')
+ }
  const sql=await readFile(new URL(file,folder),'utf8')
  if(!/^begin;/m.test(sql)) await db.exec('begin')
  await db.exec(sql)
  if(!/^begin;/m.test(sql)) await db.exec('commit')
  }
  const row=(await db.query('select * from member_search where id=1')).rows[0]
+ assert.equal((await db.query('select school_year from current_data where pathfinder_id=1')).rows[0].school_year,'2026-27')
  assert.equal(row.first_name,'Justin'); assert.equal(row.last_name,'Wu');assert.equal(row.status,'staff')
  assert.deepEqual(row.years_active,['2023-24'])
  assert.deepEqual(row.levels,[{name:'Friend',outcome:'advanced',year:null}])
@@ -49,6 +54,7 @@ test('member revision preserves history and enforces roles, ranges and access',a
  await assert.rejects(db.exec(`update pathfinders set years_active='["2023-25"]' where id=1`),e=>e.code==='23514')
  await assert.rejects(db.exec(`update pbe set history='[{"year":"2021-22","books":["John"]}]'`),e=>e.code==='23514')
  await db.exec(`update pathfinders set levels='[{"name":"Friend","outcome":"incomplete","year":"2023-24"}]' where id=1`)
+ await assert.rejects(db.exec('update current_data set school_year=null where pathfinder_id=1'),e=>e.code==='23502')
  await assert.rejects(db.exec('select * from private.member_revision_backup'),e=>e.code==='42501')
 
  // Inclusive bubbles, constrained within the matching year and ANDed across categories.

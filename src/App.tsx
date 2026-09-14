@@ -2,7 +2,7 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import type { Session } from '@supabase/supabase-js'
 import flcLogo from './assets/FL_Logo.png'
 import { getSupabase } from './lib/supabase'
-import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, PERIODS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
+import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, PERIODS, STATUSES, PAGE_SIZE, searchPathfinders,
   getPathfinder, saveProfileNotes, LEVELS, type PathfinderDetails, type Filters, type Pathfinder } from './lib/pathfinders'
 
 function message(error: unknown) {
@@ -103,7 +103,7 @@ function Search() {
       <form onSubmit={submit} onReset={reset} className="filters">
         <label className="name-filter">Name<input type="search" value={draft.name} onChange={e => update('name', e.target.value)} placeholder="Search by name" maxLength={200} /></label>
         <Select label="Status" value={draft.status} options={STATUSES} onChange={value => update('status', value)} />
-        <MultiSelect label="Years" values={draft.year} options={[...PERIODS, ...YEARS]} onChange={value => update('year', value)} />
+        <MultiSelect label="Years" values={draft.year} options={[...PERIODS]} onChange={value => update('year', value)} />
         <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('level', value)} />
         <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('activity', value)} />
         <MultiSelect label="Red Zone Events" values={draft.event} options={EVENT_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('event', value)} />
@@ -187,15 +187,21 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
     <div className="selected-options">{values.map(value => <button type="button" className="secondary" key={value}
       aria-label={`Remove ${value} from ${label}`} onClick={() => onChange(values.filter(item => item !== value))}>{value}</button>)}</div>
     {open && <ul id={`${id}-options`} role="listbox" aria-label={`${label} options`} className="option-list">
-      {grouping ? [...new Set(matches.map(grouping))].map(level => <li key={level} role="presentation" className={groupKey ? "level-choice activity-year-choice" : "level-choice"}>
+      {grouping ? [...new Set(matches.map(grouping))].map(level => <li key={level} role="presentation" className={groupKey ? "level-choice activity-year-choice" : "level-choice"}
+        onMouseDown={event => { if (groupKey && !(event.target as HTMLElement).closest('button, select')) event.preventDefault() }}
+        onClick={event => { if (groupKey && !(event.target as HTMLElement).closest('button, select')) add(level) }}>
         <div role="group" aria-label={level}>
-          <span className="level-name">{level}</span>
+          {groupKey ? <button type="button" className="level-name group-select" role="option" aria-label={level}
+            id={matches.includes(level) ? `${id}-option-${matches.indexOf(level)}` : undefined}
+            aria-selected={matches.indexOf(level) === active} aria-disabled={disabled(level)}
+            onMouseDown={event => event.preventDefault()} onClick={() => add(level)}>{level}</button>
+            : <span className="level-name">{level}</span>}
           {detailOptions?.[level] && <select className="history-detail-select" aria-label={`${level} ${detailKind(level)}`}
             value={detailSelections[level] ?? ''} onChange={event => { setDetailSelections(current => ({ ...current, [level]: event.target.value })); setActive(0) }}>
             <option value="">{`Any ${detailKind(level)}`}</option>
             {detailOptions[level].map(detail => <option key={detail}>{detail}</option>)}
           </select>}
-          <div className="level-variants">{matches.filter(option => grouping(option) === level).map(option => {
+          <div className="level-variants">{matches.filter(option => grouping(option) === level && (!groupKey || option !== level)).map(option => {
             const index = matches.indexOf(option)
             return <button type="button" role="option" tabIndex={-1} key={option} id={`${id}-option-${index}`}
               aria-label={option} aria-selected={index === active} aria-disabled={disabled(option)}
