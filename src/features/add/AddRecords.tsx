@@ -40,6 +40,7 @@ function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
+  const [personal, setPersonal] = useState({ firstName: '', lastName: '', birthday: '' })
   const [requestId] = useState(() => crypto.randomUUID())
   const submitting = useRef(false)
   const [summary, setSummary] = useState<{ firstName: string; lastName: string; birthday: string } | null>(null)
@@ -104,6 +105,16 @@ function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
   const orderedStaffTitles = [...staffTitles].sort((a, b) =>
     groups.indexOf(staffTitleGroup(a)) - groups.indexOf(staffTitleGroup(b)))
   const displayYear = year ? `${year.slice(0, 4)}-${Number(year.slice(0, 4)) + 1}` : 'Not recorded'
+  if (saving) return <Modal title="Adding Record" header={<h2>Adding Record</h2>} onClose={onClose} closeDisabled>
+    <div className="record-feedback" role="status" aria-live="polite" aria-busy="true">
+      <p>Saving the new profile…</p><p className="muted">Please wait while the record is submitted.</p>
+    </div>
+  </Modal>
+  if (saveError) return <Modal title="Unable to Add Record" header={<h2>Unable to Add Record</h2>} onClose={onClose}>
+    <p className="error" role="alert">{saveError}</p>
+    <p>Your entered details have been kept. Return to the form to review them or try again.</p>
+    <button onClick={() => setSaveError('')}>Back to form</button>
+  </Modal>
   if (saved && summary) return <Modal title="Record Added" header={<h2>Record Added</h2>} onClose={onClose}>
     <p role="status">The new profile has been saved.</p>
     <section className="profile-summary" aria-label="New profile summary">
@@ -124,15 +135,15 @@ function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     <form className="record-form" onSubmit={submit} onChange={resetConfirmation} aria-busy={saving}>
       <fieldset disabled={saving} className="record-fieldset">
       <div className="record-fields">
-        <label>First Name<input name="first_name" required maxLength={200} pattern={'.*\\S.*'} autoComplete="given-name" /></label>
-        <label>Last Name<input name="last_name" maxLength={200} autoComplete="family-name" /><small className="muted">Leave blank if unknown.</small></label>
+        <label>First Name<input name="first_name" value={personal.firstName} onChange={e => setPersonal({...personal, firstName:e.target.value})} required maxLength={200} pattern={'.*\\S.*'} autoComplete="given-name" /></label>
+        <label>Last Name<input name="last_name" value={personal.lastName} onChange={e => setPersonal({...personal, lastName:e.target.value})} maxLength={200} autoComplete="family-name" /><small className="muted">Leave blank if unknown.</small></label>
         <label>Status<select required value={status} onChange={event => { setStatus(event.target.value); setTitles([]) }}><option value="">Select status</option>{STATUSES.map(value => <option key={value}>{value}</option>)}</select></label>
-        <label>Birthday<input name="birth_date" type="date" autoComplete="bday" /><small className="muted">Optional if unknown.</small></label>
+        <label>Birthday<input name="birth_date" value={personal.birthday} onChange={e => setPersonal({...personal, birthday:e.target.value})} type="date" autoComplete="bday" /><small className="muted">Optional if unknown.</small></label>
         <label>Current Year<input readOnly value={year ? `${year.slice(0, 4)}-${Number(year.slice(0, 4)) + 1}` : ''} placeholder={loading ? 'Loading current year…' : 'Unavailable'} /><small className="muted">Current club school year.</small></label>
-        <div className={status === 'Staff' ? 'staff-title-select' : undefined}>{hasTitle && !loading && !error ? <MultiSelect key={status} label="Class/Title" values={titles} options={status === 'Pathfinder' ? LEVELS : orderedStaffTitles}
+        <div className={status === 'Staff' ? 'staff-title-select' : undefined}>{status === 'Pathfinder' ? <label>Class/Title<select value={titles[0] ?? ''} onChange={e => setTitles(e.target.value ? [e.target.value] : [])}><option value="">Not recorded</option>{LEVELS.map(level => <option key={level}>{level}</option>)}</select></label> : hasTitle && !loading && !error ? <MultiSelect key={status} label="Class/Title" values={titles} options={orderedStaffTitles}
           optionGroup={status === 'Staff' ? staffTitleGroup : undefined} variantLabel={status === 'Staff' ? staffTitleLabel : undefined}
           emptyMessage="No titles available" onChange={values => { if (!submitting.current) { setTitles(values); resetConfirmation() } }} /> : <label>Class/Title<select disabled><option>{loading ? 'Loading options…' : hasTitle ? 'Options unavailable' : status ? 'N/A' : 'Select a status first'}</option></select></label>}
-          {hasTitle && <small className="muted">Choose one or more, or leave blank if unknown.</small>}</div>
+          {hasTitle && <small className="muted">{status === 'Pathfinder' ? 'Choose one class, or leave blank if unknown.' : 'Choose one or more, or leave blank if unknown.'}</small>}</div>
       </div>
       {/* Keep the inline choices from collapsing between pointer down and click. */}
       <div className="record-footer" onMouseDown={event => { if ((event.target as HTMLElement).closest('button')) event.preventDefault() }}>

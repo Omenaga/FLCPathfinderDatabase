@@ -108,7 +108,7 @@ test('member revision preserves history and enforces roles, ranges and access',a
  assert.equal(added.first_name,'New'); assert.equal(added.last_name,'Example'); assert.equal(added.status,'staff')
  assert.deepEqual(added.current_title,['Club Director','Drill Instructor'])
  assert.deepEqual(added.current_activities,['N/A'])
- assert.deepEqual(added.years_active,[]); assert.deepEqual(added.levels,[])
+ assert.deepEqual(added.years_active,['2026-27']); assert.deepEqual(added.levels,[])
  await assert.rejects(create(request,'Changed','staff','["Club Director"]'),e=>e.code==='22023')
  const before=(await db.query('select count(*) as n from pathfinders')).rows[0].n
  for (const [status,title,year] of [['staff','["Friend"]','2026-27'],['parent','["Friend"]','2026-27'],['unknown',null,'2026-27'],['pathfinder','["Friend"]','2025-26']]) {
@@ -116,9 +116,13 @@ test('member revision preserves history and enforces roles, ranges and access',a
   assert.equal((await db.query('select count(*) as n from pathfinders')).rows[0].n,before)
  }
  await assert.rejects(create('10000000-0000-0000-0000-000000000002','   ','parent',null))
- for (const [index,status,title] of [[3,'pathfinder','["Friend","Companion"]'],[4,'parent',null],[5,'not_active',null]]) {
-  const id=(await create(`10000000-0000-0000-0000-00000000000${index}`,'Valid',status,title)).rows[0].id
+ await assert.rejects(create('10000000-0000-0000-0000-000000000007','Multiple','pathfinder','["Friend","Companion"]'),e=>e.code==='23514')
+ await assert.rejects(create('10000000-0000-0000-0000-000000000008',' new ','parent',null),e=>e.code==='23505' && /already exists/.test(e.message))
+ assert.equal((await db.query('select count(*) as n from pathfinders')).rows[0].n,before)
+ for (const [index,status,title] of [[3,'pathfinder','["Friend"]'],[4,'parent',null],[5,'not_active',null]]) {
+  const id=(await create(`10000000-0000-0000-0000-00000000000${index}`,`Valid ${index}`,status,title)).rows[0].id
   assert.equal((await db.query('select status from current_data where pathfinder_id=$1',[id])).rows[0].status,status)
+  assert.deepEqual((await db.query('select years_active from pathfinders where id=$1',[id])).rows[0].years_active,['2026-27'])
  }
  await db.exec('reset role; set role anon;')
  await assert.rejects(create('10000000-0000-0000-0000-000000000006','Denied','parent',null),e=>e.code==='42501')

@@ -13,7 +13,7 @@ One permanent row per person, including Pathfinder, Staff, Parent, and inactive 
 | `id` | integer identity | Permanent primary key |
 | `first_name` | text | Trimmed, 1-200 characters |
 | `last_name` | text | Trimmed, up to 200 characters; blank allowed when unknown |
-| `years_active` | jsonb | Unique Pathfinder participation ranges, e.g. `["2023-24"]` |
+| `years_active` | jsonb | Unique participation ranges, e.g. `["2023-24"]`; Add Record initializes this with Current Year for every status |
 | `levels` | jsonb | Level/outcome/year entries described below |
 | `birth_date` | date, nullable | Birthday; display MM/DD/YYYY without timezone conversion |
 | `notes` | text, nullable | Multiline plain text; editable through Save Notes in the profile |
@@ -247,14 +247,14 @@ Add a tab alongside **Search** that opens a page for adding and, eventually, edi
 | Last Name | `pathfinders.last_name` | Trim whitespace; up to 200 characters; blank allowed when unknown under the existing schema |
 | Status | `current_data.status` | Select Pathfinder, Staff, Parent, or Not Active |
 | Birthday | `pathfinders.birth_date` | Date input; store a date without timezone conversion; blank stores null |
-| Class/Title | `current_data.current_title` | Status-dependent choices; support multiple selections to match the existing array field; unknown titles may remain unselected |
+| Class/Title | `current_data.current_title` | Pathfinder: one class; Staff: multiple titles allowed. Stored as an array; unknown titles may remain unselected |
 | Current Year | `current_data.school_year` | Autofill from the configured `current_club_year()`; display the full range, e.g. `2026-2027`, and store `2026-27` |
 
 The configured club year is the source of truth for autofill. Follow the existing intentional season rollover rather than changing the year automatically in January or guessing a school-year boundary. Reopening the form uses the configured current year.
 
 ### Status-dependent Class/Title
 
-- **Pathfinder:** offer only Friend, Companion, Explorer, Ranger, Voyager, Guide, Pioneer, and Navigator.
+- **Pathfinder:** offer only Friend, Companion, Explorer, Ranger, Voyager, Guide, Pioneer, and Navigator in a single-selection dropdown. The Add RPC also rejects multiple classes. Existing registrations are not rewritten.
 - **Staff:** load the allowed options from the `staff_titles` table. Do not hardcode a separate title catalog or allow free-text titles. Show loading/error/retry states if the catalog cannot be retrieved.
 - Group Staff choices using the search dropdown's inner buttons: **Counselor** contains the eight classes; **Instructor** contains Drill, Drums, PBE, and TLT; **Leader** contains those four activities plus Master Guide. Remaining titles appear under **Other**, after Counselor, Instructor, and Leader. Headings are not selectable; multiple titles within a group are allowed. Inner labels are shortened for display, while selections retain the exact catalog title (e.g. Drums under Leader selects `Drum Corps Leader`). Only titles present in the catalog are offered.
 - **Parent / Not Active:** disable Class/Title, display N/A, and store null.
@@ -266,7 +266,7 @@ The configured club year is the source of truth for autofill. Follow the existin
 2. Once valid, request confirmation in the same modal and change the button to **Confirm (5s)**. Count down the remaining seconds on the button. Five seconds is the initial confirmation window.
 3. Clicking Confirm within that window submits the record. Expiration restores **Add** without submitting or clearing the entered values. The timeout never submits automatically.
 4. Any field change cancels confirmation and restores Add, so confirmation always applies to the values reviewed. Closing the modal cancels its timer and discards the unsaved form.
-5. While saving, disable the form, repeat submission, and modal closing, and show a pending state. On success, replace the form in the modal with **Record Added** and a quick summary of First Name, Last Name, Status, Birthday, Class/Title, and Current Year. Close returns to the Add / Edit Profiles page. Search refreshes using its existing filters and page, so a new record appears when it matches those filters. On failure, preserve the inputs, display the error, and return to Add for a fresh confirmation.
+5. Confirm replaces the form with an **Adding Record** loading screen until Supabase responds; repeat submission and modal closing are disabled. On success, show **Record Added** with a quick summary of First Name, Last Name, Status, Birthday, Class/Title, and Current Year. Close returns to the Add / Edit Profiles page. Search refreshes using its existing filters and page, so a new record appears when it matches those filters. On failure, show an **Unable to Add Record** screen explaining the error, with **Back to form** to restore all inputs for correction or a fresh confirmation, and Close to leave.
 
 ### Persistence requirements
 
@@ -274,7 +274,11 @@ The configured club year is the source of truth for autofill. Follow the existin
 
 The migration `20260915140000_add_record.sql` adds this function and the nullable unique `pathfinders.creation_request_id` column; existing people remain unchanged. The form keeps a random request UUID across retries. Transaction-level locking serializes identical requests; a successful retry with identical details returns the existing ID. Reusing that request with different details is rejected with a prompt to check Search. This protects retries within the same open form; a new form is a new request, and names are not unique identifiers.
 
-Fields outside this form use existing database defaults and validation, including Staff current activities normalized to `["N/A"]`. Do not infer historical participation, earned levels, or activity/event records from this current registration form.
+The migration `20260915150000_add_record_years_active.sql` makes new Add Record submissions initialize `pathfinders.years_active` with the selected Current Year (e.g. `["2026-27"]`), for every status. This is saved in the same transaction as the person and current registration; retries do not duplicate the year. Existing records are not backfilled.
+
+Other fields use existing database defaults and validation, including Staff current activities normalized to `["N/A"]`. Earned levels and activity/event records are not inferred from this current registration form.
+
+`20260915160000_add_record_validation.sql` rejects a new Add request when both First Name and Last Name match an existing person, case-insensitively after trimming surrounding spaces (including matching blank last names). The error states that the profile already exists and directs the user to Search. The name check and insert are serialized in the transaction to prevent simultaneous Add requests from creating duplicates. A retry of an already successful request still returns its original ID. Existing duplicate profiles are preserved; direct administrator edits remain governed by the existing table constraints.
 
 ## Future rollover
 
