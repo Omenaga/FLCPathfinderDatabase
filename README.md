@@ -4,13 +4,14 @@ A web application for searching current and historical member records for the Fo
 
 ## Current features
 
-- Supabase PostgreSQL database with 18 application tables in [the database schema](docs/database-schema.md).
-- Staff email/password sign-in: every Supabase Auth account has immediate staff access.
-- Search by name, active year, level (including Advanced), extracurricular, and Red Zone event. An active year of `2014` matches either `2013-2014` or `2014-2015`. Filters combine with AND; name search matches part of a name, ignoring case. Results are sorted by name with an internal ID tie-breaker in pages of 25. Member IDs are not displayed or offered as a search filter. Earned level filters still distinguish Advanced status.
-- Results show current Status, Grade, Current class, and Current activities. Unregistered and Graduated members show N/A for grade, current class, and current activities. Clicking a name opens a profile with name/status, recorded years, earned levels, extracurricular histories, and Red Zone results. Historical fields remain searchable.
-- Database constraints, foreign keys, participation validation, and row-level security support future add/edit screens. The current UI is for searching and viewing; administrators can enter records through Supabase now.
+- Current results: First, Last, Status, Title, and Current activities.
+- Status choices: Pathfinder, Staff, Parent, Not Active; no current data means Not Active.
+- Search names, periods/calendar years, Basic/Advanced/Incomplete levels, activity teams/instruments/operations, and Red Zone placements. Selections within a category use OR; selected categories combine with AND.
+- Profile with Birthday, separate Pathfinder/Staff histories, and editable multiline Notes. Honors remains a separate WIP dialog.
+- All stored years use `YYYY-YY`. Detailed history is explicitly associated with Pathfinder or Staff roles.
+- Supabase Auth accounts retain immediate application access, independently of person Status.
 
-The initial migration was applied to the linked hosted project on September 8, 2026. No member data or login credentials are seeded.
+See [the current schema](docs/database-schema.md) for tables, validation, examples, and future work.
 
 ## Stack and local development
 
@@ -33,29 +34,25 @@ Only put a publishable key in the frontend. `VITE_` values are bundled into the 
 
 ## Staff accounts
 
-Create staff accounts in Supabase **Authentication > Users**, then sign in through the app. No allowlist entry, SQL grant, or separate approval is needed. All authenticated accounts can read, insert, and update through the API; the current interface supports searching and viewing. Browser deletion remains disabled.
+Create staff accounts in Supabase **Authentication > Users**, then sign in through the app. No allowlist entry, SQL grant, or separate approval is needed. All authenticated accounts can read, insert, and update through the API; the interface supports searching, profiles, and saving Notes. Browser deletion remains disabled.
 
 Keep **Allow new users to sign up** disabled in hosted Supabase Auth settings, and anonymous sign-ins disabled. Accounts are provisioned by administrators. Local `supabase/config.toml` also disables signup. Configure hosted Auth before applying the access migration; changing the local file alone does not update hosted settings.
 
 The September 11 migration changes `current_staff_role()` to return `editor` for any authenticated user identity. Existing RLS policies and older clients remain compatible. The old private allowlist table is retained only as historical data and is never consulted for access; its grant script is retired. Manage accounts and password resets through Supabase Auth.
 
-## Entering records and preserving relationships
+## Entering records
 
-Use Supabase's Table Editor or SQL Editor as an administrator for now. Create the `pathfinders` row first. Identity IDs are generated automatically; duplicate names are allowed because different members may share a name.
+Use Supabase Table Editor for member, current, and historical records. The app currently edits Notes; other data entry remains in Supabase. Create the person with first_name and last_name, then link detail rows with pathfinder_id. IDs remain internal. Do not commit member records or credentials.
 
-- Core member JSON arrays default to `[]`; PBE history requires at least one year/books entry. School years must be consecutive, such as `"2024-2025"`.
-- `levels` contains objects such as `[{"name":"Friend","advanced":true}]`, with one entry per level name.
-- Add activity/event history directly to its detail table using `pathfinder_id`. Both Any year and dated filters derive participation from those records.
-- Drums uses one row per member/instrument with all corresponding years. PBE uses one row per member with a `history` array pairing each year with its books. TLT also uses one `history` row, pairing integer calendar years with operations.
-- Drill has one row per member containing all Drill years.
-- Red Zone has one result per member/year in each event table. Honor Evaluations and Bible Events additionally distinguish results by `name`. `placement` belongs to the year in the same row and accepts `1st Place`, `2nd Place`, `3rd Place`, or `Participation`.
-- Participation may be listed before detailed years/results are entered; the UI labels those details as pending.
+Current Data uses one `current_title` field validated against status. Pathfinder titles use the eight levels. Staff titles come from `staff_titles`, which is intentionally empty until supplied. Parent/Not Active titles are null.
 
-Keep actual member data out of source control. Tests use synthetic fixtures in an isolated database and mocked browser responses.
+History years are ranges such as `2023-24`. Levels use `{ "name": "Friend", "outcome": "basic", "year": "2023-24" }`; unknown migrated dates remain null. Set `history_role` to the role when an activity/event occurred. Drill teams are Precision, Freestyle, Adult; a team does not determine the person's role automatically.
+
+The September 14 migration preserves a private administrator-only snapshot, converts legacy standalone 2024 to `2023-24` as approved, and keeps unknown level years and Drill teams unassigned. This is historical migration context, not a rule for guessing dates on new entries.
 
 ## Migrations and generated types
 
-[The initial migration](supabase/migrations/20260908000000_pathfinder_database.sql) creates the 17 application tables, a private staff allowlist, JSON validation functions, participation triggers, search indexes, and access policies. `created_at` and `updated_at` timestamps are included on members. Core arrays use PostgreSQL `jsonb` with GIN indexes; the name/ID index supports result ordering.
+[The initial migration](supabase/migrations/20260908000000_pathfinder_database.sql) creates the 17 application tables, a private staff allowlist, JSON validation functions, participation triggers, search indexes, and access policies. `created_at` and `updated_at` timestamps are included on members. Subsequent migrations revise these initial tables; apply the entire migration history. The current name index uses last_name, first_name, and ID.
 
 For a new hosted project:
 
@@ -89,61 +86,15 @@ npm run build
 
 `npm test` executes the migration in PGlite (PostgreSQL in memory) and checks validation, paired histories, search predicates, foreign keys, and role permissions using a minimal Supabase Auth contract. It does not connect to or modify the hosted project.
 
-`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies sign-in, combined filters, the history profile and nested Honors placeholder, empty/error states, retries, pagination, immediate authenticated access, and signed-out isolation. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
+`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies current result columns, range/outcome filters, role-specific profiles, the nested Honors placeholder, retries, Notes saves/failures, and mobile scrolling. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
 
 ## Project context
 
 Read [the project context](docs/project-context.md) for ministry background, source links, and terminology. The implemented data model follows [the database schema](docs/database-schema.md); preliminary ideas in the context document are not additional implemented features.
 
-## Current registration view
 
-The [Current Data schema](docs/database-schema.md#current-data) is implemented. `current_data` has one row per member, linked by `pathfinder_id`. Populate it through Supabase with the known school year, status (`new`, `returning`, `graduated`), grade, class, and activities. No current rows are inferred from historical records.
+## Shared year search
 
-`public.current_club_year()` explicitly selects `2026-2027`. The `member_search` view left-joins that season's current data and applies underlying RLS. Members without current records appear as Unregistered unless marked Graduated. Graduation persists in `pathfinders.graduated`, independently of registration, and takes precedence in results. Single-year and activity filters include current enrollment as well as history; level/event filters retain their historical meaning. IDs and school year remain internal.
+The **Years** control now applies to Levels, Extracurricular, and Red Zone Events together. Category dropdowns contain only the names and their outcome/team/instrument/operation/placement choices, never years. For example, Years = 2023-24, Levels = Basic or Advanced Friend, and Extracurricular = Snare or Teaching finds people with either selected Friend outcome AND either activity detail, each recorded in 2023-24. Multiple years match any selected year. Without years, the selected categories search all history. With only years selected, browse participation years. Calendar-year selections retain adjacent-period matching. Unknown level years cannot match a specific year.
 
-The profile loads historical records on demand, omits empty activity/event sections, and supports loading, retry, Escape, and focus restoration. Honors opens a separate WIP dialog without fetching honors data. Annual rollover remains future work.
-
-Status is searchable through `member_search.status`: New, Returning, Graduated, or Unregistered. Unregistered is derived from the absence of current-year data; graduation takes precedence. Existing current rows with an unknown status remain unclassified rather than being assumed inactive. The Status filter combines with historical filters using AND.
-
-Active year, Level earned, Extracurricular, and Red Zone event support multiple selections with searchable dropdowns. Type to narrow options and press Enter to add; selected chips can be removed. Every selected value must match (AND), including across filter categories. Each selected calendar year matches either adjacent school year. Year choices run from 2010 through the current calendar year. The Level earned dropdown contains regular and Advanced options side by side (Friend, Friend (Advanced), Companion, Companion (Advanced), and so on). Each selection matches its exact Advanced status. Selected chips sit below the inputs in fixed-height scrollable areas to preserve alignment. Status remains a single-select filter.
-
-## PBE and TLT history
-
-PBE uses **one row per Pathfinder**. Enter a `history` JSON array in Supabase Table Editor:
-
-```json
-[
-  { "year": "2013-2014", "books": ["2 Samuel"] },
-  { "year": "2014-2015", "books": ["Matthew"] },
-  { "year": "2017-2018", "books": ["Daniel", "Esther"] }
-]
-```
-
-Add more years to the same array. Each book is a separate string, validated against that year's entries in `pbe_year_books`. Duplicate years, duplicate books, and additional PBE rows for the same member are rejected. Empty `books` arrays preserve participation with details not yet recorded.
-
-TLT also uses one row per Pathfinder, with a `history` array:
-
-```json
-[
-  { "year": 2017, "operations": ["Teaching", "Records"] },
-  { "year": 2026, "operations": ["Administrative", "Activity"] }
-]
-```
-
-TLT years are integers from 2017 through the current database year, with the upper limit advancing automatically. Any of Administrative, Outreach, Teaching, Activity, Records, and Counseling can be paired with any allowed year. Multiple operations per year are allowed; duplicate years and duplicate operations within a year are rejected. An empty operations array records participation with details unknown. The calendar-year migration requires legacy TLT rows to be explicitly mapped first; the live table was empty when it was applied.
-
-PBE/TLT details can be added without setting a core extracurricular entry. Honor Evaluation and Bible Event catalogs remain at the design stage.
-
-
-Activity search supports Any year or specific calendar years for Drill, Drums, PBE, and TLT. Multiple selections require every activity/year pair. Drill, Drums, and PBE search both adjacent school years: 2024 matches 2023-2024 or 2024-2025 in that activity's history, without changing stored school years. Confirmed current activities also match their school year's calendar endpoints. TLT matches its recorded calendar year exactly (2017 through the current year); current registration alone does not imply a completed TLT operation in a calendar year. Other activity choices start at 2010. The security-invoker member_search view exposes search_activity_years for server-side filtering before pagination.
-
-
-Red Zone event filters offer Any year and calendar years from 2010 through the current year, grouped under each event with compact year buttons. Typing and multiple selections are supported. Every selected event/year must match an actual result in that event table; years match exactly. The security-invoker `member_search.search_event_years` field performs this filtering before pagination. Honor Evaluation and Bible Event name catalogs remain unchanged.
-
-
-Participation searches and profiles derive from activity/event detail tables through `pathfinder_id`. The obsolete core participation columns were removed by `20260912020000_remove_core_participation.sql`. `member_search` computes `search_activities`, `search_activity_years`, `search_events`, and `search_event_years` from detail records under RLS.
-
-Level Earned offers Any, Regular, and Advanced in one row per level. Any matches either achievement variant; only one choice per level can be selected. Different selected levels must all be earned.
-
-
-History filter refinements: Drums offers Snare, Quad, Bass, Tenor, and Cymbol; TLT offers Administrative, Outreach, Teaching, Activity, Records, and Counseling. Every Red Zone event offers 1st Place, 2nd Place, 3rd Place, and Participation. Choose a refinement, then a calendar year or Any year. Any instrument/operation/placement preserves broad participation matching. Typed full selections are also supported, such as `Drums (2019) / Snare`. Each selected name/year/detail combination must match the same detail record; multiple selections require all combinations. Computed JSON fields `search_activity_details` and `search_event_details` enforce these associations before pagination.
+Honors is still an empty placeholder; its future implementation must use the same shared years and within-category OR behavior. No honors records are fetched or falsely matched by the placeholder today.

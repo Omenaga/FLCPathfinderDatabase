@@ -2,8 +2,8 @@ import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } fr
 import type { Session } from '@supabase/supabase-js'
 import flcLogo from './assets/FL_Logo.png'
 import { getSupabase } from './lib/supabase'
-import { ACTIVITY_OPTIONS, ACTIVITY_DETAILS, EVENT_DETAILS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
-  getPathfinder, LEVELS, type PathfinderDetails, type Filters, type Pathfinder } from './lib/pathfinders'
+import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, PERIODS, YEARS, STATUSES, PAGE_SIZE, searchPathfinders,
+  getPathfinder, saveProfileNotes, LEVELS, type PathfinderDetails, type Filters, type Pathfinder } from './lib/pathfinders'
 
 function message(error: unknown) {
   return error && typeof error === 'object' && 'message' in error ? String(error.message) : 'Unable to connect. Please try again.'
@@ -99,14 +99,14 @@ function Search() {
   function submit(event: FormEvent) { event.preventDefault(); beginSearch(); setFilters({ ...draft }); setPage(0) }
   function reset() { setHonors([]); beginSearch(); setDraft(EMPTY_FILTERS); setFilters({ ...EMPTY_FILTERS }); setPage(0) }
   return <>
-    <section className="panel"><h2>Find a Pathfinder</h2><p className="muted">Select one or more options, or type and press Enter to add them. Members must match every selection. Leave filters blank to browse all members.</p>
+    <section className="panel"><h2>Find a Pathfinder</h2><p className="muted">Select one or more options, or type and press Enter to add them. Match any bubble within each category, and every selected category. Years apply to all selected history categories. Leave filters blank to browse all members.</p>
       <form onSubmit={submit} onReset={reset} className="filters">
         <label className="name-filter">Name<input type="search" value={draft.name} onChange={e => update('name', e.target.value)} placeholder="Search by name" maxLength={200} /></label>
         <Select label="Status" value={draft.status} options={STATUSES} onChange={value => update('status', value)} />
-        <MultiSelect label="Years Active" values={draft.year} options={YEARS} onChange={value => update('year', value)} />
-        <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} exclusiveKey={option => option.replace(/ \((?:Advanced|Any)\)$/, '')} onChange={value => update('level', value)} />
-        <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} detailOptions={ACTIVITY_DETAILS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[0].includes(' (') ? option.split(' / ')[0].slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('activity', value)} />
-        <MultiSelect label="Red Zone Events" values={draft.event} options={EVENT_OPTIONS} detailOptions={EVENT_DETAILS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[0].includes(' (') ? option.split(' / ')[0].slice(option.indexOf(' (') + 2, -1) : 'Any year'} onChange={value => update('event', value)} />
+        <MultiSelect label="Years" values={draft.year} options={[...PERIODS, ...YEARS]} onChange={value => update('year', value)} />
+        <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('level', value)} />
+        <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('activity', value)} />
+        <MultiSelect label="Red Zone Events" values={draft.event} options={EVENT_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('event', value)} />
         <MultiSelect label="Honors" values={honors} options={[]} onChange={setHonors} emptyMessage="No honors available yet" />
         <div className="actions"><button type="submit" disabled={busy}>Search records</button><button type="reset" className="secondary">Clear filters</button></div>
       </form>
@@ -114,15 +114,15 @@ function Search() {
     <section className="panel" aria-busy={busy}><div className="section-heading"><h2>Members</h2><span role="status">{busy ? 'Searching…' : `${count} ${count === 1 ? 'member' : 'members'} found`}</span></div>
       {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { beginSearch(); setAttempt(attempt + 1) }}>Try again</button></> : !busy && members.length === 0 ?
         <p>No members found. Try fewer filters. If this is a new database, add the first records through Supabase.</p> : members.length > 0 && <>
-        <div className="table-scroll"><table><thead><tr><th>Name</th><th>Status</th><th>Grade</th><th>Current class</th><th>Current activities</th></tr></thead><tbody>
+        <div className="table-scroll"><table><thead><tr><th>First</th><th>Last</th><th>Status</th><th>Title</th><th>Current activities</th></tr></thead><tbody>
           {members.map(member => {
-            const departed = !member.has_current_data || member.status === 'graduated'
-            const status = member.status ? member.status[0].toUpperCase() + member.status.slice(1) : 'Not recorded'
-            return <tr key={member.id}><td><button className="member-link" aria-haspopup="dialog" onClick={() => setSelected(member.id)}>{member.name}</button></td>
-              <td>{member.status === 'graduated' ? 'Graduated' : member.has_current_data ? status : 'Unregistered'}</td>
-              <td>{departed ? 'N/A' : member.grade ?? '?'}</td>
-              <td>{departed ? 'N/A' : member.class_level ?? '?'}</td>
-              <td>{departed ? 'N/A' : (member.current_activities as string[] | null)?.join(', ') || '?'}</td></tr>
+            const inactive = !member.has_current_data || member.status === 'not_active'
+            const hasTitle = member.status === 'pathfinder' || member.status === 'staff'
+            return <tr key={member.id}>
+              <td><button className="member-link" aria-label={`Open profile for ${member.name}`} aria-haspopup="dialog" onClick={() => setSelected(member.id)}>{member.first_name}</button></td>
+              <td>{member.last_name || 'Not recorded'}</td><td>{statusLabel(member.status)}</td>
+              <td>{hasTitle ? member.current_title ?? 'Not recorded' : 'N/A'}</td>
+              <td>{inactive ? 'N/A' : (member.current_activities as string[] | null)?.join(', ') || 'None recorded'}</td></tr>
           })}
         </tbody></table></div>
         <div className="pagination"><button className="secondary" disabled={page === 0 || busy} onClick={() => { beginSearch(); setPage(page - 1) }}>Previous</button>
@@ -130,7 +130,7 @@ function Search() {
           <button className="secondary" disabled={(page + 1) * PAGE_SIZE >= count || busy} onClick={() => { beginSearch(); setPage(page + 1) }}>Next</button></div>
       </>}
     </section>
-    {selected !== null && <ProfileOverlay key={selected} id={selected} status={members.find(member => member.id === selected)?.status ?? 'unregistered'} onClose={() => setSelected(null)} />}
+    {selected !== null && <ProfileOverlay key={selected} id={selected} status={members.find(member => member.id === selected)?.status ?? 'not_active'} onClose={() => setSelected(null)} />}
   </>
 }
 
@@ -190,9 +190,9 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
       {grouping ? [...new Set(matches.map(grouping))].map(level => <li key={level} role="presentation" className={groupKey ? "level-choice activity-year-choice" : "level-choice"}>
         <div role="group" aria-label={level}>
           <span className="level-name">{level}</span>
-          {detailOptions?.[level] && <select className="history-detail-select" aria-label={`${level} ${level === 'Drums' ? 'instrument' : level === 'TLT' ? 'operation' : 'placement'}`}
+          {detailOptions?.[level] && <select className="history-detail-select" aria-label={`${level} ${detailKind(level)}`}
             value={detailSelections[level] ?? ''} onChange={event => { setDetailSelections(current => ({ ...current, [level]: event.target.value })); setActive(0) }}>
-            <option value="">{level === 'Drums' ? 'Any instrument' : level === 'TLT' ? 'Any operation' : 'Any placement'}</option>
+            <option value="">{`Any ${detailKind(level)}`}</option>
             {detailOptions[level].map(detail => <option key={detail}>{detail}</option>)}
           </select>}
           <div className="level-variants">{matches.filter(option => grouping(option) === level).map(option => {
@@ -200,7 +200,7 @@ function MultiSelect({ compact = false, label, values, options, onChange, exclus
             return <button type="button" role="option" tabIndex={-1} key={option} id={`${id}-option-${index}`}
               aria-label={option} aria-selected={index === active} aria-disabled={disabled(option)}
               onMouseDown={event => event.preventDefault()} onClick={() => add(option)}>
-              {variantLabel ? variantLabel(option) : option.endsWith(' (Any)') ? 'Any' : option.endsWith(' (Advanced)') ? 'Advanced' : 'Regular'}
+              {variantLabel ? variantLabel(option) : option.endsWith(' (Any)') ? 'Any' : option.endsWith(' (Advanced)') ? 'Advanced' : 'Basic'}
             </button>
           })}</div>
         </div>
@@ -231,6 +231,15 @@ function Modal({ title, children, onClose }: { title: string; children: ReactNod
   </dialog>
 }
 
+function statusLabel(status: string | null) {
+  return status === 'not_active' || !status ? 'Not Active' : status[0].toUpperCase() + status.slice(1)
+}
+function detailKind(name: string) {
+  if (name === 'Drill') return 'team'
+  if (name === 'Drums') return 'instrument'
+  if (name === 'TLT') return 'operation'
+  return (LEVELS as readonly string[]).includes(name) ? 'outcome' : 'placement'
+}
 function ProfileOverlay({ id, status, onClose }: { id: number; status: string; onClose: () => void }) {
   const [details, setDetails] = useState<PathfinderDetails | null>(null)
   const [error, setError] = useState('')
@@ -244,26 +253,58 @@ function ProfileOverlay({ id, status, onClose }: { id: number; status: string; o
     return () => controller.abort()
   }, [id, attempt])
   const years = [...new Set(details?.member.years_active ?? [])].sort()
-  const levels = [...(details?.member.levels ?? [])].sort((a, b) => LEVELS.indexOf(a.name as typeof LEVELS[number]) - LEVELS.indexOf(b.name as typeof LEVELS[number]))
+  const levels = [...(details?.member.levels ?? [])].sort((a, b) => LEVELS.indexOf(a.name as typeof LEVELS[number]) - LEVELS.indexOf(b.name as typeof LEVELS[number]) || (a.year ?? '').localeCompare(b.year ?? ''))
+  const birthday = details?.member.birth_date
   return <Modal title="Member profile" onClose={onClose}>
-    {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { setError(''); setDetails(null); setAttempt(value => value + 1) }}>Try again</button></> : !details ? <p role="status">Loading profile?</p> : <>
-      <div className="profile-heading"><h2>{details.member.name}</h2><span className="profile-status">{status[0].toUpperCase() + status.slice(1)}</span></div>
-      <section className="profile-summary"><h3>Years Active</h3><p>{years.join(', ') || 'No years recorded'}</p>
-        <h3>Levels Earned</h3><p>{levels.map(level => level.name + (level.advanced ? ' (Advanced)' : '')).join(', ') || 'No levels recorded'}</p></section>
-      {details.activities.map(activity => <section className="profile-activity" key={activity.name}>
-        <h3>{activity.name === 'Drums' ? 'Drum' : activity.name}</h3>
-        <dl className="profile-records">{activity.records.flatMap(record => record.years.map(year => ({ year, detail: record.detail })))
-          .sort((a, b) => a.year.localeCompare(b.year) || a.detail.localeCompare(b.detail))
-          .map((record, index) => <div key={`${record.year}-${index}`}><dt>{record.year}</dt><dd>{record.detail || 'Details not recorded'}</dd></div>)}</dl>
+    {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { setError(''); setDetails(null); setAttempt(value => value + 1) }}>Try again</button></> : !details ? <p role="status">Loading profile...</p> : <>
+      <div className="profile-heading"><h2>{[details.member.first_name, details.member.last_name].filter(Boolean).join(' ')}</h2><span className="profile-status">{statusLabel(status)}</span></div>
+      <section className="profile-summary"><h3>Birthday</h3><p>{birthday ? `${birthday.slice(5,7)}/${birthday.slice(8,10)}/${birthday.slice(0,4)}` : 'Not recorded'}</p></section>
+      {details.roles.map(group => <section className="profile-role" key={group.role} aria-label={`${group.role === 'staff' ? 'Staff' : 'Pathfinder'} history`}>
+        <h3 className="role-heading">{group.role === 'staff' ? 'Staff History' : 'Pathfinder History'}</h3>
+        {group.role === 'pathfinder' ? <section className="profile-summary"><h4>Years Active</h4><p>{years.join(', ') || 'No years recorded'}</p>
+          <h4>Levels</h4>{levels.length ? <ul>{levels.map((level,index) => <li key={index}>{level.name} ({statusLabel(level.outcome)}) - {level.year ?? 'Year unknown'}</li>)}</ul> : <p>No levels recorded</p>}</section>
+        : <section className="profile-summary"><h4>Years and Titles</h4>{details.staffHistory.length ? <dl className="profile-records">{details.staffHistory.map(record => <div key={record.id}><dt>{(record.years as string[]).join(', ')}</dt><dd>{record.title ?? 'Title not recorded'}</dd></div>)}</dl> : <p>No staff years or titles recorded</p>}</section>}
+        {group.activities.map(activity => <section className="profile-activity" key={activity.name}>
+          <h4>{activity.name === 'Drums' ? 'Drum' : activity.name}</h4>
+          <dl className="profile-records">{activity.records.flatMap(record => record.years.map(year => ({ year, detail: record.detail })))
+            .sort((a, b) => a.year.localeCompare(b.year) || a.detail.localeCompare(b.detail))
+            .map((record, index) => <div key={`${record.year}-${index}`}><dt>{record.year}</dt><dd>{record.detail || 'Details not recorded'}</dd></div>)}</dl>
+        </section>)}
+        {group.events.length > 0 && <section><h4>Red Zone Events</h4><div className="profile-events">
+          {group.events.map(event => <article key={event.name}><h5>{event.name}</h5><ul>{event.records.map((record, index) =>
+            <li key={`${record.year}-${index}`}><strong>{record.year}</strong>{record.name && <span>{record.name}</span>}<span>{record.placement}</span></li>)}</ul></article>)}
+        </div></section>}
+        {group.role === 'pathfinder' && <section className="profile-honors"><h4>Honors</h4><button className="secondary" onClick={() => setHonorsOpen(true)}>View Honors</button></section>}
       </section>)}
-      {details.events.length > 0 && <section><h3>Red Zone Events</h3><div className="profile-events">
-        {details.events.map(event => <article key={event.name}><h4>{event.name}</h4><ul>{event.records.map((record, index) =>
-          <li key={`${record.year}-${index}`}><strong>{record.year}</strong>{record.name && <span>{record.name}</span>}<span>{record.placement}</span></li>)}</ul></article>)}
-      </div></section>}
-      <section className="profile-honors"><h3>Honors</h3><button className="secondary" onClick={() => setHonorsOpen(true)}>View Honors</button></section>
+      <NotesEditor id={id} initialNotes={details.member.notes ?? ''} />
     </>}
     {honorsOpen && <Modal title="Honors" onClose={() => setHonorsOpen(false)}><h2>Honors</h2><p className="honors-wip">WIP</p></Modal>}
   </Modal>
+}
+function NotesEditor({ id, initialNotes }: { id: number; initialNotes: string }) {
+  const notesId = useId()
+  const [notes, setNotes] = useState(initialNotes)
+  const [savedNotes, setSavedNotes] = useState(initialNotes)
+  const [pending, setPending] = useState(false)
+  const [error, setError] = useState('')
+  const [saved, setSaved] = useState(false)
+  const request = useRef<AbortController | null>(null)
+  useEffect(() => () => request.current?.abort(), [])
+  async function save(event: FormEvent) {
+    event.preventDefault()
+    const controller = new AbortController(); request.current = controller
+    setPending(true); setError(''); setSaved(false)
+    try {
+      await saveProfileNotes(id, notes, controller.signal)
+      if (!controller.signal.aborted) { setSavedNotes(notes); setSaved(true) }
+    } catch(error) { if (!controller.signal.aborted) setError(message(error)) }
+    finally { if (!controller.signal.aborted) setPending(false) }
+  }
+  return <form className="profile-notes" onSubmit={save}><label htmlFor={notesId}>Notes</label><textarea id={notesId} value={notes} rows={5} disabled={pending} onChange={event => { setNotes(event.target.value); setSaved(false) }} placeholder="Add a sentence or several paragraphs" />
+    <button disabled={pending || notes === savedNotes}>{pending ? 'Saving...' : 'Save Notes'}</button>
+    {notes !== savedNotes && <p className="muted">Unsaved changes - save before closing the profile.</p>}
+    {saved && <p role="status">Notes saved</p>}{error && <p role="alert" className="error">{error}</p>}
+  </form>
 }
 
 export default App

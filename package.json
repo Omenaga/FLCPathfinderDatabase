@@ -9,7 +9,7 @@
         "lint": "oxlint",
         "preview": "vite preview",
         "supabase": "supabase",
-        "test": "node --test tests/database.test.mjs",
+        "test": "node --test tests/database.test.mjs tests/revision.test.mjs",
         "test:ui": "playwright test"
     },
     "dependencies": {

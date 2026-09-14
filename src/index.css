@@ -103,3 +103,11 @@ li { padding: .25rem 0; line-height: 1.5; }
 .selected-options { gap: .2rem; }
 .selected-options button { font-size: .625rem; padding: .15rem .25rem; line-height: 1.35; min-height: 24px; max-width: 100%; overflow-wrap: anywhere; }
 .history-detail-select { min-height: 28px; padding: .2rem .3rem; font-size: .75rem; margin-bottom: .3rem; }
+
+.profile-role { border: 1px solid #d8e1ee; border-radius: .6rem; padding: 1rem; margin-top: 1.25rem; }
+.profile-role .role-heading { margin: 0 0 1rem; color: #244bab; }
+.profile-role h4 { margin-top: 1rem; }
+.profile-events h5 { font-size: .9rem; margin: 0 0 .6rem; }
+.profile-notes { border-top: 1px solid #d8e1ee; margin-top: 1.5rem; padding-top: 1rem; }
+.profile-notes textarea { font: inherit; width: 100%; padding: .65rem; border: 1px solid #adbbd0; border-radius: .4rem; resize: vertical; }
+.profile-notes button { margin-top: .7rem; }
