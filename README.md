@@ -1,4 +1,4 @@
-﻿# FLC Pathfinder Database
+# FLC Pathfinder Database
 
 A web application for searching current and historical member records for the Forest Lake Seventh-day Adventist Church Pathfinder ministry in Apopka, Florida.
 
@@ -7,7 +7,9 @@ A web application for searching current and historical member records for the Fo
 - Current results: First, Last, Status, Title, and Current activities.
 - Status choices: Pathfinder, Staff, Parent, Not Active; no current data means Not Active.
 - Search names, periods/calendar years, Basic/Advanced/Incomplete levels, activity teams/instruments/operations, and Red Zone placements. Selections within a category use OR; selected categories combine with AND.
-- Profile with Birthday, separate Pathfinder/Staff histories, and editable multiline Notes. Honors remains a separate WIP dialog.
+- Profile with Birthday, separate Pathfinder/Staff histories, editable multiline Notes, and a separate earned Honors dialog.
+- Add New Profile creates a person and current registration. Add to Record adds history to multiple selected profiles, reporting added, existing, and failed entries.
+- Member tables sort by Status, current Class/Title priority, Last Name, then First Name before pagination.
 - All stored years use `YYYY-YY`. Detailed history is explicitly associated with Pathfinder or Staff roles.
 - Supabase Auth accounts retain immediate application access, independently of person Status.
 
@@ -42,9 +44,13 @@ The September 11 migration changes `current_staff_role()` to return `editor` for
 
 ## Entering records
 
-Use **Add / Edit Profiles > Add Record** to create a person and current registration together. Enter names, Status, optional Birthday and Class/Title; Current Year comes from the configured club year. Click Add, then Confirm within five seconds. Record Added shows the saved profile summary. Failed saves preserve your inputs for retry. Historical data and edits other than Notes remain in Supabase Table Editor. IDs remain internal. Do not commit member records or credentials.
+Use **Add > Add New Profile** to create a person and current registration together. Enter names, Status, optional Birthday and Class/Title; Current Year comes from the configured club year. Click Add, then Confirm within five seconds. Record Added shows the saved profile summary. Failed saves preserve your inputs for retry.
 
-Current Data uses one `current_title` field validated against status. Pathfinder titles use the eight levels. Staff titles come from `staff_titles`, which is intentionally empty until supplied. Parent/Not Active titles are null.
+Use **Add > Add to Record** to choose a year and one class/title, activity, event, or honor for existing profiles. PBE automatically includes all books configured for that year. Search and check recipients in the expanded modal; selected profiles appear below the results. Click Finish / Done, review the receipt, then Confirm (no timer). Only Staff titles exclude current Pathfinders. No historical-role choice is needed. New details are merged with existing history and the year is added to Years Active. The receipt separates Added, Already had this information, and Not added with reasons, hiding empty sections. Conflicts preserve existing records. Use Review failed profiles to correct or retry failures.
+
+Changing existing data other than Notes remains in Supabase Table Editor; Edit Profiles is a separate placeholder. IDs remain internal. Do not commit member records or credentials.
+
+Current Data uses one `current_title` array field validated against status. New Pathfinder profiles select one of the eight levels. Staff titles come from `staff_titles`; `sort_order` follows the numbered catalog in the schema. Parent/Not Active titles are null.
 
 History years are ranges such as `2023-24`. Levels use `{ "name": "Friend", "outcome": "basic", "year": "2023-24" }`; unknown migrated dates remain null. Set `history_role` to the role when an activity/event occurred. Drill teams are Precision, Freestyle, Adult; a team does not determine the person's role automatically.
 
@@ -86,7 +92,7 @@ npm run build
 
 `npm test` executes the migration in PGlite (PostgreSQL in memory) and checks validation, paired histories, search predicates, foreign keys, and role permissions using a minimal Supabase Auth contract. It does not connect to or modify the hosted project.
 
-`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies current result columns, range/outcome filters, role-specific profiles, the nested Honors placeholder, retries, Notes saves/failures, and mobile scrolling. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
+`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies current result columns, range/outcome filters, role-specific profiles, earned Honors loading, retries, Notes saves/failures, and mobile scrolling. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
 
 ## Project context
 
@@ -98,7 +104,7 @@ npm run build
 - `src/components/`: shared Select, MultiSelect, and Modal components.
 - `src/lib/`: Supabase access, database types, data functions, and shared formatting/error helpers.
 
-`src/features/add/` contains the Add Record form and saved profile summary. `App.tsx` connects the page navigation and refreshes Search after creation without discarding its filters. The `add_member_record` Supabase function saves both rows atomically and prevents duplicate creation on retries from the same form. Apply `20260915140000_add_record.sql` before using this frontend. A future Edit screen can live in `src/features/edit/`.
+`src/features/add/` contains new-profile creation, Add to Record, and honor lookup. `App.tsx` connects page navigation and refreshes Search after saves without discarding its filters. `add_member_record` creates both registration rows atomically. `add_to_records` merges history with per-profile rollback, existing-information checks, and receipts. Apply the full migration history through `20260915180000_simplify_history_additions.sql` before using this frontend. A future Edit screen can live in `src/features/edit/`.
 
 Read [the project context](docs/project-context.md) for ministry background, source links, and terminology. The implemented data model follows [the database schema](docs/database-schema.md); preliminary ideas in the context document are not additional implemented features.
 
@@ -107,4 +113,4 @@ Read [the project context](docs/project-context.md) for ministry background, sou
 
 The **Years** control now applies to Levels, Extracurricular, and Red Zone Events together. Category dropdowns contain only the names and their outcome/team/instrument/operation/placement choices, never years. For example, Years = 2023-24, Levels = Basic or Advanced Friend, and Extracurricular = Snare or Teaching finds people with either selected Friend outcome AND either activity detail, each recorded in 2023-24. Multiple years match any selected year. Without years, the selected categories search all history. With only years selected, browse participation years. Calendar-year selections retain adjacent-period matching. Unknown level years cannot match a specific year.
 
-Honors is still an empty placeholder; its future implementation must use the same shared years and within-category OR behavior. No honors records are fetched or falsely matched by the placeholder today.
+The general Search Honors filter remains a placeholder; its future filtering must use shared years and within-category OR behavior. Add to Record honor lookup and profile honor display are implemented separately.

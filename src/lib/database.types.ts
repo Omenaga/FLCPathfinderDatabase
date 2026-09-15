@@ -54,6 +54,13 @@ export type Database = {
             foreignKeyName: "current_data_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: true
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "current_data_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: true
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -93,6 +100,13 @@ export type Database = {
             foreignKeyName: "drill_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drill_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -123,6 +137,13 @@ export type Database = {
             columns: ["pathfinder_id"]
             isOneToOne: false
             referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "drum_corps_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search_base"
             referencedColumns: ["id"]
           },
           {
@@ -184,6 +205,13 @@ export type Database = {
             columns: ["pathfinder_id"]
             isOneToOne: false
             referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "honors_earned_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search_base"
             referencedColumns: ["id"]
           },
           {
@@ -265,6 +293,13 @@ export type Database = {
             foreignKeyName: "pbe_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pbe_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -319,6 +354,13 @@ export type Database = {
             foreignKeyName: "red_zone_archery_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_archery_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -355,6 +397,13 @@ export type Database = {
             columns: ["pathfinder_id"]
             isOneToOne: false
             referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_bible_events_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search_base"
             referencedColumns: ["id"]
           },
           {
@@ -400,6 +449,13 @@ export type Database = {
             foreignKeyName: "red_zone_burning_twine_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_burning_twine_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -439,6 +495,13 @@ export type Database = {
             foreignKeyName: "red_zone_drill_performance_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_drill_performance_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -472,6 +535,13 @@ export type Database = {
             columns: ["pathfinder_id"]
             isOneToOne: false
             referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_drum_performance_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search_base"
             referencedColumns: ["id"]
           },
           {
@@ -520,6 +590,13 @@ export type Database = {
             foreignKeyName: "red_zone_honor_evaluations_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_honor_evaluations_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -553,6 +630,13 @@ export type Database = {
             columns: ["pathfinder_id"]
             isOneToOne: false
             referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_jump_rope_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search_base"
             referencedColumns: ["id"]
           },
           {
@@ -598,6 +682,13 @@ export type Database = {
             foreignKeyName: "red_zone_knots_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_knots_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -631,6 +722,13 @@ export type Database = {
             columns: ["pathfinder_id"]
             isOneToOne: false
             referencedRelation: "member_search"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_lashing_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
+            referencedRelation: "member_search_base"
             referencedColumns: ["id"]
           },
           {
@@ -676,6 +774,13 @@ export type Database = {
             foreignKeyName: "red_zone_tents_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "red_zone_tents_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -709,6 +814,13 @@ export type Database = {
             foreignKeyName: "staff_history_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: true
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_history_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: true
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -716,12 +828,15 @@ export type Database = {
       }
       staff_titles: {
         Row: {
+          sort_order: number
           title: string
         }
         Insert: {
+          sort_order?: number
           title: string
         }
         Update: {
+          sort_order?: number
           title?: string
         }
         Relationships: []
@@ -757,6 +872,13 @@ export type Database = {
             foreignKeyName: "tlt_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
             isOneToOne: false
+            referencedRelation: "member_search_base"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tlt_pathfinder_id_fkey"
+            columns: ["pathfinder_id"]
+            isOneToOne: false
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -765,6 +887,34 @@ export type Database = {
     }
     Views: {
       member_search: {
+        Row: {
+          created_at: string | null
+          current_activities: Json | null
+          current_title: Json | null
+          first_name: string | null
+          has_current_data: boolean | null
+          id: number | null
+          last_name: string | null
+          levels: Json | null
+          name: string | null
+          search_activities: Json | null
+          search_activity_details: Json | null
+          search_activity_years: Json | null
+          search_event_details: Json | null
+          search_event_years: Json | null
+          search_events: Json | null
+          search_years: Json | null
+          sort_first_name: string | null
+          sort_last_name: string | null
+          sort_status: number | null
+          sort_title: number | null
+          status: string | null
+          updated_at: string | null
+          years_active: Json | null
+        }
+        Relationships: []
+      }
+      member_search_base: {
         Row: {
           created_at: string | null
           current_activities: Json | null
@@ -801,6 +951,10 @@ export type Database = {
           p_status: string
         }
         Returns: number
+      }
+      add_to_records: {
+        Args: { p_entry: Json; p_ids: number[]; p_year: string }
+        Returns: Json
       }
       current_club_year: { Args: never; Returns: string }
       current_staff_role: { Args: never; Returns: string }

@@ -4,6 +4,7 @@ import MultiSelect from '../../components/MultiSelect'
 import { LEVELS, STATUSES } from '../../lib/pathfinders'
 import { getSupabase } from '../../lib/supabase'
 import { message } from '../../lib/errors'
+import AddToRecord from './AddToRecord'
 
 function staffTitleGroup(title: string) {
   if (title.endsWith(' Counselor')) return 'Counselor'
@@ -18,12 +19,14 @@ function staffTitleLabel(title: string) {
 
 export default function AddRecords({ onAdded }: { onAdded: () => void }) {
   const [open, setOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   return <section className="panel">
-    <div className="section-heading"><h2>Add / Edit Profiles</h2></div>
+    <div className="section-heading"><h2>Add</h2></div>
     <p>Create a member profile with their personal details and current registration.</p>
-    <button onClick={() => setOpen(true)}>Add Record</button>
-    <div className="records-placeholder"><h3>Edit profiles</h3><p className="muted">Profile editing is coming later. You can already update notes from a member’s search profile.</p></div>
+    <button onClick={() => setOpen(true)}>Add New Profile</button>
+    <div className="records-placeholder"><h3>Add to Record</h3><p className="muted">Add achievements and participation to one or more existing profiles.</p><button onClick={() => setHistoryOpen(true)}>Add to Record</button></div>
     {open && <AddRecordModal onClose={() => setOpen(false)} onAdded={onAdded} />}
+    {historyOpen && <AddToRecord onClose={() => setHistoryOpen(false)} onAdded={onAdded} />}
   </section>
 }
 
@@ -129,7 +132,7 @@ function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
       </dl>
     </section>
   </Modal>
-  return <Modal title="Add Record" header={<h2>Add Record</h2>} onClose={onClose} closeDisabled={saving}>
+  return <Modal title="Add New Profile" header={<h2>Add New Profile</h2>} onClose={onClose} closeDisabled={saving}>
     <p>Enter the member’s details and current registration.</p>
     {error && <div role="alert"><p className="error">{error}</p><button type="button" className="secondary" onClick={() => { setError(''); setLoading(true); setAttempt(value => value + 1) }}>Retry form options</button></div>}
     <form className="record-form" onSubmit={submit} onChange={resetConfirmation} aria-busy={saving}>

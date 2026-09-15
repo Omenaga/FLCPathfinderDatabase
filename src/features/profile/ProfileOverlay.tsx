@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import Modal from '../../components/Modal'
 import NotesEditor from './NotesEditor'
+import HonorsOverlay from './HonorsOverlay'
 import { message } from '../../lib/errors'
 import { statusLabel } from '../../lib/format'
 import { getPathfinder, LEVELS, type PathfinderDetails } from '../../lib/pathfinders'
@@ -42,6 +43,6 @@ export default function ProfileOverlay({ id, status, onClose }: { id: number; st
       <section className="profile-honors"><h3>Honors</h3><button className="secondary" onClick={() => setHonorsOpen(true)}>View Honors</button></section>
       <NotesEditor id={id} initialNotes={details.member.notes ?? ''} />
     </>}
-    {honorsOpen && <Modal title="Honors" onClose={() => setHonorsOpen(false)}><h2>Honors</h2><p className="honors-wip">WIP</p></Modal>}
+    {honorsOpen && <HonorsOverlay id={id} onClose={() => setHonorsOpen(false)} />}
   </Modal>
 }

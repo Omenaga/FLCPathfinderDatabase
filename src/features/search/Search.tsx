@@ -7,7 +7,7 @@ import { statusLabel } from '../../lib/format'
 import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, PERIODS, STATUSES, PAGE_SIZE, searchPathfinders,
   type Filters, type Pathfinder } from '../../lib/pathfinders'
 
-export default function Search({ recordsVersion = 0 }: { recordsVersion?: number }) {
+export default function Search({ recordsVersion = 0, selection }: { recordsVersion?: number; selection?: { members: Pathfinder[]; onToggle: (member: Pathfinder) => void; excludePathfinders: boolean } }) {
   // Honors are a UI placeholder until the catalog and search integration are added.
   const [honors, setHonors] = useState<string[]>([])
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
@@ -21,12 +21,12 @@ export default function Search({ recordsVersion = 0 }: { recordsVersion?: number
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     const controller = new AbortController()
-    searchPathfinders(filters, page, controller.signal).then(result => {
+    searchPathfinders(filters, page, controller.signal, selection?.excludePathfinders).then(result => {
       if (!controller.signal.aborted) { setMembers(result.members); setCount(result.count); setError('') }
     }).catch(error => { if (!controller.signal.aborted) setError(message(error)) })
       .finally(() => { if (!controller.signal.aborted) setBusy(false) })
     return () => controller.abort()
-  }, [filters, page, attempt, recordsVersion])
+  }, [filters, page, attempt, recordsVersion, selection?.excludePathfinders])
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
     setDraft(current => ({ ...current, [key]: value }))
   }
@@ -37,7 +37,7 @@ export default function Search({ recordsVersion = 0 }: { recordsVersion?: number
     <section className="panel"><h2>Find a Pathfinder</h2><p className="muted">Select one or more options, or type and press Enter to add them. Match any bubble within each category, and every selected category. Years apply to all selected history categories. Leave filters blank to browse all members.</p>
       <form onSubmit={submit} onReset={reset} className="filters">
         <label className="name-filter">Name<input type="search" value={draft.name} onChange={e => update('name', e.target.value)} placeholder="Search by name" maxLength={200} /></label>
-        <Select label="Status" value={draft.status} options={STATUSES} onChange={value => update('status', value)} />
+        <Select label="Status" value={draft.status} options={selection?.excludePathfinders ? STATUSES.filter(status => status !== 'Pathfinder') : STATUSES} onChange={value => update('status', value)} />
         <MultiSelect label="Years" values={draft.year} options={[...PERIODS]} onChange={value => update('year', value)} />
         <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('level', value)} />
         <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('activity', value)} />
@@ -49,11 +49,12 @@ export default function Search({ recordsVersion = 0 }: { recordsVersion?: number
     <section className="panel" aria-busy={busy}><div className="section-heading"><h2>Members</h2><span role="status">{busy ? 'Searching…' : `${count} ${count === 1 ? 'member' : 'members'} found`}</span></div>
       {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { beginSearch(); setAttempt(attempt + 1) }}>Try again</button></> : !busy && members.length === 0 ?
         <p>No members found. Try fewer filters. If this is a new database, add the first records through Supabase.</p> : members.length > 0 && <>
-        <div className="table-scroll"><table><thead><tr><th>First Name</th><th>Last Name</th><th>Status</th><th>Class/Titles</th><th>Current activities</th></tr></thead><tbody>
+        <div className="table-scroll"><table><thead><tr>{selection && <th>Select</th>}<th>First Name</th><th>Last Name</th><th>Status</th><th>Class/Titles</th><th>Current activities</th></tr></thead><tbody>
           {members.map(member => {
             const inactive = !member.has_current_data || member.status === 'not_active'
             const hasTitle = member.status === 'pathfinder' || member.status === 'staff'
             return <tr key={member.id}>
+              {selection && <td><input type="checkbox" aria-label={`Select ${member.name}`} checked={selection.members.some(value => value.id === member.id)} onChange={() => selection.onToggle(member)} /></td>}
               <td><button className="member-link" aria-label={`Open profile for ${member.name}`} aria-haspopup="dialog" onClick={() => setSelected(member.id)}>{member.first_name}</button></td>
               <td>{member.last_name || 'Not recorded'}</td><td>{statusLabel(member.status)}</td>
               <td>{hasTitle ? (member.current_title as string[] | null)?.join(', ') || 'Not recorded' : 'N/A'}</td>

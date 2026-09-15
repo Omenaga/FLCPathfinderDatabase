@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 
-export default function Modal({ title, header, children, onClose, closeDisabled = false }: { title: string; header?: ReactNode; children: ReactNode; onClose: () => void; closeDisabled?: boolean }) {
+export default function Modal({ title, header, children, onClose, closeDisabled = false, wide = false }: { title: string; header?: ReactNode; children: ReactNode; onClose: () => void; closeDisabled?: boolean; wide?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null)
   useEffect(() => { dialog.current?.querySelector<HTMLButtonElement>('.modal-close')?.focus() }, [title])
   useEffect(() => {
@@ -15,7 +15,7 @@ export default function Modal({ title, header, children, onClose, closeDisabled 
       opener?.focus()
     }
   }, [])
-  return <dialog ref={dialog} className="profile-overlay" aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (!closeDisabled) onClose() }}>
+  return <dialog ref={dialog} className={`profile-overlay${wide ? ' wide-overlay' : ''}`} aria-label={title} onCancel={event => { event.preventDefault(); event.stopPropagation(); if (!closeDisabled) onClose() }}>
     <header className="modal-header">
       {header}
       <button className="secondary modal-close" disabled={closeDisabled} onClick={onClose} autoFocus>Close</button>

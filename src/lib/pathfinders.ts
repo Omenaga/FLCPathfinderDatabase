@@ -70,14 +70,15 @@ export function historySearchExpression(filters: Filters) {
   return groups.length ? `and(${groups.join(',')})` : ''
 }
 
-export async function searchPathfinders(filters: Filters, page: number, signal: AbortSignal) {
+export async function searchPathfinders(filters: Filters, page: number, signal: AbortSignal, excludePathfinders = false) {
   let query = getSupabase().from('member_search').select('*', { count: 'exact' })
   if (filters.status) query = query.eq('status', filters.status.toLowerCase().replaceAll(' ', '_'))
+  if (excludePathfinders) query = query.neq('status', 'pathfinder')
   const name = filters.name.trim()
   if (name) query = query.ilike('name', `%${name.replace(/[\\%_]/g, '\\$&')}%`)
   const expression = historySearchExpression(filters)
   if (expression) query = query.or(expression)
-  const { data, count, error } = await query.order('last_name').order('first_name').order('id')
+  const { data, count, error } = await query.order('sort_status').order('sort_title').order('sort_last_name').order('sort_first_name').order('id')
     .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1).abortSignal(signal)
   if (error) throw error
   return { members: (data ?? []), count: count ?? 0 }

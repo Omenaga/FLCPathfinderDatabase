@@ -5,10 +5,19 @@
 .record-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
 .record-fields small { font-weight: 400; font-size: .8rem; }
 .record-fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.recipient-chips, .honor-options { display: flex; flex-wrap: wrap; gap: .4rem; margin: .75rem 0; }
+.history-receipt { margin-bottom: 1rem; }
+.history-receipt h3 { margin-top: 0; }
+.profile-overlay .actions { margin-bottom: 1rem; }
+input[type="checkbox"] { width: 1.2rem; min-height: 1.2rem; height: 1.2rem; accent-color: #244bab; }
 .staff-title-select .level-choice .level-variants { display: flex; flex-wrap: wrap; gap: .35rem; }
 .staff-title-select .level-choice .level-variants button { flex: 0 1 auto; white-space: normal; font-size: .8rem; padding: .35rem .45rem; }
 .record-fields input[readonly] { background: #f0f4fa; }
-.record-form .option-list { position: static; margin-top: .5rem; }
+.profile-overlay.wide-overlay { width: calc(100vw - 3rem); height: calc(100dvh - 3rem); max-height: calc(100dvh - 3rem); }
+.selected-profiles { margin: 1.5rem 0; }
+.selected-profile-list { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: .5rem 2rem; }
+.pbe-summary { grid-column: 1 / -1; }
+.selected-profile-list label { flex-direction: row; align-items: center; gap: .75rem; }
 .record-form .selected-options { height: auto; min-height: 1rem; }
 .record-form .selected-options button { font-size: .8rem; padding: .3rem .5rem; }
 .record-footer { border-top: 1px solid #d8e1ee; margin-top: 1.5rem; padding-top: 1rem; }

@@ -124,7 +124,50 @@ test('member revision preserves history and enforces roles, ranges and access',a
   assert.equal((await db.query('select status from current_data where pathfinder_id=$1',[id])).rows[0].status,status)
   assert.deepEqual((await db.query('select years_active from pathfinders where id=$1',[id])).rows[0].years_active,['2026-27'])
  }
+ // Batch additions preserve earlier values and distinguish same-year details.
+ const batch=async(ids,year,entry)=>(await db.query('select add_to_records($1,$2,$3) as result',[ids,year,JSON.stringify(entry)])).rows[0].result
+ const staffId=created
+ const pfId=(await db.query("select id from pathfinders where first_name='Valid 3'")).rows[0].id
+ let receipt=await batch([staffId,pfId],'2025-26',{kind:'drums',details:['Snare']})
+ assert.deepEqual(receipt.map(r=>r.status),['added','added'])
+ receipt=await batch([staffId,pfId],'2025-26',{kind:'drums',details:['Snare','Bass']})
+ assert.ok(receipt.every(r=>r.status==='added'))
+ assert.deepEqual((await db.query('select history from drum_corps where pathfinder_id=$1',[pfId])).rows[0].history,[{year:'2025-26',drums:['Bass','Snare']}])
+ assert.ok((await batch([staffId,pfId],'2025-26',{kind:'drums',details:['Snare']})).every(r=>r.status==='already'))
+ assert.deepEqual((await db.query('select years_active from pathfinders where id=$1',[pfId])).rows[0].years_active,['2026-27','2025-26'])
+ receipt=await batch([staffId,pfId],'2024-25',{kind:'staff',details:['Drill Instructor']})
+ assert.equal(receipt.find(r=>r.id===staffId).status,'added')
+ assert.match(receipt.find(r=>r.id===pfId).reason,/Current Pathfinders/)
+ assert.equal((await db.query('select years_active from pathfinders where id=$1',[pfId])).rows[0].years_active.includes('2024-25'),false)
+ receipt=await batch([pfId],'2024-25',{kind:'drill',team:'Adult'})
+ assert.equal(receipt[0].status,'added')
+ for (const entry of [{kind:'level',name:'Friend',outcome:'advanced'},{kind:'drill',team:'Precision'},{kind:'pbe',details:['Romans']},{kind:'tlt',details:['Teaching']}]) {
+  assert.equal((await batch([pfId],'2024-25',entry))[0].status,'added')
+  assert.equal((await batch([pfId],'2024-25',entry))[0].status,'already')
+ }
+ assert.equal((await batch([pfId],'2024-25',{kind:'level',name:'Friend',outcome:'basic'}))[0].status,'added')
+ assert.equal((await batch([pfId],'2024-25',{kind:'drill',team:'Freestyle'}))[0].status,'added')
+ const eventEntry={kind:'event',event:'Archery',placement:'1st Place'}
+ assert.equal((await batch([pfId],'2022-23',eventEntry))[0].status,'added')
+ receipt=await batch([staffId,pfId],'2022-23',{...eventEntry,placement:'2nd Place'})
+ assert.equal(receipt.find(r=>r.id===staffId).status,'added'); assert.equal(receipt.find(r=>r.id===pfId).status,'error')
+ assert.equal((await db.query('select placement from red_zone_archery where pathfinder_id=$1',[pfId])).rows[0].placement,'1st Place')
+ assert.equal((await batch([pfId],'2022-23',{kind:'event',event:'Bible Events',name:'Memory',placement:'Participation'}))[0].status,'added')
+ assert.deepEqual((await db.query('select history from pbe where pathfinder_id=$1',[pfId])).rows[0].history,[{year:'2024-25',books:['1 Corinthians','2 Corinthians','Romans']}])
+ await assert.rejects(batch([pfId],'1900-01',{kind:'pbe',details:[]}),/No Bible books/)
+ assert.equal((await db.query('select years_active from pathfinders where id=$1',[pfId])).rows[0].years_active.includes('1900-01'),false)
+ const honorId=(await db.query("insert into honors(name) values('Test Honor') returning id")).rows[0].id
+ assert.equal((await batch([pfId],'2020-21',{kind:'honor',honor_id:honorId}))[0].status,'added')
+ await db.query("update pathfinders set years_active=years_active-'2020-21' where id=$1",[pfId])
+ receipt=await batch([pfId],'2020-21',{kind:'honor',honor_id:honorId})
+ assert.equal(receipt[0].status,'already'); assert.equal(receipt[0].year_added,true)
+ // Ranking uses current Status and the highest-priority title, before names.
+ await db.query("update current_data set current_title='[\"Junior Staff\",\"Club Director\"]' where pathfinder_id=$1",[staffId])
+ const ranked=(await db.query('select id,sort_status,sort_title from member_search order by sort_status,sort_title,sort_last_name,sort_first_name,id')).rows
+ assert.ok(ranked.findIndex(r=>r.id===pfId)<ranked.findIndex(r=>r.id===staffId))
+ assert.equal(ranked.find(r=>r.id===staffId).sort_title,1)
  await db.exec('reset role; set role anon;')
+ await assert.rejects(batch([pfId],'2025-26',{kind:'drums',details:['Snare']}),e=>e.code==='42501')
  await assert.rejects(create('10000000-0000-0000-0000-000000000006','Denied','parent',null),e=>e.code==='42501')
  await assert.rejects(db.exec('select * from member_search'),e=>e.code==='42501')
  } finally {await db.close()}
