@@ -42,37 +42,37 @@ Grade is removed. For Pathfinder, each current_title entry must be one of the ei
 `staff_titles(title text primary key)` holds allowed staff titles; authenticated users may read the catalog, and administrators configure it. Referenced titles cannot be removed in a way that invalidates saved current or historical data. No placeholder title is stored.
 
 1. Club Director
-2. Friend Counselor
-3. Companion Counselor
-4. Explorer Counselor
-5. Ranger Counselor
-6. Voyager Counselor
-7. Guide Counselor
-8. Pioneer Counselor
-9. Navigator Counselor
-10. Master Guide Leader
-11. PBE Leader
-12. Drum Corps Leader
-13. Drill Leader
-14. TLT Leader
-15. PBE Instructor
-16. Drum Instructor
-17. Drill Instructor
-18. TLT Instructor
-19. Associate Director
-20. Treasurer
-21. Administrative Assistant
-22. Equipment
-23. Trailer
-24. Camping
-25. IT
-26. Audio/Visual
-27. Medical
-28. Security
+2. Associate Director
+3. Treasurer
+4. Administrative Assistant
+5. Friend Counselor
+6. Companion Counselor
+7. Explorer Counselor
+8. Ranger Counselor
+9. Voyager Counselor
+10. Guide Counselor
+11. Pioneer Counselor
+12. Navigator Counselor
+13. Master Guide Leader
+14. PBE Leader
+15. Drum Corps Leader
+16. Drill Leader
+17. TLT Leader
+18. PBE Instructor
+19. Drum Instructor
+20. Drill Instructor
+21. TLT Instructor 
+22. Medical
+23. Security
+24. Equipment
+25. Trailer
+26. Camping
+27. IT
+28. Audio/Visual  
 29. Social Media
 30. Photography
-31. Junior Staff
-32. Master Guide
+31. Master Guide
+32. Junior Staff
 
 `staff_history` contains `id` (identity primary key), `pathfinder_id` (unique FK), and `history` (nonempty JSON array). One row per member, with one entry per unique period and multiple titles allowed per period. Titles come from `staff_titles` but are not restricted to particular years. Empty title arrays preserve participation with an unknown title. Validation and catalog-protection triggers prevent invalid references. Staff years are included in Years Active search.
 
@@ -209,7 +209,23 @@ The search Honors control remains a placeholder. View Honors opens a separate WI
 
 ## Search and current results
 
-The security-invoker `member_search` view returns one row per person, preserving RLS, server-side counts, and pagination. Current Data is left-joined for the selected club season. Missing current data defaults to Not Active. First and Last are separate displayed columns; the derived full name supports combined name searching. Results sort by last name, first name, and internal ID.
+The security-invoker `member_search` view returns one row per person, preserving RLS, server-side counts, and pagination. Current Data is left-joined for the selected club season. Missing current data defaults to Not Active. First and Last are separate displayed columns; the derived full name supports combined name searching. The current implementation sorts by last name, first name, and internal ID; the planned default below replaces that order.
+
+### Planned automatic member ordering (not implemented)
+
+Apply this order whenever a search displays a member table, including the recipient search in Add to Record:
+
+1. **Current Status:** Pathfinder, Staff, Parent, Not Active.
+2. **Current Class/Title within that status:**
+   - Pathfinder: Friend, Companion, Explorer, Ranger, Voyager, Guide, Pioneer, Navigator.
+   - Staff: the exact numbered priority order in **`staff_titles` and `staff_history`** above (Club Director first, Junior Staff last), using the updated schema list as the source of truth. If a person has multiple current titles, use the highest-priority title (lowest numbered rank) as the sorting key; continue displaying all their titles.
+   - Parent and Not Active: no title ordering; these statuses have no titles.
+   - Pathfinder/Staff profiles with no recorded or ranked title sort after ranked titles within their status. For legacy Pathfinder records with multiple classes, use the earliest class in the progression as the sorting key.
+3. **Last Name:** alphabetical, case-insensitive.
+4. **First Name:** alphabetical, case-insensitive.
+5. Internal person ID breaks otherwise identical ties for stable pagination.
+
+Sort the complete matching result set on the server **before pagination**, rather than sorting only the displayed page. The Staff catalog currently has only a title key, so implementation must explicitly represent this priority order; neither alphabetical order nor table insertion order defines Staff priority. This ordering uses current registration, not earned levels or historical titles.
 
 Visible columns: **First, Last, Status, Title, Current activities**. First opens the profile. Title is current_title for Pathfinder/Staff (Not recorded if null), and N/A for Parent/Not Active. Inactive current activities display N/A. Historical activities never masquerade as current participation.
 
@@ -233,7 +249,17 @@ Both role sections remain identifiable, with empty messages when their summary h
 
 The overlay preserves filters/results/pagination, supports loading/retry and mobile scrolling, prevents stale requests from rendering, and returns focus to its opener. Honors preserves the underlying profile and closes independently with Escape or Close.
 
-## Add Record flow
+## Planned Add page sections and labels (not implemented)
+
+Keep the creation and history-addition actions in the Add area alongside Search:
+
+- Rename the existing **Add Record** creation button to **Add New Profile**. It continues to open the new-person registration flow documented below.
+- Replace the current **Edit Profiles** placeholder section with **Add to Record**, with a button of the same name. This opens the planned flow for adding information to one or more existing profiles.
+- Move **Edit Profiles** into a separate, future section for changing existing data. It is not part of Add to Record, and its placement and implementation remain future work.
+
+These are planned UI labels; existing database function names and the creation flow remain unchanged.
+
+## Add New Profile flow (currently labeled Add Record)
 
 The Add / Edit Profiles page includes the Add Record modal, with status-dependent choices, the configured current year, and a five-second confirmation countdown. Confirm calls `add_member_record` in Supabase and shows Record Added only after saving succeeds. Profile editing remains future work.
 
@@ -279,6 +305,74 @@ The migration `20260915150000_add_record_years_active.sql` makes new Add Record 
 Other fields use existing database defaults and validation, including Staff current activities normalized to `["N/A"]`. Earned levels and activity/event records are not inferred from this current registration form.
 
 `20260915160000_add_record_validation.sql` rejects a new Add request when both First Name and Last Name match an existing person, case-insensitively after trimming surrounding spaces (including matching blank last names). The error states that the profile already exists and directs the user to Search. The name check and insert are serialized in the transaction to prevent simultaneous Add requests from creating duplicates. A retry of an already successful request still returns its original ID. Existing duplicate profiles are preserved; direct administrator edits remain governed by the existing table constraints.
+
+## Planned Add to Record flow: add history to existing profiles (not implemented)
+
+**Add to Record** adds documentation to existing profiles. This is the flow previously discussed as editing; changing or removing existing data belongs to the separate future **Edit Profiles** section. The following is an initial plan and will be expanded with further requirements.
+
+### Year and documentation choice
+
+1. Clicking **Add to Record** opens a dialog asking **what year to document**. Choose one school-year period for the new entry, using the existing `YYYY-YY` storage format. Recipient profiles are selected after the information to add is defined.
+2. Choose exactly one documentation category per entry: **Level Earned**, **Extracurricular**, **Red Zone Events**, or **Honors**.
+3. Show the relevant choices and any further detail options underneath that category. The same year and documentation will be added to each selected existing profile.
+
+| Category | Choices and dependent details | Existing storage / planning notes |
+|---|---|---|
+| Level Earned | Select exactly one of the eight Pathfinder classes (Friend, Companion, Explorer, Ranger, Voyager, Guide, Pioneer, Navigator), or one Staff class | Pathfinder achievements use `pathfinders.levels` with name, outcome, and year. The Staff class catalog and its storage are still to be defined; do not assume Staff classes are the same as `staff_titles`. Outcome selection for this flow remains to be specified. |
+| Extracurricular | Select Drill, Drum, PBE, or TLT, then choose any applicable further details | Drill: team; Drum: instrument; PBE: book options for the selected year; TLT: operation. Use the existing activity catalogs and history tables. Whether each detail permits one or multiple selections remains to be specified. |
+| Red Zone Events | Select an event, then its placement | Use the existing event tables and placements: 1st Place, 2nd Place, 3rd Place, Participation. Named events also need their event/evaluation name; the input flow for those names remains to be specified. |
+| Honors | Type an honor name to search the database catalog, then select a matching honor | Plan for hundreds of honors with searchable database-backed suggestions, similar to Search. Use `honors` for the catalog and `honors_earned` for the person/year association. Honors UI integration remains unimplemented. |
+
+### Eligibility by role
+
+Depending on the selected documentation option, eligibility may be restricted to **Pathfinders**, **Staff**, **Parents**, or any combination of those roles. **Confirmed rule: when a Staff title is chosen, profiles whose current Status is Pathfinder must not appear as selectable options.** Other allowed-role combinations remain to be supplied; do not infer that this rule permits or excludes Parent or Not Active profiles.
+
+The Staff-title exclusion explicitly uses current Status. For other options, the plan must still define whether eligibility uses current Status or the person's role in the documented year, and how Not Active people are handled. Existing activity, event, and honor history supports only `pathfinder` and `staff` in `history_role`; Parent history requires an explicit schema decision before implementation. Do not silently record Parent participation as another role. The relationship between the earlier Staff class choice and Staff titles remains to be clarified.
+
+### Search and select recipient profiles
+
+After defining the year and documentation, present a profile search similar to the existing Search feature. Users can search for existing profiles and **check/select or uncheck/deselect any number of eligible profiles** to receive that same information.
+
+- Track selection by permanent person ID, not by name.
+- Preserve checked profiles when the user changes searches, filters, or result pages, so they can gather recipients across multiple searches. Provide a visible selection count and a way to review and deselect chosen profiles.
+- Apply the eligibility rules to the available recipients. If the documentation changes, revalidate the selection and identify/remove any newly ineligible recipients before confirmation.
+- Require at least one eligible selected profile before enabling **Finish / Done**. This button opens the final review; it does not write records.
+
+### Final review and submission
+
+1. **Finish / Done** opens a final confirmation screen with a quick transcript/receipt of **what will be added and to whom**: the year, category, chosen class/title/activity/event/honor, applicable details such as outcome or placement, and every selected recipient's name. Include current Status where useful for distinguishing recipients and reviewing eligibility.
+2. Allow the user to return to the preceding steps to adjust the information or recipient selection before saving.
+3. The final **Confirm** button is **not timed**. Only this confirmation submits the documentation for the reviewed recipients.
+4. After Confirm, the final modal shows a **loading state** while the information is being saved. Prevent repeat submission while it is pending.
+5. On a save failure, show an **error state explaining why**. Preserve the proposed information and recipient selection for review or retry. Information already present on a profile is a normal skipped outcome, not a save failure, and must not stop additions to other profiles. Handling of other batch failures and retry behavior remains to be defined before implementation; the UI must not imply that unsaved entries succeeded.
+6. On completion, show a final receipt listing **Added** profiles and **Already had this information** profiles, with counts for each group and the documented information. If every selected profile already had the information, show that outcome without reporting an error or claiming new additions. Close returns to the main page.
+
+Recheck recipient eligibility on the backend when saving, including the current-Status exclusion for Staff titles, so a status change after selection cannot bypass the rule.
+
+### Preserve existing records
+
+New documentation must preserve all previously recorded years, achievements, activities, results, and honors. For tables that store multiple periods/details in one JSON array, adding documentation means appending or merging new entries while retaining existing values.
+
+For each selected profile, ensure the documented year is present in **both** `pathfinders.years_active` and the relevant category's history entry. Append the year to `years_active` only if missing, retaining all previous years. Save the year with the specific information in the appropriate table/JSON history structure as well. These changes must succeed together for that profile; a failed category write must not leave only a new Years Active entry.
+
+Check each selected profile for the proposed information in the documented year and applicable historical role. If it already has all of that category information, report **Already had this information** and still add the year to `years_active` if missing; note that Years Active update in the receipt. Continue adding the information to profiles that do not have it. If a profile already has only part of the selected details, preserve those details and add only the missing ones, reporting the profile under **Added**. Do not create duplicate entries.
+
+**A matching year alone never makes information a duplicate**, whether that year appears in `years_active`, the destination table, or both. Within the selected year and applicable role, compare the category-specific information:
+
+| Category | Details used to identify existing information |
+|---|---|
+| Levels | Level name and outcome |
+| Staff titles | Selected title (Staff class mapping remains to be defined) |
+| Honors | Selected honor identity/name |
+| Drill | Team |
+| Drum | Instrument (`drum_played` in the user's terminology; currently stored in the period's `drums` array) |
+| PBE | Bible book |
+| TLT | Operation |
+| Red Zone Events | Event, event/evaluation name where applicable, and placement |
+
+For example, a profile with `2026-27` in Years Active and Snare recorded for that year can still receive Bass for `2026-27`. Preserve Snare, add Bass to that year's drum history, and keep only one `2026-27` entry in Years Active.
+
+If distinct information conflicts with an existing record under the schema's uniqueness rules (for example, another placement for an event allowing only one result per person/year/role), do not overwrite it or label it as already present; conflict handling or a schema adjustment remains to be specified. Batch transaction/retry behavior for other errors also remains to be specified.
 
 ## Future rollover
 
