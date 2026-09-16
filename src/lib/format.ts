@@ -1,7 +1,11 @@
+// Shared display labels keep database values and user-facing wording consistent.
+
 import { LEVELS } from './pathfinders'
 
 export function statusLabel(status: string | null) {
-  return status === 'not_active' || !status ? 'Not Active' : status[0].toUpperCase() + status.slice(1)
+  return status === 'not_active' || !status
+    ? 'Not Active'
+    : status[0].toUpperCase() + status.slice(1)
 }
 export function detailKind(name: string) {
   if (name === 'Drill') return 'team'

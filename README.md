@@ -48,7 +48,7 @@ Use **Add New Profile** in the header to create a person and current registratio
 
 Use **Add to Record** in the header to choose a year and one class/title, activity, event, or honor for existing profiles. PBE automatically includes all books configured for that year, with optional Area, State, Union, and Divisional results (one placement per region). Search and check recipients in the expanded modal; selected profiles appear below the results. Click Finish / Done, review the receipt, then Confirm (no timer). Only Staff titles exclude current Pathfinders. No historical-role choice is needed. New details are merged with existing history and the year is added to Years Active. The receipt separates Added, Already had this information, and Not added with reasons, hiding empty sections. Conflicts preserve existing records. Use Review failed profiles to correct or retry failures.
 
-Use **Edit Profile** beside Close in a member popup to change existing personal details, current registration, history entries, honors, and Notes. Click **Save Changes** in the editor header to review a receipt of Added, Updated, and Removed entries, then **Confirm** to save. Confirmation has no timer; **Back to Edit** retains the draft. A successful atomic save returns to the refreshed member popup and refreshes search results. Cancel returns without saving; failures keep your draft. Stale profiles must be reopened before saving so another user?s changes are not overwritten. Each non-level history section offers an Add button, including empty sections. An X on a history instance removes it from the draft; the receipt must be confirmed before it is deleted. All eight classes are shown without Add buttons; N/A means no recorded outcome. Year dropdowns run from 2010-11 through the current year, with Unknown available for history. PBE books are automatically selected from the year catalog. Current Registration sits between Notes and Levels. History instances can be removed, but Current Registration and the member profile cannot be deleted. Missing Current Registration is filled in by the editor with the configured club year and Not Active status. IDs remain internal. Do not commit member records or credentials.
+Use **Edit Profile** beside Close in a member popup to change existing personal details, current registration, history entries, honors, and Notes. Click **Save Changes** in the editor header to review a receipt of Added, Updated, and Removed entries, then **Confirm** to save. Confirmation has no timer; **Back to Edit** retains the draft. A successful atomic save returns to the refreshed member popup and refreshes search results. Cancel returns without saving; failures keep your draft. Stale profiles must be reopened before saving so another user's changes are not overwritten. Each non-level history section offers an Add button, including empty sections. An X on a history instance removes it from the draft; the receipt must be confirmed before it is deleted. All eight classes are shown without Add buttons; N/A means no recorded outcome. Year dropdowns run from 2010-11 through the current year, with Unknown available for history. PBE books are automatically selected from the year catalog. Current Registration sits between Notes and Levels. History instances can be removed, but Current Registration and the member profile cannot be deleted. Missing Current Registration is filled in by the editor with the configured club year and Not Active status. IDs remain internal. Do not commit member records or credentials.
 
 Current Data uses one `current_title` array field validated against status. New Pathfinder profiles select one of the eight levels. Staff titles come from `staff_titles`; `sort_order` follows the numbered catalog in the schema. Parent/Not Active titles are null.
 
@@ -96,18 +96,19 @@ npm run build
 
 ## Project context
 
+Start with [the code guide](docs/code-guide.md) for a beginner-friendly walkthrough, data rules, and maintenance conventions. Use `npm run format` to format maintained files and `npm run format:check` to verify their formatting.
+
 ### Frontend structure
 
 - `src/App.tsx`: application shell, sign-in, session lifecycle, and feature entry point.
 - `src/features/search/Search.tsx`: search filters, results, pagination, and opening member profiles.
-- `src/features/profile/`: member history popup and Notes editor.
+- `src/features/profile/`: member history, earned honors, profile editing, and change receipts.
 - `src/components/`: shared Select, MultiSelect, and Modal components.
 - `src/lib/`: Supabase access, database types, data functions, and shared formatting/error helpers.
 
-`src/features/add/` contains new-profile creation, Add to Record, and honor lookup. `App.tsx` connects page navigation and refreshes Search after saves without discarding its filters. `add_member_record` creates both registration rows atomically. `add_to_records` merges history with per-profile rollback, existing-information checks, and receipts. Apply the full migration history through `20260916000000_unknown_history_years.sql` before using this frontend. A future Edit screen can live in `src/features/edit/`.
+`src/features/add/` contains new-profile creation, Add to Record, and honor lookup. `App.tsx` connects page navigation and refreshes Search after saves without discarding its filters. `add_member_record` creates both registration rows atomically. `add_to_records` merges history with per-profile rollback, existing-information checks, and receipts. Apply the full migration history through `20260916040000_preserve_current_registration.sql` before using this frontend.
 
 Read [the project context](docs/project-context.md) for ministry background, source links, and terminology. The implemented data model follows [the database schema](docs/database-schema.md); preliminary ideas in the context document are not additional implemented features.
-
 
 ## Shared year search
 

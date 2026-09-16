@@ -1,3 +1,5 @@
+// One shared browser client handles authentication and typed database requests.
+
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { Database as GeneratedDatabase } from './database.types'
 
@@ -12,7 +14,9 @@ type Database = Omit<GeneratedDatabase, 'public'> & {
         Returns: Functions['add_to_records']['Returns']
       }
       add_member_record: {
-        Args: Omit<Functions['add_member_record']['Args'], 'p_birth_date'> & { p_birth_date: string | null }
+        Args: Omit<Functions['add_member_record']['Args'], 'p_birth_date'> & {
+          p_birth_date: string | null
+        }
         Returns: Functions['add_member_record']['Returns']
       }
     }

@@ -14,16 +14,16 @@ The club is based at Forest Lake Seventh-day Adventist Church, 515 Harley Lester
 
 The church's 2026–2027 registration describes eligibility as grades 5–12 or age 10 and above. It lists these classes:
 
-| Grade | Class | Division |
-| --- | --- | --- |
-| 5 | Friend | E-Tracker |
-| 6 | Companion | E-Tracker |
-| 7 | Explorer | E-Tracker |
-| 8 | Ranger | E-Tracker |
-| 9 | Voyager | Varsity |
-| 10 | Guide | Varsity |
-| 11 | Pioneer | Varsity |
-| 12 | Navigator | Varsity |
+| Grade | Class     | Division  |
+| ----- | --------- | --------- |
+| 5     | Friend    | E-Tracker |
+| 6     | Companion | E-Tracker |
+| 7     | Explorer  | E-Tracker |
+| 8     | Ranger    | E-Tracker |
+| 9     | Voyager   | Varsity   |
+| 10    | Guide     | Varsity   |
+| 11    | Pioneer   | Varsity   |
+| 12    | Navigator | Varsity   |
 
 Activities include Pathfinder Bible Experience (Bible Bowl), Drum Corps, Drill Team, and Teen Leadership Training (grade 9+). Registration distinguishes new and returning members, collects guardian details, and requires a notarized medical consent form per child. Adult overnight participation requires volunteer eligibility screening. These are published season-specific practices, not yet application requirements. [Source: 2026–2027 registration](https://forestlake.churchcenter.com/registrations/events/3638481).
 

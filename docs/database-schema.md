@@ -8,17 +8,17 @@ Implemented September 14, 2026. React/Vite uses Supabase PostgreSQL and Auth. Al
 
 One permanent row per person, including Pathfinder, Staff, Parent, and inactive people. IDs remain internal and are never name-based.
 
-| Column | Type | Meaning |
-|---|---|---|
-| `id` | integer identity | Permanent primary key |
-| `first_name` | text | Trimmed, 1-200 characters |
-| `last_name` | text | Trimmed, up to 200 characters; blank allowed when unknown |
-| `years_active` | jsonb | Unique participation ranges, e.g. `["2023-24"]`; Add Record initializes this with Current Year for every status |
-| `levels` | jsonb | Level/outcome/year entries described below |
-| `birth_date` | date, nullable | Birthday; display MM/DD/YYYY without timezone conversion |
-| `notes` | text, nullable | Multiline plain text; displayed as plain text in the profile; editable through Edit Profile |
-| `creation_request_id` | uuid, nullable, unique | Internal Add Record request identifier; prevents duplicate creation when the same form is retried |
-| `created_at`, `updated_at` | timestamptz | Creation and automatically updated modification time |
+| Column                     | Type                   | Meaning                                                                                                         |
+| -------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `id`                       | integer identity       | Permanent primary key                                                                                           |
+| `first_name`               | text                   | Trimmed, 1-200 characters                                                                                       |
+| `last_name`                | text                   | Trimmed, up to 200 characters; blank allowed when unknown                                                       |
+| `years_active`             | jsonb                  | Unique participation ranges, e.g. `["2023-24"]`; Add Record initializes this with Current Year for every status |
+| `levels`                   | jsonb                  | Level/outcome/year entries described below                                                                      |
+| `birth_date`               | date, nullable         | Birthday; display MM/DD/YYYY without timezone conversion                                                        |
+| `notes`                    | text, nullable         | Multiline plain text; displayed as plain text in the profile; editable through Edit Profile                     |
+| `creation_request_id`      | uuid, nullable, unique | Internal Add Record request identifier; prevents duplicate creation when the same form is retried               |
+| `created_at`, `updated_at` | timestamptz            | Creation and automatically updated modification time                                                            |
 
 The old name, graduated, extracurriculars, and red_zone_participation columns are removed. Full display/search names are derived from first and last names. Historical participation comes from detail tables.
 
@@ -26,14 +26,14 @@ The old name, graduated, extracurriculars, and red_zone_participation columns ar
 
 At most one row per person. `current_club_year()` selects `2026-27`; this changes only through an intentional rollover, not automatically in January.
 
-| Column | Type | Meaning |
-|---|---|---|
-| `pathfinder_id` | integer PK/FK | References the permanent person |
-| `school_year` | text | Required `YYYY-YY` range; defaults to current_club_year() for new rows; internal club-season selection |
-| `status` | text | Pathfinder (`pathfinder`), Staff (`staff`), Parent (`parent`), Not Active (`not_active`); default Not Active |
-| `current_title` | jsonb, nullable | Unique array of Pathfinder classes or Staff titles, validated against status |
-| `current_activities` | jsonb | Staff: `["N/A"]` automatically; otherwise a unique array of Drill, Drums, PBE, TLT |
-| `created_at`, `updated_at` | timestamptz | Maintained timestamps |
+| Column                     | Type            | Meaning                                                                                                      |
+| -------------------------- | --------------- | ------------------------------------------------------------------------------------------------------------ |
+| `pathfinder_id`            | integer PK/FK   | References the permanent person                                                                              |
+| `school_year`              | text            | Required `YYYY-YY` range; defaults to current_club_year() for new rows; internal club-season selection       |
+| `status`                   | text            | Pathfinder (`pathfinder`), Staff (`staff`), Parent (`parent`), Not Active (`not_active`); default Not Active |
+| `current_title`            | jsonb, nullable | Unique array of Pathfinder classes or Staff titles, validated against status                                 |
+| `current_activities`       | jsonb           | Staff: `["N/A"]` automatically; otherwise a unique array of Drill, Drums, PBE, TLT                           |
+| `created_at`, `updated_at` | timestamptz     | Maintained timestamps                                                                                        |
 
 Grade is removed. For Pathfinder, each current_title entry must be one of the eight level names. For Staff, each title must come from `staff_titles`; the catalog is seeded with the titles below. Multiple titles/classes may be stored, e.g. `["Club Director", "Drill Instructor"]` for Staff. Unknown titles remain null or an empty array. Staff activities are normalized to `["N/A"]`; moving away from Staff clears that marker to `[]` unless replacement activities are supplied. Original current data is retained in administrator-only `private.current_title_json_backup`. Parent/Not Active must have null titles. Changing status requires a compatible title or clearing it. Current classes do not imply earned achievements.
 
@@ -113,12 +113,12 @@ Each object has exactly name, outcome, and year. Null year preserves unknown dat
 
 Every detail table references `pathfinders.id` using `pathfinder_id`. Activities and Red Zone events always appear in Pathfinder History, regardless of current status. These tables have no `history_role` column. Staff History contains staff titles only.
 
-| Table | Columns besides pathfinder_id | Uniqueness / behavior |
-|---|---|---|
-| `drill` | id identity PK, team nullable text, years jsonb | One row per member/team, including an unknown team; nonempty years |
-| `drum_corps` | id identity PK, history jsonb | One row per member; each range paired with its instruments |
-| `pbe` | id identity PK, history jsonb | One row per member; each range paired with its books and optional region placements |
-| `tlt` | id identity PK, history jsonb | One row per member; each range paired with its operations |
+| Table        | Columns besides pathfinder_id                   | Uniqueness / behavior                                                               |
+| ------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `drill`      | id identity PK, team nullable text, years jsonb | One row per member/team, including an unknown team; nonempty years                  |
+| `drum_corps` | id identity PK, history jsonb                   | One row per member; each range paired with its instruments                          |
+| `pbe`        | id identity PK, history jsonb                   | One row per member; each range paired with its books and optional region placements |
+| `tlt`        | id identity PK, history jsonb                   | One row per member; each range paired with its operations                           |
 
 Drill teams: **Precision, Freestyle, Adult**. Adult is a team, not automatic evidence of a Staff role.
 
@@ -144,7 +144,11 @@ PBE example:
 
 ```json
 [
-  { "year": "2021-22", "books": ["1 Kings", "Ruth"], "results": { "Area": "1st Place", "State": "Participation" } },
+  {
+    "year": "2021-22",
+    "books": ["1 Kings", "Ruth"],
+    "results": { "Area": "1st Place", "State": "Participation" }
+  },
   { "year": "2022-23", "books": ["John"] }
 ]
 ```
@@ -157,41 +161,41 @@ PBE entries may include an optional `results` object keyed by **Area**, **State*
 
 Read-only for authenticated users; administrator-managed catalog keyed by `(school_year, book_name)`. Each PBE book must belong to its entry's exact period. Catalog changes cannot invalidate saved history. Unknown periods may have empty book arrays but cannot accept books until configured.
 
-| School year | Allowed Bible books |
-|---|---|
-| `2011-12` | 1 Samuel, Mark |
-| `2012-13` | Acts, 1 Thessalonians, 2 Thessalonians |
-| `2013-14` | 2 Samuel |
-| `2014-15` | Matthew |
-| `2015-16` | Exodus |
-| `2016-17` | Galatians, Ephesians, Philippians, Colossians, 1 Timothy, 2 Timothy |
-| `2017-18` | Daniel, Esther |
-| `2018-19` | Luke |
-| `2019-20` | Ezra, Nehemiah, Hosea, Amos, Jonah, Micah |
-| `2020-21` | Hebrews, James, 1 Peter, 2 Peter |
-| `2021-22` | 1 Kings, Ruth |
-| `2022-23` | John |
-| `2023-24` | Joshua, Judges |
-| `2024-25` | Romans, 1 Corinthians, 2 Corinthians |
-| `2025-26` | Isaiah (Chapters 1–33) |
-| `2026-27` | Mark, 1 Peter, 2 Peter, 1 John, 2 John, 3 John |
+| School year | Allowed Bible books                                                 |
+| ----------- | ------------------------------------------------------------------- |
+| `2011-12`   | 1 Samuel, Mark                                                      |
+| `2012-13`   | Acts, 1 Thessalonians, 2 Thessalonians                              |
+| `2013-14`   | 2 Samuel                                                            |
+| `2014-15`   | Matthew                                                             |
+| `2015-16`   | Exodus                                                              |
+| `2016-17`   | Galatians, Ephesians, Philippians, Colossians, 1 Timothy, 2 Timothy |
+| `2017-18`   | Daniel, Esther                                                      |
+| `2018-19`   | Luke                                                                |
+| `2019-20`   | Ezra, Nehemiah, Hosea, Amos, Jonah, Micah                           |
+| `2020-21`   | Hebrews, James, 1 Peter, 2 Peter                                    |
+| `2021-22`   | 1 Kings, Ruth                                                       |
+| `2022-23`   | John                                                                |
+| `2023-24`   | Joshua, Judges                                                      |
+| `2024-25`   | Romans, 1 Corinthians, 2 Corinthians                                |
+| `2025-26`   | Isaiah (Chapters 1–33)                                              |
+| `2026-27`   | Mark, 1 Peter, 2 Peter, 1 John, 2 John, 3 John                      |
 
 ## Red Zone Events (RZE)
 
 Each table has `id` identity PK, `pathfinder_id` FK, `year` text range, `placement` text. Named events also have a required `name` for the evaluation/event. Known results sort newest first in the profile; Unknown results follow with spacing.
 
-| Label | Table | Unique per |
-|---|---|---|
-| Drill Performance | red_zone_drill_performance | person/period/placement |
-| Drum Performance | red_zone_drum_performance | person/period/placement |
+| Label             | Table                      | Unique per                   |
+| ----------------- | -------------------------- | ---------------------------- |
+| Drill Performance | red_zone_drill_performance | person/period/placement      |
+| Drum Performance  | red_zone_drum_performance  | person/period/placement      |
 | Honor Evaluations | red_zone_honor_evaluations | person/period/name/placement |
-| Bible Events | red_zone_bible_events | person/period/name/placement |
-| Knots Relay | red_zone_knots | person/period/placement |
-| Tents | red_zone_tents | person/period/placement |
-| Jump Rope | red_zone_jump_rope | person/period/placement |
-| Archery | red_zone_archery | person/period/placement |
-| Lashing | red_zone_lashing | person/period/placement |
-| Burning Twine | red_zone_burning_twine | person/period/placement |
+| Bible Events      | red_zone_bible_events      | person/period/name/placement |
+| Knots Relay       | red_zone_knots             | person/period/placement      |
+| Tents             | red_zone_tents             | person/period/placement      |
+| Jump Rope         | red_zone_jump_rope         | person/period/placement      |
+| Archery           | red_zone_archery           | person/period/placement      |
+| Lashing           | red_zone_lashing           | person/period/placement      |
+| Burning Twine     | red_zone_burning_twine     | person/period/placement      |
 
 Placements are exactly **1st Place, 2nd Place, 3rd Place, Participation**. Each placement stays attached to its period and event. Honor Evaluation/Bible Event name catalogs remain future work: administrator-supplied names are stored on the records today. No assignments are invented.
 
@@ -199,9 +203,9 @@ Placements are exactly **1st Place, 2nd Place, 3rd Place, Participation**. Each 
 
 Fill in names before implementing restrictions. Both will use `YYYY-YY` period keys, not standalone calendar years. TBD is not an allowed stored name.
 
-| Period | Allowed Honor Evaluation names | Allowed Bible Event names |
-|---|---|---|
-| To be filled in | TBD | TBD |
+| Period          | Allowed Honor Evaluation names | Allowed Bible Event names |
+| --------------- | ------------------------------ | ------------------------- |
+| To be filled in | TBD                            | TBD                       |
 
 ## Honors
 
@@ -269,14 +273,14 @@ The **Add New Profile** button opens a modal form for creating a person and curr
 
 ### Form fields
 
-| Label | Stored field | Behavior |
-|---|---|---|
-| First Name | `pathfinders.first_name` | Required; trim whitespace; 1-200 characters |
-| Last Name | `pathfinders.last_name` | Trim whitespace; up to 200 characters; blank allowed when unknown under the existing schema |
-| Status | `current_data.status` | Select Pathfinder, Staff, Parent, or Not Active |
-| Birthday | `pathfinders.birth_date` | Date input; store a date without timezone conversion; blank stores null |
-| Class/Title | `current_data.current_title` | Pathfinder: one class; Staff: multiple titles allowed. Stored as an array; unknown titles may remain unselected |
-| Current Year | `current_data.school_year` | Autofill from the configured `current_club_year()`; display the full range, e.g. `2026-2027`, and store `2026-27` |
+| Label        | Stored field                 | Behavior                                                                                                          |
+| ------------ | ---------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| First Name   | `pathfinders.first_name`     | Required; trim whitespace; 1-200 characters                                                                       |
+| Last Name    | `pathfinders.last_name`      | Trim whitespace; up to 200 characters; blank allowed when unknown under the existing schema                       |
+| Status       | `current_data.status`        | Select Pathfinder, Staff, Parent, or Not Active                                                                   |
+| Birthday     | `pathfinders.birth_date`     | Date input; store a date without timezone conversion; blank stores null                                           |
+| Class/Title  | `current_data.current_title` | Pathfinder: one class; Staff: multiple titles allowed. Stored as an array; unknown titles may remain unselected   |
+| Current Year | `current_data.school_year`   | Autofill from the configured `current_club_year()`; display the full range, e.g. `2026-2027`, and store `2026-27` |
 
 The configured club year is the source of truth for autofill. Follow the existing intentional season rollover rather than changing the year automatically in January or guessing a school-year boundary. Reopening the form uses the configured current year.
 
@@ -318,12 +322,12 @@ Other fields use existing database defaults and validation, including Staff curr
 2. Choose exactly one documentation category per entry: **Level Earned**, **Extracurricular**, **Red Zone Events**, or **Honors**.
 3. Show the relevant choices and any further detail options underneath that category. The same year and documentation will be added to each selected existing profile.
 
-| Category | Choices and dependent details | Existing storage / planning notes |
-|---|---|---|
-| Level Earned | Select exactly one of the eight Pathfinder classes, or one existing Staff title | Pathfinder achievements use `pathfinders.levels` with name, selected Basic/Advanced/Incomplete outcome, and year. Staff class means a title from `staff_titles`, saved into `staff_history` for that year. |
-| Extracurricular | Select Drill, Drum, PBE, or TLT, then details | Drill: one team; Drum: one or more instruments; PBE: automatically include all books from the selected year's catalog, displayed for review without individual selection; TLT: one or more operations. Existing values are merged rather than replaced. PBE book selection may change in a future revision. |
-| Red Zone Events | Select one event and placement | Placements: 1st Place, 2nd Place, 3rd Place, Participation. Honor Evaluations and Bible Events also require a typed name. Different existing placements are reported as conflicts, not overwritten. |
-| Honors | Type an honor name and select one catalog match | Database-backed suggestions read `honors`; additions use `honors_earned` for person/year. No free-text catalog creation. |
+| Category        | Choices and dependent details                                                   | Existing storage / planning notes                                                                                                                                                                                                                                                                           |
+| --------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Level Earned    | Select exactly one of the eight Pathfinder classes, or one existing Staff title | Pathfinder achievements use `pathfinders.levels` with name, selected Basic/Advanced/Incomplete outcome, and year. Staff class means a title from `staff_titles`, saved into `staff_history` for that year.                                                                                                  |
+| Extracurricular | Select Drill, Drum, PBE, or TLT, then details                                   | Drill: one team; Drum: one or more instruments; PBE: automatically include all books from the selected year's catalog, displayed for review without individual selection; TLT: one or more operations. Existing values are merged rather than replaced. PBE book selection may change in a future revision. |
+| Red Zone Events | Select one event and placement                                                  | Placements: 1st Place, 2nd Place, 3rd Place, Participation. Honor Evaluations and Bible Events also require a typed name. Different existing placements are reported as conflicts, not overwritten.                                                                                                         |
+| Honors          | Type an honor name and select one catalog match                                 | Database-backed suggestions read `honors`; additions use `honors_earned` for person/year. No free-text catalog creation.                                                                                                                                                                                    |
 
 ### Eligibility by role
 
@@ -363,16 +367,16 @@ Check each selected profile using the category-specific scope below (all years f
 
 **A matching year alone never makes information a duplicate**, whether that year appears in `years_active`, the destination table, or both. Compare the category-specific information below, across all years where specified:
 
-| Category | Details used to identify existing information |
-|---|---|
-| Levels | Level name across all years and outcomes; keep the existing version |
-| Staff titles | Selected existing Staff title |
-| Honors | Selected honor identity/name |
-| Drill | Team |
-| Drum | Instrument (`drum_played` in the user's terminology; currently stored in the period's `drums` array) |
-| PBE | Bible book and each region/placement pair |
-| TLT | Operation across all years; add only operations not previously recorded |
-| Red Zone Events | Event, event/evaluation name where applicable, and placement |
+| Category        | Details used to identify existing information                                                        |
+| --------------- | ---------------------------------------------------------------------------------------------------- |
+| Levels          | Level name across all years and outcomes; keep the existing version                                  |
+| Staff titles    | Selected existing Staff title                                                                        |
+| Honors          | Selected honor identity/name                                                                         |
+| Drill           | Team                                                                                                 |
+| Drum            | Instrument (`drum_played` in the user's terminology; currently stored in the period's `drums` array) |
+| PBE             | Bible book and each region/placement pair                                                            |
+| TLT             | Operation across all years; add only operations not previously recorded                              |
+| Red Zone Events | Event, event/evaluation name where applicable, and placement                                         |
 
 For example, a profile with `2026-27` in Years Active and Snare recorded for that year can still receive Bass for `2026-27`. Preserve Snare, add Bass to that year's drum history, and keep only one `2026-27` entry in Years Active.
 
@@ -385,7 +389,6 @@ If distinct information conflicts with an existing record under the schema's uni
 ## Future rollover
 
 Automatic rollover is not implemented. A future role-aware registration archive must preserve outgoing status, current_title, current activities, and period before starting a new season. Do not infer earned levels from current titles or infer operation/result dates from current registration. Birthday and Notes remain person-level fields rather than duplicated annual data.
-
 
 ## Shared year search
 
@@ -421,7 +424,6 @@ PBE with an unknown year stores no automatically inferred Bible books (`books: [
 
 Each profile section (levels, staff titles, activities, event results, and honors) places undated entries last, labels them **Unknown**, and inserts a margin before them when dated entries exist. General searches without a year still find unknown-year participation; searches for a specific year do not match undated entries. Existing once-per-member level and TLT rules also apply to unknown-year entries.
 
-
 ## Editing existing profiles
 
 `20260916010000_edit_profile.sql` originally added authenticated, security-invoker RPCs `get_profile_for_edit(p_id)` and `update_profile(p_id, p_original, p_profile)`. The editor uses ordinary labeled fields for personal details and Notes, current registration, levels, Staff history, Drill, Drums, PBE books/results, TLT, Red Zone results, and earned honors. All history sections are offered, including empty sections, with Add buttons for additional entries. Existing row identities, ownership, and audit fields cannot be changed, and permanent member profiles cannot be deleted through this RPC. History and registration entries can be removed. New rows contain editable fields only; their ownership and identities are assigned by the database.
@@ -430,18 +432,15 @@ Save Changes in the editor header opens a receipt grouped into Added, Updated, a
 
 The save locks the profile and existing related rows, compares the original snapshot with the current database snapshot, and updates only changed rows through a fixed table/column allowlist. Existing constraints and RLS remain in force. All updates are in one transaction: an invalid field rolls back every change. A stale snapshot is rejected with instructions to reopen the editor. No existing records are rewritten by the migration, and anonymous callers cannot execute either RPC.
 
-
 `20260916020000_edit_profile_additions.sql` extends the atomic editor save to insert new history rows and a missing current registration. Staff/Drums/PBE/TLT entries append inside their member-level history arrays. Extra Drill instances with the same team merge their years into that team's stored row. All additions retain the existing ownership checks, RLS, constraints, and stale-snapshot checks; any invalid addition rolls back the entire save.
 
 The editor displays all eight classes by name. Missing outcomes display N/A without creating placeholder database entries; selecting N/A removes that particular level entry. Multiple recorded entries for a class remain individually editable. Year selectors offer 2010-11 through the current calendar year's club period, plus Unknown for nullable history, and preserve any existing older value. Current Registration is below Notes and above Levels. Entry fieldsets retain their boundaries without numbered headings.
 
 PBE books are read-only in the editor and derive from the chosen year. On saving a changed PBE section, the server derives every entry's books from `pbe_year_books`; submitted book lists cannot override the catalog. Unknown years have no books. Each history section can add a new instance without leaving the editor.
 
-
 `20260916030000_edit_profile_removals.sql` allows the atomic editor save to remove registration and history rows omitted from the reviewed snapshot. Direct table DELETE remains denied. Only `update_profile` uses narrowly scoped security-definer privileges for the reviewed save, explicitly requiring an authenticated editor identity before accessing data. Permanent `pathfinders` rows and catalogs remain protected. The RPC still validates ownership, row identities, the full original snapshot, and all updated/added data. Deletes occur before updates within a table, and all changes roll back together if any operation fails.
 
 Each existing history instance has an X in its top-right corner. Removing the last Staff/Drums/PBE/TLT history entry removes the enclosing stored detail row. Level sections remain visible for all eight classes; they have no Add buttons, and removing an outcome resets that class to N/A. Removals stay in the draft until the user confirms the receipt. Returning from the receipt preserves the draft, and cancelling the editor discards all proposed changes. A successful save returns to the refreshed profile popup.
-
 
 `20260916040000_preserve_current_registration.sql` requires exactly one Current Registration row in a profile save and prevents removing/replacing its stored identity. The editor has no X for Current Registration. If registration was already absent, the editor supplies an editable Not Active registration for `current_club_year()` and includes it in the save receipt. No existing database records are rewritten by the migration.
 
