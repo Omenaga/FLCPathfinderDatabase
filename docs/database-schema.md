@@ -1,6 +1,6 @@
 # FLC Pathfinder Database Schema
 
-Implemented September 14, 2026. React/Vite uses Supabase PostgreSQL and Auth. All authenticated accounts remain trusted application users; person Status is participation information, not an authorization role. Anonymous access and browser deletion are denied by RLS/permissions.
+Implemented September 14, 2026. React/Vite uses Supabase PostgreSQL and Auth. All authenticated accounts remain trusted application users; person Status is participation information, not an authorization role. Anonymous access and deletion of permanent member profiles are denied by RLS/permissions. Authenticated users can remove registration and history entries.
 
 ## Person and current data
 
@@ -424,8 +424,20 @@ Each profile section (levels, staff titles, activities, event results, and honor
 
 ## Editing existing profiles
 
-`20260916010000_edit_profile.sql` adds authenticated, security-invoker RPCs `get_profile_for_edit(p_id)` and `update_profile(p_id, p_original, p_profile)`. The editor uses ordinary labeled fields for personal details and Notes, current registration, levels, Staff history, Drill, Drums, PBE books/results, TLT, Red Zone results, and earned honors. Only sections with existing rows are offered; use Add to Record for new history. Existing row identities, ownership, and audit fields cannot be changed, and rows cannot be added or deleted through this RPC.
+`20260916010000_edit_profile.sql` originally added authenticated, security-invoker RPCs `get_profile_for_edit(p_id)` and `update_profile(p_id, p_original, p_profile)`. The editor uses ordinary labeled fields for personal details and Notes, current registration, levels, Staff history, Drill, Drums, PBE books/results, TLT, Red Zone results, and earned honors. All history sections are offered, including empty sections, with Add buttons for additional entries. Existing row identities, ownership, and audit fields cannot be changed, and permanent member profiles cannot be deleted through this RPC. History and registration entries can be removed. New rows contain editable fields only; their ownership and identities are assigned by the database.
 
-Save changes arms a five-second Confirm button. Expiry or any field change resets confirmation; only Confirm submits. While saving, repeat submissions and closing are blocked. Success closes the editor and reloads the original profile popup and search results. Errors retain the draft. Cancel discards the draft.
+Save Changes in the editor header opens a receipt grouped into Added, Updated, and Removed, with before/after details. Cancel replaces Close in the editor header. The receipt has an untimed Confirm button and Back to Edit; only Confirm submits. While saving, repeat submissions and closing are blocked. Success closes the editor and reloads the original profile popup and search results. Errors retain the draft. Cancel discards the draft.
 
 The save locks the profile and existing related rows, compares the original snapshot with the current database snapshot, and updates only changed rows through a fixed table/column allowlist. Existing constraints and RLS remain in force. All updates are in one transaction: an invalid field rolls back every change. A stale snapshot is rejected with instructions to reopen the editor. No existing records are rewritten by the migration, and anonymous callers cannot execute either RPC.
+
+
+`20260916020000_edit_profile_additions.sql` extends the atomic editor save to insert new history rows and a missing current registration. Staff/Drums/PBE/TLT entries append inside their member-level history arrays. Extra Drill instances with the same team merge their years into that team's stored row. All additions retain the existing ownership checks, RLS, constraints, and stale-snapshot checks; any invalid addition rolls back the entire save.
+
+The editor displays all eight classes by name. Missing outcomes display N/A without creating placeholder database entries; selecting N/A removes that particular level entry. Multiple recorded entries for a class remain individually editable. Year selectors offer 2010-11 through the current calendar year's club period, plus Unknown for nullable history, and preserve any existing older value. Current Registration is below Notes and above Levels. Entry fieldsets retain their boundaries without numbered headings.
+
+PBE books are read-only in the editor and derive from the chosen year. On saving a changed PBE section, the server derives every entry's books from `pbe_year_books`; submitted book lists cannot override the catalog. Unknown years have no books. Each history section can add a new instance without leaving the editor.
+
+
+`20260916030000_edit_profile_removals.sql` allows the atomic editor save to remove registration and history rows omitted from the reviewed snapshot. Direct table DELETE remains denied. Only `update_profile` uses narrowly scoped security-definer privileges for the reviewed save, explicitly requiring an authenticated editor identity before accessing data. Permanent `pathfinders` rows and catalogs remain protected. The RPC still validates ownership, row identities, the full original snapshot, and all updated/added data. Deletes occur before updates within a table, and all changes roll back together if any operation fails.
+
+Each existing history instance has an X in its top-right corner. Removing the last Staff/Drums/PBE/TLT history entry removes the enclosing stored detail row. Level sections remain visible for all eight classes; they have no Add buttons, and removing an outcome resets that class to N/A. Removals stay in the draft until the user confirms the receipt. Returning from the receipt preserves the draft, and cancelling the editor discards all proposed changes. A successful save returns to the refreshed profile popup.

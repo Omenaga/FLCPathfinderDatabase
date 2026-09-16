@@ -1,8 +1,14 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 
-export default function Modal({ title, header, headerActions, children, onClose, closeDisabled = false, wide = false }: { title: string; header?: ReactNode; headerActions?: ReactNode; children: ReactNode; onClose: () => void; closeDisabled?: boolean; wide?: boolean }) {
+export default function Modal({ title, header, headerActions, children, onClose, closeDisabled = false, hideClose = false, wide = false }: { title: string; header?: ReactNode; headerActions?: ReactNode; children: ReactNode; onClose: () => void; closeDisabled?: boolean; hideClose?: boolean; wide?: boolean }) {
   const dialog = useRef<HTMLDialogElement>(null)
-  useEffect(() => { dialog.current?.querySelector<HTMLButtonElement>('.modal-close')?.focus() }, [title])
+  useEffect(() => {
+    const element = dialog.current
+    if (!element) return
+    element.scrollTop = 0
+    const action = element.querySelector<HTMLButtonElement>('.modal-close') ?? element.querySelector<HTMLButtonElement>('.modal-header-actions button:not(:disabled)')
+    action?.focus()
+  }, [title])
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null
     const element = dialog.current!
@@ -20,7 +26,7 @@ export default function Modal({ title, header, headerActions, children, onClose,
       {header}
       <div className="modal-header-actions">
         {headerActions}
-        <button className="secondary modal-close" disabled={closeDisabled} onClick={onClose} autoFocus>Close</button>
+        {!hideClose && <button className="secondary modal-close" disabled={closeDisabled} onClick={onClose} autoFocus>Close</button>}
       </div>
     </header>
     {children}
