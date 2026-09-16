@@ -231,6 +231,28 @@ test('member revision preserves history and enforces roles, ranges and access',a
  await db.query("update pathfinders set years_active=years_active-'2020-21' where id=$1",[pfId])
  receipt=await batch([pfId],'2020-21',{kind:'honor',honor_id:honorId})
  assert.equal(receipt[0].status,'already'); assert.equal(receipt[0].year_added,true)
+ // Unknown years are null throughout history, never added to Years Active.
+ const undatedEntries=[{kind:'level',name:'Navigator',outcome:'basic'},{kind:'staff',details:['Club Director']},
+  {kind:'drill',team:'Precision'},{kind:'drums',details:['Tenor']},{kind:'tlt',details:['Records']},
+  {kind:'pbe',results:{Area:'1st Place'}},{kind:'honor',honor_id:honorId},
+  {kind:'event',event:'Archery',placement:'Participation'},
+  {kind:'event',event:'Bible Events',name:'Unknown year event',placement:'1st Place'}]
+ const knownYears=(await db.query('select years_active from pathfinders where id=$1',[staffId])).rows[0].years_active
+ for(const entry of undatedEntries) {
+  const addedUnknown=await batch([staffId],null,entry)
+  assert.equal(addedUnknown[0].status,'added',JSON.stringify(addedUnknown))
+  assert.equal(addedUnknown[0].year_added,false)
+  assert.equal((await batch([staffId],null,entry))[0].status,'already',JSON.stringify(entry))
+ }
+ assert.deepEqual((await db.query('select years_active from pathfinders where id=$1',[staffId])).rows[0].years_active,knownYears)
+ assert.ok((await db.query('select levels from pathfinders where id=$1',[staffId])).rows[0].levels.some(e=>e.name==='Navigator' && e.year===null))
+ for(const table of ['staff_history','drum_corps','pbe','tlt']) assert.ok((await db.query(`select history from ${table} where pathfinder_id=$1`,[staffId])).rows[0].history.some(e=>e.year===null))
+ const unknownSearch=(await db.query('select * from member_search where id=$1',[staffId])).rows[0]
+ assert.ok(unknownSearch.search_activities.includes('PBE'))
+ assert.ok(unknownSearch.search_events.includes('Bible Events'))
+ assert.ok(unknownSearch.search_activity_details.some(e=>e.name==='PBE' && e.year===null && e.detail==='Area / 1st Place'))
+ await assert.rejects(db.query("update pathfinders set years_active='[null]' where id=$1",[staffId]),e=>e.code==='23514')
+ await assert.rejects(db.query("insert into honors_earned(pathfinder_id,honor_id,year_earned) values($1,$2,null)",[staffId,honorId]),e=>e.code==='23505')
  // Ranking uses current Status and the highest-priority title, before names.
  await db.query("update current_data set current_title='[\"Junior Staff\",\"Club Director\"]' where pathfinder_id=$1",[staffId])
  const ranked=(await db.query('select id,sort_status,sort_title from member_search order by sort_status,sort_title,sort_last_name,sort_first_name,id')).rows

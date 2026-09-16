@@ -85,7 +85,7 @@ Grade is removed. For Pathfinder, each current_title entry must be one of the ei
 
 ## Year ranges and migration
 
-All stored participation/achievement years use consecutive `YYYY-YY` ranges, e.g. `2012-13`, `2023-24`, `2026-27`. The four-digit start year must be at least 1900; the suffix must be the last two digits of the following year. `1999-00` is valid. Birthday is still a full date, and audit timestamps remain timestamps.
+All stored participation/achievement years use consecutive `YYYY-YY` ranges, e.g. `2012-13`, `2023-24`, `2026-27`. Historical entries may instead have a null year (displayed as Unknown). Known years: the four-digit start year must be at least 1900; the suffix must be the last two digits of the following year. `1999-00` is valid. Birthday is still a full date, and audit timestamps remain timestamps.
 
 This applies to Years Active, levels, current school_year, Drill years, Drums/PBE/TLT history, all RZE results, honors earned, staff_history, and year-linked catalogs. Sort by the full starting year. Duplicate ranges in a single years array are rejected.
 
@@ -178,7 +178,7 @@ Read-only for authenticated users; administrator-managed catalog keyed by `(scho
 
 ## Red Zone Events (RZE)
 
-Each table has `id` identity PK, `pathfinder_id` FK, `year` text range, `placement` text. Named events also have a required `name` for the evaluation/event. Results sort newest first in the profile.
+Each table has `id` identity PK, `pathfinder_id` FK, `year` text range, `placement` text. Named events also have a required `name` for the evaluation/event. Known results sort newest first in the profile; Unknown results follow with spacing.
 
 | Label | Table | Unique per |
 |---|---|---|
@@ -314,7 +314,7 @@ Other fields use existing database defaults and validation, including Staff curr
 
 ### Year and documentation choice
 
-1. Clicking **Add to Record** opens a dialog with **Information category** first and **Year to document** second. Years run from the configured current club year back through `2010-11`, newest first, using `YYYY-YY`. All dropdowns except Information category support **Type or choose?**, with one selection for year, class/title, outcome, team, event, and placement. Recipient profiles are selected after the information to add is defined.
+1. Clicking **Add to Record** opens a dialog with **Information category** first and **Year to document** second. Years run from the configured current club year back through `2010-11`, newest first, using `YYYY-YY`, plus **Unknown**. All dropdowns except Information category support **Type or choose?**, with one selection for year, class/title, outcome, team, event, and placement. Recipient profiles are selected after the information to add is defined.
 2. Choose exactly one documentation category per entry: **Level Earned**, **Extracurricular**, **Red Zone Events**, or **Honors**.
 3. Show the relevant choices and any further detail options underneath that category. The same year and documentation will be added to each selected existing profile.
 
@@ -412,3 +412,11 @@ Under Extracurricular ? PBE, a region dropdown offers Area, State, Union, and Di
 - Drum: different instruments may share a year; the same instrument/year is skipped. An instrument may recur in a different year.
 - TLT: multiple operations may share a year, but an operation already present in any year is skipped. Mixed submissions add only unseen operations, with a receipt note listing those skipped.
 - Entirely duplicate level or TLT submissions do not add a new Years Active entry. Other categories retain their existing Years Active behavior. Existing historical rows are not rewritten by this migration.
+
+### Unknown documentation years
+
+`20260916000000_unknown_history_years.sql` allows Add to Record to use **Unknown** for every category. The RPC receives `p_year: null`; historical JSON entries store `year: null`, Drill years may include JSON null, and event/honor date columns allow SQL null. Unique keys and duplicate checks treat unknown dates consistently. Current registration and Years Active continue to require actual years; unknown additions never append to Years Active.
+
+PBE with an unknown year stores no automatically inferred Bible books (`books: []`), but can store region placements. Existing catalog rules remain in force for known books and years. The form explains that books cannot be determined without a year.
+
+Each profile section (levels, staff titles, activities, event results, and honors) places undated entries last, labels them **Unknown**, and inserts a margin before them when dated entries exist. General searches without a year still find unknown-year participation; searches for a specific year do not match undated entries. Existing once-per-member level and TLT rules also apply to unknown-year entries.

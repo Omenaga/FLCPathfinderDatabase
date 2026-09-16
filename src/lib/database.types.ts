@@ -169,19 +169,19 @@ export type Database = {
           honor_id: number
           id: number
           pathfinder_id: number
-          year_earned: string
+          year_earned: string | null
         }
         Insert: {
           honor_id: number
           id?: never
           pathfinder_id: number
-          year_earned: string
+          year_earned?: string | null
         }
         Update: {
           honor_id?: number
           id?: never
           pathfinder_id?: number
-          year_earned?: string
+          year_earned?: string | null
         }
         Relationships: [
           {
@@ -313,19 +313,19 @@ export type Database = {
           id: number
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {
@@ -357,21 +357,21 @@ export type Database = {
           name: string
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           name: string
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           name?: string
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {
@@ -402,19 +402,19 @@ export type Database = {
           id: number
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {
@@ -445,19 +445,19 @@ export type Database = {
           id: number
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {
@@ -488,19 +488,19 @@ export type Database = {
           id: number
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {
@@ -532,21 +532,21 @@ export type Database = {
           name: string
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           name: string
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           name?: string
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {
@@ -577,19 +577,19 @@ export type Database = {
           id: number
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {
@@ -620,19 +620,19 @@ export type Database = {
           id: number
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {
@@ -663,19 +663,19 @@ export type Database = {
           id: number
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {
@@ -706,19 +706,19 @@ export type Database = {
           id: number
           pathfinder_id: number
           placement: string
-          year: string
+          year: string | null
         }
         Insert: {
           id?: never
           pathfinder_id: number
           placement: string
-          year: string
+          year?: string | null
         }
         Update: {
           id?: never
           pathfinder_id?: number
           placement?: string
-          year?: string
+          year?: string | null
         }
         Relationships: [
           {

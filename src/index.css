@@ -142,3 +142,6 @@ li { padding: .25rem 0; line-height: 1.5; }
 .option-list .group-select { width: 100%; text-align: left; border: 0; border-radius: .25rem; background: transparent; color: #172d52; padding: .2rem 0; }
 .option-list .group-select:hover, .option-list .group-select[aria-selected="true"] { background: #dfe9fa; }
 .option-list .group-select[aria-disabled="true"] { opacity: .6; cursor: default; }
+
+.profile-records > div:not(.unknown-history) + .unknown-history,
+.profile-events li:not(.unknown-history) + .unknown-history { margin-top: 1.5rem; }

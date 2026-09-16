@@ -6,7 +6,11 @@ import type { Database as GeneratedDatabase } from './database.types'
 type Functions = GeneratedDatabase['public']['Functions']
 type Database = Omit<GeneratedDatabase, 'public'> & {
   public: Omit<GeneratedDatabase['public'], 'Functions'> & {
-    Functions: Omit<Functions, 'add_member_record'> & {
+    Functions: Omit<Functions, 'add_member_record' | 'add_to_records'> & {
+      add_to_records: {
+        Args: Omit<Functions['add_to_records']['Args'], 'p_year'> & { p_year: string | null }
+        Returns: Functions['add_to_records']['Returns']
+      }
       add_member_record: {
         Args: Omit<Functions['add_member_record']['Args'], 'p_birth_date'> & { p_birth_date: string | null }
         Returns: Functions['add_member_record']['Returns']

@@ -104,7 +104,7 @@ npm run build
 - `src/components/`: shared Select, MultiSelect, and Modal components.
 - `src/lib/`: Supabase access, database types, data functions, and shared formatting/error helpers.
 
-`src/features/add/` contains new-profile creation, Add to Record, and honor lookup. `App.tsx` connects page navigation and refreshes Search after saves without discarding its filters. `add_member_record` creates both registration rows atomically. `add_to_records` merges history with per-profile rollback, existing-information checks, and receipts. Apply the full migration history through `20260915230000_history_duplicate_rules.sql` before using this frontend. A future Edit screen can live in `src/features/edit/`.
+`src/features/add/` contains new-profile creation, Add to Record, and honor lookup. `App.tsx` connects page navigation and refreshes Search after saves without discarding its filters. `add_member_record` creates both registration rows atomically. `add_to_records` merges history with per-profile rollback, existing-information checks, and receipts. Apply the full migration history through `20260916000000_unknown_history_years.sql` before using this frontend. A future Edit screen can live in `src/features/edit/`.
 
 Read [the project context](docs/project-context.md) for ministry background, source links, and terminology. The implemented data model follows [the database schema](docs/database-schema.md); preliminary ideas in the context document are not additional implemented features.
 
@@ -114,3 +114,5 @@ Read [the project context](docs/project-context.md) for ministry background, sou
 The **Years** control now applies to Levels, Extracurricular, and Red Zone Events together. Category dropdowns contain only the names and their outcome/team/instrument/operation/placement choices, never years. For example, Years = 2023-24, Levels = Basic or Advanced Friend, and Extracurricular = Snare or Teaching finds people with either selected Friend outcome AND either activity detail, each recorded in 2023-24. Multiple years match any selected year. Without years, the selected categories search all history. With only years selected, browse participation years. Calendar-year selections retain adjacent-period matching. Unknown level years cannot match a specific year.
 
 The general Search Honors filter remains a placeholder; its future filtering must use shared years and within-category OR behavior. Add to Record honor lookup and profile honor display are implemented separately.
+
+Add to Record supports **Unknown** years for every category. Undated history appears last with an Unknown label and does not add a Years Active entry. PBE cannot infer Bible books for an unknown year.

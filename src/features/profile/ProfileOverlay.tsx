@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import Modal from '../../components/Modal'
+import HistoryRecords from './HistoryRecords'
 import NotesEditor from './NotesEditor'
 import HonorsOverlay from './HonorsOverlay'
 import { message } from '../../lib/errors'
@@ -27,17 +28,15 @@ export default function ProfileOverlay({ id, status, onClose }: { id: number; st
       <section className="profile-summary"><h3>Years Active</h3><p>{years.join(', ') || 'No years recorded'}</p></section>
       {details.roles.map(group => <section className="profile-role" key={group.role} aria-label={`${group.role === 'staff' ? 'Staff' : 'Pathfinder'} history`}>
         <h3 className="role-heading">{group.role === 'staff' ? 'Staff History' : 'Pathfinder History'}</h3>
-        {group.role === 'pathfinder' ? <section className="profile-summary"><h4>Levels</h4>{levels.length ? <dl className="profile-records">{levels.map((level,index) => <div key={index}><dt>{level.year ?? 'Year unknown'}</dt><dd>{level.name} ({statusLabel(level.outcome)})</dd></div>)}</dl> : <p>No levels recorded</p>}</section>
-        : <section className="profile-summary"><h4>Years and Titles</h4>{details.staffHistory.length ? <dl className="profile-records">{details.staffHistory.map(record => <div key={record.year}><dt>{record.year}</dt><dd>{record.titles.join(', ') || 'Title not recorded'}</dd></div>)}</dl> : <p>No staff years or titles recorded</p>}</section>}
+        {group.role === 'pathfinder' ? <section className="profile-summary"><h4>Levels</h4>{levels.length ? <HistoryRecords records={levels.map(level => ({ year: level.year, detail: `${level.name} (${statusLabel(level.outcome)})` }))} /> : <p>No levels recorded</p>}</section>
+        : <section className="profile-summary"><h4>Years and Titles</h4>{details.staffHistory.length ? <HistoryRecords records={details.staffHistory.map(record => ({ year: record.year, detail: record.titles.join(', ') || 'Title not recorded' }))} /> : <p>No staff years or titles recorded</p>}</section>}
         {group.activities.map(activity => <section className="profile-activity" key={activity.name}>
           <h4>{activity.name === 'Drums' ? 'Drum' : activity.name}</h4>
-          <dl className="profile-records">{activity.records.flatMap(record => record.years.map(year => ({ year, detail: record.detail })))
-            .sort((a, b) => a.year.localeCompare(b.year) || a.detail.localeCompare(b.detail))
-            .map((record, index) => <div key={`${record.year}-${index}`}><dt>{record.year}</dt><dd>{record.detail || 'Details not recorded'}</dd></div>)}</dl>
+          <HistoryRecords records={activity.records.flatMap(record => record.years.map(year => ({ year, detail: record.detail || 'Details not recorded' })))} />
         </section>)}
         {group.events.length > 0 && <section><h4>Red Zone Events</h4><div className="profile-events">
           {group.events.map(event => <article key={event.name}><h5>{event.name}</h5><ul>{event.records.map((record, index) =>
-            <li key={`${record.year}-${index}`}><strong>{record.year}</strong>{record.name && <span>{record.name}</span>}<span>{record.placement}</span></li>)}</ul></article>)}
+            <li key={`${record.year}-${index}`} className={record.year === null ? 'unknown-history' : undefined}><strong>{record.year ?? 'Unknown'}</strong>{record.name && <span>{record.name}</span>}<span>{record.placement}</span></li>)}</ul></article>)}
         </div></section>}
       </section>)}
       <section className="profile-honors"><h3>Honors</h3><button className="secondary" onClick={() => setHonorsOpen(true)}>View Honors</button></section>

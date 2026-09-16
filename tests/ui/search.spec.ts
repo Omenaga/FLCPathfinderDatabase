@@ -287,7 +287,7 @@ test('role histories retain year detail links and nested honors focus',async({pa
  const staff=profile.getByRole('region',{name:'Staff history'})
  await expect(pf).toContainText('Friend (Basic)')
  await expect(pf).toContainText('Companion (Incomplete)')
- await expect(pf).toContainText('Year unknown')
+ await expect(pf).toContainText('Unknown')
  await expect(pf).toContainText('Precision')
  await expect(pf).toContainText('Snare')
  await expect(pf).not.toContainText('1 Kings, Ruth')
@@ -427,4 +427,49 @@ test('PBE search links region and placement bubbles to the selected year',async(
  await page.getByRole('button',{name:'Clear filters'}).click()
  await page.getByRole('combobox',{name:'Extracurricular',exact:true}).click()
  await expect(page.getByRole('combobox',{name:'PBE region',exact:true})).toHaveValue('')
+})
+
+
+test('Unknown PBE year saves without books and undated history follows dated records',async({page})=>{
+ await setup(page)
+ await page.route('**/rest/v1/rpc/current_club_year',r=>r.fulfill({json:'2026-27'}))
+ await page.route('**/rest/v1/staff_titles?**',r=>r.fulfill({json:[]}))
+ await page.route('**/rest/v1/pbe_year_books?**',r=>r.fulfill({json:[]}))
+ let payload:Record<string,unknown>|undefined
+ await page.route('**/rest/v1/rpc/add_to_records',r=>{payload=r.request().postDataJSON();return r.fulfill({json:[{id:2,name:'Justin Wu',status:'added',year_added:false}]})})
+ await page.getByRole('button',{name:'Add',exact:true}).click()
+ await page.getByRole('button',{name:'Add to Record',exact:true}).click()
+ const dialog=page.getByRole('dialog',{name:'Add to Record',exact:true})
+ await dialog.getByLabel('Information category').selectOption('pbe')
+ await dialog.getByRole('combobox',{name:'Year to document',exact:true}).fill('Unknown')
+ await dialog.getByRole('combobox',{name:'Year to document',exact:true}).press('Enter')
+ await expect(dialog).toContainText('Bible books cannot be determined without a year.')
+ await dialog.getByRole('combobox',{name:'PBE regions (optional)',exact:true}).fill('Area / 1st Place')
+ await dialog.getByRole('combobox',{name:'PBE regions (optional)',exact:true}).press('Enter')
+ await page.keyboard.press('Escape')
+ await dialog.getByRole('button',{name:'Select profiles'}).click()
+ await dialog.getByRole('checkbox',{name:'Select Justin Wu'}).check()
+ await dialog.getByRole('button',{name:'Finish / Done'}).click()
+ await page.getByRole('button',{name:'Confirm',exact:true}).click()
+ await expect(page.getByRole('dialog',{name:'Records Updated'})).toContainText('Unknown')
+ expect(payload).toEqual({p_ids:[2],p_year:null,p_entry:{kind:'pbe',details:[],results:{Area:'1st Place'}}})
+ await page.getByRole('button',{name:'Close',exact:true}).click()
+ await page.getByRole('button',{name:'Search',exact:true}).click()
+ await page.route('**/rest/v1/pathfinders?**',r=>r.fulfill({json:{...fixture,
+  staff_history:{history:[{year:null,titles:['Club Director']},{year:'2023-24',titles:['Friend Counselor']}]},
+  drum_corps:{history:[{year:null,drums:['Bass']},{year:'2024-25',drums:['Snare']}]},
+  red_zone_archery:[{year:null,placement:'Participation'},{year:'2024-25',placement:'1st Place'}]}}))
+ await page.route('**/rest/v1/honors_earned?**',r=>r.fulfill({json:[{id:1,year_earned:null,honors:{name:'Unknown honor'}},{id:2,year_earned:'2024-25',honors:{name:'Dated honor'}}]}))
+ await page.getByRole('button',{name:'Open profile for Justin Wu'}).click()
+ const profile=page.getByRole('dialog',{name:'Member profile'})
+ for(const name of ['Levels','Years and Titles','Drum']) {
+  const section=profile.locator('section').filter({has:page.getByRole('heading',{name,exact:true})}).last()
+  await expect(section.locator('dt').last()).toHaveText('Unknown')
+  expect(await section.locator('.unknown-history').first().evaluate(node=>parseFloat(getComputedStyle(node).marginTop))).toBeGreaterThan(0)
+ }
+ const archery=profile.locator('article').filter({has:page.getByRole('heading',{name:'Archery',exact:true})})
+ await expect(archery.locator('li').last()).toContainText('Unknown')
+ await profile.getByRole('button',{name:'View Honors'}).click()
+ const honors=page.getByRole('dialog',{name:'Honors',exact:true})
+ await expect(honors.locator('dt').last()).toHaveText('Unknown')
 })

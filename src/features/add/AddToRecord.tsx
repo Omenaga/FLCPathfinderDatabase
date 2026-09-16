@@ -56,7 +56,7 @@ export default function AddToRecord({ onClose, onAdded }: { onClose: () => void;
     return () => controller.abort()
   }, [attempt])
   const eligible = selected.filter(person => !(kind === 'staff' && person.status === 'pathfinder'))
-  const selectedDetails = kind === 'pbe' ? catalog?.books.filter(book => book.school_year === year).map(book => book.book_name) ?? [] : details
+  const selectedDetails = kind === 'pbe' && year === 'Unknown' ? [] : kind === 'pbe' ? catalog?.books.filter(book => book.school_year === year).map(book => book.book_name) ?? [] : details
   const namedEvent = event === 'Honor Evaluations' || event === 'Bible Events'
   const entry: Json = kind === 'level' ? { kind, name, outcome } : kind === 'staff' ? { kind, details: [name] }
     : kind === 'drill' ? { kind, team: name } : kind === 'event' ? { kind, event, placement, ...(namedEvent ? { name: name.trim() } : {}) }
@@ -65,7 +65,7 @@ export default function AddToRecord({ onClose, onAdded }: { onClose: () => void;
     : kind === 'event' ? `${event}${namedEvent ? ` — ${name}` : ''}: ${placement}` : kind === 'honor' ? honor?.name : [selectedDetails.join(', '), ...(kind === 'pbe' ? PBE_REGIONS.filter(region => region in pbeResults).map(region => `${region}: ${pbeResults[region]}`) : [])].join('; ')
   function next(formEvent: FormEvent) {
     formEvent.preventDefault()
-    if (!catalog || !year || ['level','staff','drill'].includes(kind) && !name || kind === 'level' && !outcome || kind === 'event' && (!event || !placement || namedEvent && !name.trim()) || kind === 'honor' && !honor || ['drums','pbe','tlt'].includes(kind) && !selectedDetails.length) { setError(kind === 'pbe' && !selectedDetails.length ? 'No Bible books are configured for this year.' : 'Choose the information to add.'); return }
+    if (!catalog || !year || ['level','staff','drill'].includes(kind) && !name || kind === 'level' && !outcome || kind === 'event' && (!event || !placement || namedEvent && !name.trim()) || kind === 'honor' && !honor || (['drums','tlt'].includes(kind) || kind === 'pbe' && year !== 'Unknown') && !selectedDetails.length) { setError(kind === 'pbe' && !selectedDetails.length ? 'No Bible books are configured for this year.' : 'Choose the information to add.'); return }
     if (kind === 'pbe' && Object.values(pbeResults).some(value => !value)) { setError('Choose a placement for each selected PBE region.'); return }
     setSelected(eligible); setError(''); setStep('people')
   }
@@ -74,7 +74,7 @@ export default function AddToRecord({ onClose, onAdded }: { onClose: () => void;
     if (sending.current || !eligible.length) return
     sending.current = true; setError(''); setStep('saving')
     try {
-      const { data, error } = await getSupabase().rpc('add_to_records', { p_ids: eligible.map(row => row.id!), p_year: year, p_entry: entry })
+      const { data, error } = await getSupabase().rpc('add_to_records', { p_ids: eligible.map(row => row.id!), p_year: year === 'Unknown' ? null : year, p_entry: entry })
       if (error) throw error
       if (!Array.isArray(data)) throw new Error('Could not confirm the result. Retry to check which profiles already have this information.')
       setResults(data as unknown as Receipt[]); setStep('result'); onAdded()
@@ -112,7 +112,7 @@ export default function AddToRecord({ onClose, onAdded }: { onClose: () => void;
       {!catalog && !loadError && <p role="status">Loading options…</p>}
       <form onSubmit={next} className="record-form"><div className="record-fields">
         <label>Information category<select value={kind} onChange={e => { setKind(e.target.value as Kind); setName(''); setDetails([]); setPbeResults({}); setHonor(null); setError('') }}>{kinds.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</select></label>
-        <MultiSelect single label="Year to document" values={year ? [year] : []} options={Array.from({length: Math.max(0,currentYear - 2009)},(_,index) => period(currentYear-index))} onChange={values => setYear(values[0] ?? '')} />
+        <MultiSelect single label="Year to document" values={year ? [year] : []} options={[...Array.from({length: Math.max(0,currentYear - 2009)},(_,index) => period(currentYear-index)), 'Unknown']} onChange={values => setYear(values[0] ?? '')} />
         {(kind === 'level' || kind === 'staff' || kind === 'drill') && <MultiSelect single key={kind} label={kind === 'level' ? 'Class' : kind === 'staff' ? 'Staff title' : 'Drill team'} values={name ? [name] : []} onChange={values => setName(values[0] ?? '')} options={kind === 'level' ? LEVELS : kind === 'staff' ? catalog?.staff ?? [] : ['Precision','Freestyle','Adult']} />}
         {kind === 'level' && <MultiSelect single label="Outcome" values={outcome ? [statusLabel(outcome)] : []} options={['Basic','Advanced','Incomplete']} onChange={values => setOutcome(values[0]?.toLowerCase() ?? '')} />}
         {['drums','tlt'].includes(kind) && <MultiSelect key={kind} label={kind === 'drums' ? 'Instruments' : 'Operations'} values={details} onChange={setDetails} options={kind === 'drums' ? DRUMS : OPERATIONS} />}
@@ -133,7 +133,7 @@ export default function AddToRecord({ onClose, onAdded }: { onClose: () => void;
       {kind === 'honor' && <HonorPicker value={honor} onChange={setHonor} />}
       {selected.length !== eligible.length && <p className="muted">{selected.length - eligible.length} current Pathfinder selection(s) will be removed for this Staff title.</p>}
       {error && <p className="error" role="alert">{error}</p>}
-      {kind === 'pbe' && <section className="pbe-summary" aria-label="Bible books">{selectedDetails.length ? <p><span className="muted">All books for {year} will be added: </span>{selectedDetails.join(', ')}.</p> : <p className="muted">No Bible books are configured for this year.</p>}</section>}
+      {kind === 'pbe' && <section className="pbe-summary" aria-label="Bible books">{year === 'Unknown' ? <p className="muted">Bible books cannot be determined without a year. Region results will be recorded under Unknown.</p> : selectedDetails.length ? <p><span className="muted">All books for {year} will be added: </span>{selectedDetails.join(', ')}.</p> : <p className="muted">No Bible books are configured for this year.</p>}</section>}
       <div className="record-footer" onMouseDown={e => { if ((e.target as HTMLElement).closest('button')) e.preventDefault() }}><button disabled={!catalog || !!loadError}>Select profiles</button></div>
       </form>
     </>}

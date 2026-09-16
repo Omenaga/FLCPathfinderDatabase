@@ -96,10 +96,10 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
   if (error) throw error
   const roles = (['pathfinder', 'staff'] as const).map(role => {
     const activities = [
-      { name: 'Drill', records: data.drill.map(r => ({ years: r.years as string[], detail: r.team ?? 'Team not recorded' })) },
-      { name: 'Drums', records: ((data.drum_corps?.history ?? []) as { year: string; drums: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.drums.join(', ') || 'Instrument not recorded' })) },
-      { name: 'PBE', records: ((data.pbe?.history ?? []) as { year: string; books: string[]; results?: Record<string, string> }[]).map(entry => ({ years: [entry.year], detail: PBE_REGIONS.filter(region => entry.results?.[region]).map(region => `${region} (${entry.results![region] === 'Participation' ? 'P' : entry.results![region].replace(' Place', '')})`).join(', ') || 'Results not recorded' })) },
-      { name: 'TLT', records: ((data.tlt?.history ?? []) as { year: string; operations: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.operations.join(', ') })) },
+      { name: 'Drill', records: data.drill.map(r => ({ years: r.years as (string | null)[], detail: r.team ?? 'Team not recorded' })) },
+      { name: 'Drums', records: ((data.drum_corps?.history ?? []) as { year: string | null; drums: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.drums.join(', ') || 'Instrument not recorded' })) },
+      { name: 'PBE', records: ((data.pbe?.history ?? []) as { year: string | null; books: string[]; results?: Record<string, string> }[]).map(entry => ({ years: [entry.year], detail: PBE_REGIONS.filter(region => entry.results?.[region]).map(region => `${region} (${entry.results![region] === 'Participation' ? 'P' : entry.results![region].replace(' Place', '')})`).join(', ') || 'Results not recorded' })) },
+      { name: 'TLT', records: ((data.tlt?.history ?? []) as { year: string | null; operations: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.operations.join(', ') })) },
     ].filter(group => group.records.length > 0)
     const eventRows = [data.red_zone_drill_performance, data.red_zone_drum_performance,
       data.red_zone_honor_evaluations, data.red_zone_bible_events, data.red_zone_knots,
@@ -107,10 +107,10 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
       data.red_zone_lashing, data.red_zone_burning_twine]
     const events = EVENTS.map((name, index) => ({ name, records: eventRows[index].map(r => ({
       year: r.year, placement: r.placement, name: 'name' in r && typeof r.name === 'string' ? r.name : undefined,
-    })).sort((a, b) => b.year.localeCompare(a.year)) })).filter(group => group.records.length > 0)
+    })).sort((a, b) => a.year === null ? (b.year === null ? 0 : 1) : b.year === null ? -1 : b.year.localeCompare(a.year)) })).filter(group => group.records.length > 0)
     return { role, activities: role === 'pathfinder' ? activities : [], events: role === 'pathfinder' ? events : [] }
   })
-  return { member: member(data), roles, staffHistory: (data.staff_history?.history ?? []) as { year: string; titles: string[] }[] }
+  return { member: member(data), roles, staffHistory: (data.staff_history?.history ?? []) as { year: string | null; titles: string[] }[] }
 }
 export async function saveProfileNotes(id: number, notes: string, signal: AbortSignal) {
   const { data, error } = await getSupabase().from('pathfinders').update({ notes }).eq('id', id).select('id').abortSignal(signal).single()
