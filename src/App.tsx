@@ -8,6 +8,7 @@ import { message } from './lib/errors'
 import Search from './features/search/Search'
 import AddRecords from './features/add/AddRecords'
 
+// Show setup instructions if configuration is missing, before mounting components that fetch data.
 function App() {
   try {
     getSupabase()
@@ -28,6 +29,7 @@ function App() {
   return <ConnectedApp />
 }
 
+// The same branding wraps both the sign-in screen and the signed-in action buttons.
 function Header({ children }: { children?: ReactNode }) {
   return (
     <header className="brand">
@@ -43,11 +45,13 @@ function Header({ children }: { children?: ReactNode }) {
 }
 
 function ConnectedApp() {
+  // Increment this counter after additions so Search reloads while keeping its current filters.
   const [recordsVersion, setRecordsVersion] = useState(0)
   // undefined means the session is loading; null means the user is signed out.
   const [session, setSession] = useState<Session | null>()
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  // Read the existing session and subscribe to later sign-in/sign-out events. Cleanup prevents updates after unmount.
   useEffect(() => {
     let active = true
     const client = getSupabase()
@@ -75,6 +79,7 @@ function ConnectedApp() {
       subscription.unsubscribe()
     }
   }, [])
+  // Read browser-validated form fields and let Supabase establish the authenticated session.
   async function signIn(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const values = new FormData(event.currentTarget)
@@ -92,6 +97,7 @@ function ConnectedApp() {
       setPending(false)
     }
   }
+  // Sign out on this browser only; other devices keep their sessions.
   async function signOut() {
     setError('')
     setPending(true)

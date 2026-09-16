@@ -13,6 +13,7 @@ export default function HonorPicker({
   onChange: (value: Honor | null) => void
 }) {
   const id = useId()
+  // Search text and selected honor are separate: typing again clears the parent's selected honor.
   const [query, setQuery] = useState('')
   const [matches, setMatches] = useState<Honor[]>([])
   const [busy, setBusy] = useState(false)
@@ -28,6 +29,7 @@ export default function HonorPicker({
         const { data, error } = await getSupabase()
           .from('honors')
           .select('id,name')
+          // Escape SQL wildcard characters so typed percent signs and underscores are treated literally.
           .ilike('name', `%${query.trim().replace(/[\\%_]/g, '\\$&')}%`)
           .order('name')
           .limit(20)

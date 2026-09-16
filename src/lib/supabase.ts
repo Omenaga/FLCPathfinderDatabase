@@ -27,8 +27,10 @@ let client: SupabaseClient<Database> | undefined
 
 // Initialize on demand so the starter runs before a project is connected.
 export function getSupabase(): SupabaseClient<Database> {
+  // Reuse the client so renders share authentication state instead of creating new subscriptions.
   if (client) return client
 
+  // Vite exposes these values in the browser bundle; only the public project URL and publishable key belong here.
   const url = import.meta.env.VITE_SUPABASE_URL
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 

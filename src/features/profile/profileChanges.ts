@@ -12,6 +12,7 @@ export type ProfileChange = {
   before?: string
   after?: string
 }
+// Only fields in this dictionary appear in the receipt; internal IDs are intentionally excluded.
 const labels: Record<string, string> = {
   first_name: 'First Name',
   last_name: 'Last Name',
@@ -59,6 +60,7 @@ export function profileChanges(
   proposed: Profile,
   honors: { id: number; name: string }[],
 ): ProfileChange[] {
+  // Normalize missing values, arrays, nested objects, and catalog IDs into readable comparison text.
   function display(value: Json | undefined, key: string): string {
     if (value === null || value === undefined || value === '')
       return ['year', 'year_earned'].includes(key) ? 'Unknown' : 'Not Recorded'
@@ -80,6 +82,7 @@ export function profileChanges(
     if (key === 'status' || key === 'outcome') return statusLabel(String(value))
     return String(value)
   }
+  // Describe visible row fields. PBE books are derived from the year and omitted from history receipts.
   function describe(row: Row, omitBooks = false) {
     return Object.entries(row)
       .filter(([key]) => key in labels && !(omitBooks && key === 'books'))
@@ -132,6 +135,7 @@ export function profileChanges(
     if (index >= 0) remaining.splice(index, 1)
     else unmatched.push(item)
   }
+  // After unchanged pairs are removed, a matching key means an update; no matching key means a removal.
   for (const item of unmatched) {
     const index = remaining.findIndex((next) => next.key === item.key)
     if (index >= 0) {
@@ -139,6 +143,7 @@ export function profileChanges(
       changes.push({ kind: 'Updated', label: item.label, before: item.text, after: next.text })
     } else changes.push({ kind: 'Removed', label: item.label, before: item.text })
   }
+  // Anything still unpaired exists only in the proposed snapshot, so it is an addition.
   for (const item of remaining) changes.push({ kind: 'Added', label: item.label, after: item.text })
   return changes
 }

@@ -11,6 +11,7 @@ export default function Select({
   options: readonly string[]
   onChange: (value: string) => void
 }) {
+  // The empty option means no restriction; the parent receives the raw selected value.
   return (
     <label>
       {label}

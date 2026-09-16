@@ -33,6 +33,7 @@ export default function Search({
 }) {
   // Honors are a UI placeholder until the catalog and search integration are added.
   const [honors, setHonors] = useState<string[]>([])
+  // Keep editing separate from fetching: only submit copies the draft into the active filters.
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [page, setPage] = useState(0)
@@ -41,6 +42,7 @@ export default function Search({
   const [busy, setBusy] = useState(true)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState<number | null>(null)
+  // Changing this counter retries the same query or reloads results after a profile edit.
   const [attempt, setAttempt] = useState(0)
   useEffect(() => {
     // Cancel obsolete requests so an older response cannot replace newer search results.
@@ -61,9 +63,11 @@ export default function Search({
       })
     return () => controller.abort()
   }, [filters, page, attempt, recordsVersion, selection?.excludePathfinders])
+  // Update one draft field without replacing the other filter choices.
   function update<K extends keyof Filters>(key: K, value: Filters[K]) {
     setDraft((current) => ({ ...current, [key]: value }))
   }
+  // Clear the previous page and open profile before a new request starts.
   function beginSearch() {
     setBusy(true)
     setError('')
@@ -71,12 +75,14 @@ export default function Search({
     setCount(0)
     setSelected(null)
   }
+  // Apply the completed filter draft and restart pagination at the first page.
   function submit(event: FormEvent) {
     event.preventDefault()
     beginSearch()
     setFilters({ ...draft })
     setPage(0)
   }
+  // Reset both visible inputs and the active query, including the placeholder honors selection.
   function reset() {
     setHonors([])
     beginSearch()
@@ -86,6 +92,7 @@ export default function Search({
   }
   return (
     <>
+      {/* Filter form: changes remain local until Search is submitted. */}
       <section className="panel">
         <h2>Find a Pathfinder</h2>
         <p className="muted">
@@ -195,6 +202,7 @@ export default function Search({
         ) : (
           members.length > 0 && (
             <>
+              {/* The same results table supports browsing and bulk-recipient selection. */}
               <div className="table-scroll">
                 <table>
                   <thead>
@@ -209,6 +217,7 @@ export default function Search({
                   </thead>
                   <tbody>
                     {members.map((member) => {
+                      // Current columns describe registration only; historical achievements stay in the profile dialog.
                       const inactive = !member.has_current_data || member.status === 'not_active'
                       const hasTitle = member.status === 'pathfinder' || member.status === 'staff'
                       return (
@@ -253,6 +262,7 @@ export default function Search({
                   </tbody>
                 </table>
               </div>
+              {/* Disable page navigation during loading to avoid overlapping page requests. */}
               <div className="pagination">
                 <button
                   className="secondary"
@@ -282,6 +292,7 @@ export default function Search({
           )
         )}
       </section>
+      {/* Open the selected profile above the search screen; saved edits trigger a reload. */}
       {selected !== null && (
         <ProfileOverlay
           key={selected}

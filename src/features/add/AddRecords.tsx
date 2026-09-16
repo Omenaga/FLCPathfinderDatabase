@@ -8,6 +8,7 @@ import { getSupabase } from '../../lib/supabase'
 import { message } from '../../lib/errors'
 import AddToRecord from './AddToRecord'
 
+// Group titles by their role suffix; unmatched titles appear in the Other group.
 function staffTitleGroup(title: string) {
   if (title.endsWith(' Counselor')) return 'Counselor'
   if (title.endsWith(' Instructor')) return 'Instructor'
@@ -15,6 +16,7 @@ function staffTitleGroup(title: string) {
   return 'Other'
 }
 
+// Shorten a title for its group button without changing the stored catalog value.
 function staffTitleLabel(title: string) {
   return title
     .replace(/ (Counselor|Instructor|Leader)$/, '')
@@ -34,6 +36,7 @@ export default function AddRecords({ onAdded }: { onAdded: () => void }) {
   )
 }
 
+// Own the new-person draft and confirmation lifecycle until the dialog closes.
 function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
   const [status, setStatus] = useState('')
   const [titles, setTitles] = useState<string[]>([])
@@ -42,6 +45,7 @@ function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [attempt, setAttempt] = useState(0)
+  // A deadline arms the second confirmation click; seconds is only its visible countdown.
   const [deadline, setDeadline] = useState<number | null>(null)
   const [seconds, setSeconds] = useState(5)
   const [saved, setSaved] = useState(false)
@@ -56,6 +60,7 @@ function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     lastName: string
     birthday: string
   } | null>(null)
+  // Load the configured club season and ordered staff title catalog before enabling submission.
   useEffect(() => {
     const controller = new AbortController()
     async function load() {
@@ -84,6 +89,7 @@ function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     return () => controller.abort()
   }, [attempt])
   useEffect(() => {
+    // Calculate from wall-clock time so a delayed timer cannot extend the confirmation window.
     if (deadline === null) return
     const timer = window.setInterval(() => {
       const remaining = Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
@@ -92,10 +98,12 @@ function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
     }, 100)
     return () => window.clearInterval(timer)
   }, [deadline])
+  // Any relevant input change cancels the previous confirmation and clears its save error.
   function resetConfirmation() {
     setDeadline(null)
     setSaveError('')
   }
+  // The first submit arms confirmation; a second submit before the deadline sends the record.
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (loading || error || submitting.current) return
@@ -139,12 +147,14 @@ function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: ()
       setDeadline(Date.now() + 5000)
     }
   }
+  // Only Pathfinders and Staff have current class/title choices.
   const hasTitle = status === 'Pathfinder' || status === 'Staff'
   const groups = ['Counselor', 'Instructor', 'Leader', 'Other']
   const orderedStaffTitles = [...staffTitles].sort(
     (a, b) => groups.indexOf(staffTitleGroup(a)) - groups.indexOf(staffTitleGroup(b)),
   )
   const displayYear = year ? `${year.slice(0, 4)}-${Number(year.slice(0, 4)) + 1}` : 'Not recorded'
+  // Render progress, retry, and success screens separately while retaining the form state above.
   if (saving)
     return (
       <Modal title="Adding Record" header={<h2>Adding Record</h2>} onClose={onClose} closeDisabled>

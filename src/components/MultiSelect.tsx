@@ -32,9 +32,11 @@ export default function MultiSelect({
   variantLabel?: (option: string) => string
   emptyMessage?: string
 }) {
+  // Group selection takes precedence over exclusive grouping and display-only grouping.
   const grouping = groupKey ?? exclusiveKey ?? optionGroup
   const id = useId()
   const input = useRef<HTMLInputElement>(null)
+  // These values control the menu; the selected choices themselves are owned by the parent through props.
   const [detailSelections, setDetailSelections] = useState<Record<string, string>>({})
   const [text, setText] = useState('')
   const [open, setOpen] = useState(false)
@@ -58,10 +60,12 @@ export default function MultiSelect({
       zIndex: 30,
     })
   }
+  // Measure on every opening because scrolling or layout changes may have moved the input.
   function openOptions() {
     positionOptions()
     setOpen(true)
   }
+  // While open, reposition on any ancestor scroll as well as window resize.
   useEffect(() => {
     if (!open) return
     window.addEventListener('resize', positionOptions)
@@ -71,9 +75,11 @@ export default function MultiSelect({
       document.removeEventListener('scroll', positionOptions, true)
     }
   }, [open])
+  // Hide selected choices and apply the typed search plus any group-specific detail filter.
   const matches = options.filter((option) => {
     const detail = option.split(' / ')[1] ?? ''
     const group = groupKey?.(option) ?? ''
+    // Typing a detail directly bypasses the detail dropdown so those matching options remain discoverable.
     const typedDetail =
       detailOptions &&
       Object.values(detailOptions)
@@ -85,6 +91,7 @@ export default function MultiSelect({
       option.toLowerCase().includes(text.trim().toLowerCase())
     )
   })
+  // Prevent duplicate selections, details covered by a whole-group choice, and mutually exclusive combinations.
   function disabled(option: string) {
     return (
       !!isOptionDisabled?.(option) ||
@@ -107,6 +114,7 @@ export default function MultiSelect({
     if (single) setOpen(false)
   }
   useEffect(() => {
+    // A native form reset must also clear this custom control's menu state.
     const form = input.current?.form
     const clear = () => {
       setDetailSelections({})
@@ -125,6 +133,7 @@ export default function MultiSelect({
       }}
     >
       <label htmlFor={id}>{label}</label>
+      {/* The input retains keyboard focus; aria-activedescendant identifies the highlighted option. */}
       <input
         ref={input}
         id={id}
@@ -144,6 +153,7 @@ export default function MultiSelect({
           openOptions()
         }}
         onKeyDown={(event) => {
+          // Keep keyboard navigation inside the options; Enter chooses an exact text match before the highlighted option.
           if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
             event.preventDefault()
             openOptions()
@@ -166,6 +176,7 @@ export default function MultiSelect({
           }
         }}
       />
+      {/* Each selected-value button removes that choice without submitting its surrounding form. */}
       <div className="selected-options">
         {values.map((value) => (
           <button
@@ -179,6 +190,7 @@ export default function MultiSelect({
           </button>
         ))}
       </div>
+      {/* Render either grouped choices with variants or a flat list, using the same selection rules. */}
       {open && (
         <ul
           id={`${id}-options`}
@@ -194,6 +206,7 @@ export default function MultiSelect({
                   role="presentation"
                   className={groupKey ? 'level-choice activity-year-choice' : 'level-choice'}
                   onMouseDown={(event) => {
+                    // Keep focus while clicking a group background; allow its nested controls to handle their own clicks.
                     if (groupKey && !(event.target as HTMLElement).closest('button, select'))
                       event.preventDefault()
                   }}

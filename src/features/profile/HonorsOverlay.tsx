@@ -12,6 +12,7 @@ export default function HonorsOverlay({ id, onClose }: { id: number; onClose: ()
   >(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
+  // Join earned entries to their catalog labels; changing attempt retries a failed read.
   useEffect(() => {
     const controller = new AbortController()
     getSupabase()

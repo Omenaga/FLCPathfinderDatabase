@@ -3,6 +3,7 @@
 import { getSupabase } from './supabase'
 import type { Database } from './database.types'
 
+// Shared catalog order also controls class display and search options. Values must agree with database validation.
 export const LEVELS = [
   'Friend',
   'Companion',
@@ -27,10 +28,12 @@ export const EVENTS = [
   'Burning Twine',
 ] as const
 export const STATUSES = ['Pathfinder', 'Staff', 'Parent', 'Not Active'] as const
+// Calendar-year options begin in 2010 and extend through the browser's current year.
 export const YEARS = Array.from(
   { length: Math.max(0, new Date().getFullYear() - 2009) },
   (_, index) => String(2010 + index),
 )
+// Convert a starting calendar year to the database's compact club-year format, such as 2023-24.
 export const period = (year: number) => `${year}-${String(year + 1).slice(-2)}`
 export const PERIODS = YEARS.map((year) => period(Number(year)))
 export const LEVEL_DETAILS: Record<string, readonly string[]> = Object.fromEntries(
@@ -47,6 +50,7 @@ export const OPERATIONS = [
 ] as const
 export const PBE_REGIONS = ['Area', 'State', 'Union', 'Divisional'] as const
 export const PLACEMENTS = ['1st Place', '2nd Place', '3rd Place', 'Participation'] as const
+// PBE choices include both a region alone and a region/placement pair.
 export const ACTIVITY_DETAILS: Record<string, readonly string[]> = {
   Drill: ['Precision', 'Freestyle', 'Adult'],
   Drums: DRUMS,
@@ -59,6 +63,7 @@ export const ACTIVITY_DETAILS: Record<string, readonly string[]> = {
 export const EVENT_DETAILS: Record<string, readonly string[]> = Object.fromEntries(
   EVENTS.map((event) => [event, PLACEMENTS]),
 )
+// Include the broad category plus each narrower detail, using the separator understood by historyFilter.
 function historyOptions(names: readonly string[], details: Record<string, readonly string[]>) {
   return names.flatMap((name) => [
     name,
@@ -68,6 +73,7 @@ function historyOptions(names: readonly string[], details: Record<string, readon
 export const LEVEL_OPTIONS = historyOptions(LEVELS, LEVEL_DETAILS)
 export const ACTIVITY_OPTIONS = historyOptions(ACTIVITIES, ACTIVITY_DETAILS)
 export const EVENT_OPTIONS = historyOptions(EVENTS, EVENT_DETAILS)
+// Keep all text after the category together: a PBE detail can itself contain a separator.
 export function historyFilter(option: string) {
   const [name, ...parts] = option.split(' / ')
   const detail = parts.join(' / ')
@@ -81,6 +87,7 @@ type EarnedLevel = {
 }
 type MemberRow = Database['public']['Tables']['pathfinders']['Row']
 
+// Narrow generic JSON fields to the shapes enforced by database validation.
 function member(row: MemberRow) {
   return { ...row, years_active: row.years_active as string[], levels: row.levels as EarnedLevel[] }
 }
@@ -128,8 +135,10 @@ export function historySearchExpression(filters: Filters) {
       ),
     ),
   ]
+  // Build one alternative group per selected category, then require every category group to match.
   const groups: string[] = []
   const any = (clauses: string[]) => `or(${[...new Set(clauses)].join(',')})`
+  // Put the outcome and year in one JSON object so both must belong to the same earned level.
   if (filters.level.length)
     groups.push(
       any(
@@ -185,6 +194,7 @@ export async function searchPathfinders(
   let query = getSupabase().from('member_search').select('*', { count: 'exact' })
   if (filters.status) query = query.eq('status', filters.status.toLowerCase().replaceAll(' ', '_'))
   if (excludePathfinders) query = query.neq('status', 'pathfinder')
+  // Escape SQL pattern characters so a name search treats percent signs and underscores as text.
   const name = filters.name.trim()
   if (name) query = query.ilike('name', `%${name.replace(/[\\%_]/g, '\\$&')}%`)
   const expression = historySearchExpression(filters)
@@ -266,6 +276,7 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
         ),
       },
     ].filter((group) => group.records.length > 0)
+    // Keep table results aligned with EVENTS; each index supplies records for that event label.
     const eventRows = [
       data.red_zone_drill_performance,
       data.red_zone_drum_performance,

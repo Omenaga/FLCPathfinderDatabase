@@ -21,6 +21,7 @@ import { statusLabel } from '../../lib/format'
 import type { Json } from '../../lib/database.types'
 
 type Kind = 'level' | 'staff' | 'drill' | 'drums' | 'pbe' | 'tlt' | 'event' | 'honor'
+// Each recipient can succeed, already have the entry, or fail independently of the other recipients.
 type Receipt = {
   id: number
   name: string
@@ -46,6 +47,7 @@ export default function AddToRecord({
   onClose: () => void
   onAdded: () => void
 }) {
+  // This step selects the visible screen; the shared draft and recipient list survive transitions.
   const [step, setStep] = useState<'details' | 'people' | 'review' | 'saving' | 'result' | 'error'>(
     'details',
   )
@@ -69,6 +71,7 @@ export default function AddToRecord({
   const [selected, setSelected] = useState<Pathfinder[]>([])
   const [results, setResults] = useState<Receipt[]>([])
   const sending = useRef(false)
+  // Load independent catalogs together; the database season determines the available year range.
   useEffect(() => {
     const controller = new AbortController()
     async function load() {
@@ -105,6 +108,7 @@ export default function AddToRecord({
   const eligible = selected.filter(
     (person) => !(kind === 'staff' && person.status === 'pathfinder'),
   )
+  // PBE books are derived from the selected year, never guessed for an Unknown year.
   const selectedDetails =
     kind === 'pbe' && year === 'Unknown'
       ? []
@@ -114,6 +118,7 @@ export default function AddToRecord({
             .map((book) => book.book_name) ?? [])
         : details
   const namedEvent = event === 'Honor Evaluations' || event === 'Bible Events'
+  // Build the category-specific payload expected by add_to_records; irrelevant form fields are omitted.
   const entry: Json =
     kind === 'level'
       ? { kind, name, outcome }
@@ -132,6 +137,7 @@ export default function AddToRecord({
                     ? { results: pbeResults }
                     : {}),
                 }
+  // Describe the same proposed entry in plain language for the review and result screens.
   const description =
     kind === 'level'
       ? `${name} (${statusLabel(outcome)})`
@@ -149,6 +155,7 @@ export default function AddToRecord({
                     )
                   : []),
               ].join('; ')
+  // Require the fields needed by the chosen category before advancing to recipient selection.
   function next(formEvent: FormEvent) {
     formEvent.preventDefault()
     if (
@@ -176,6 +183,7 @@ export default function AddToRecord({
     setError('')
     setStep('people')
   }
+  // Track recipients by stable member ID so selections persist across searches and pages.
   function toggle(person: Pathfinder) {
     setSelected((current) =>
       current.some((row) => row.id === person.id)
@@ -210,6 +218,7 @@ export default function AddToRecord({
       sending.current = false
     }
   }
+  // Reuse the year/category/details summary before confirmation and after saving.
   function summary() {
     return (
       <section className="history-receipt">
@@ -253,6 +262,7 @@ export default function AddToRecord({
       closeDisabled={step === 'saving'}
       wide={step === 'people'}
     >
+      {/* Render the workflow screen from step; all draft values remain in this component between screens. */}
       {step === 'saving' ? (
         <p role="status">Saving information to the selected profiles…</p>
       ) : step === 'error' ? (
@@ -499,6 +509,7 @@ export default function AddToRecord({
                     }
                     onChange={(values) => {
                       const next = Object.fromEntries(values.map((value) => value.split(' / ')))
+                      // Region progression must stay contiguous; removing an earlier region also drops all later regions.
                       const firstMissing = PBE_REGIONS.findIndex((region) => !next[region])
                       setPbeResults(
                         Object.fromEntries(

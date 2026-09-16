@@ -24,6 +24,7 @@ export default function ProfileOverlay({
   const [attempt, setAttempt] = useState(0)
   const [honorsOpen, setHonorsOpen] = useState(false)
   const [editing, setEditing] = useState(false)
+  // Load on member changes and retries; abort when the dialog closes to ignore late responses.
   useEffect(() => {
     const controller = new AbortController()
     getPathfinder(id, controller.signal)
@@ -35,7 +36,9 @@ export default function ProfileOverlay({
       })
     return () => controller.abort()
   }, [id, attempt])
+  // Deduplicate display years without modifying the fetched record.
   const years = [...new Set(details?.member.years_active ?? [])].sort()
+  // Sort by year, then class order; the sentinel places unknown dates after recorded years.
   const levels = [...(details?.member.levels ?? [])].sort(
     (a, b) =>
       (a.year ?? '9999').localeCompare(b.year ?? '9999') ||
@@ -96,6 +99,7 @@ export default function ProfileOverlay({
             <h3>Years Active</h3>
             <p>{years.join(', ') || 'No years recorded'}</p>
           </section>
+          {/* Render Pathfinder and Staff histories separately, independent of current registration. */}
           {details.roles.map((group) => (
             <section
               className="profile-role"
@@ -175,6 +179,7 @@ export default function ProfileOverlay({
           <ProfileNotes notes={details.member.notes ?? ''} />
         </>
       )}
+      {/* The editor is a nested dialog; successful saves reload both this profile and its parent results. */}
       {editing && (
         <EditProfile
           id={id}

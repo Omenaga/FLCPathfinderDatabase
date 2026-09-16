@@ -22,6 +22,7 @@ export default function Modal({
   wide?: boolean
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
+  // A new dialog step may change its title; start that step at the top and focus a header action.
   useEffect(() => {
     const element = dialog.current
     if (!element) return
@@ -32,6 +33,7 @@ export default function Modal({
     action?.focus()
   }, [title])
   useEffect(() => {
+    // Remember the previous focus and scroll settings so nested dialogs restore their parent correctly.
     const opener = document.activeElement as HTMLElement | null
     const element = dialog.current!
     const overflow = document.body.style.overflow
@@ -49,6 +51,7 @@ export default function Modal({
       className={`profile-overlay${wide ? ' wide-overlay' : ''}`}
       aria-label={title}
       onCancel={(event) => {
+        // Handle Escape through the parent callback so React state stays in sync with the native dialog.
         event.preventDefault()
         event.stopPropagation()
         if (!closeDisabled) onClose()

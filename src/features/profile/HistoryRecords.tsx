@@ -9,6 +9,7 @@ export default function HistoryRecords({
   records: { year: string | null; detail: ReactNode }[]
   newestFirst?: boolean
 }) {
+  // Copy before sorting to preserve the caller's order. Null years stay last in either date direction.
   const sorted = [...records].sort((a, b) =>
     a.year === null
       ? b.year === null

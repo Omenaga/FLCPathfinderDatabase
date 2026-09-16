@@ -22,12 +22,14 @@ import { profileChanges } from './profileChanges'
 import type { Json } from '../../lib/database.types'
 
 type Row = Record<string, Json>
+// The edit RPC returns a snapshot keyed by table name, with each value containing that table's rows.
 type Profile = Record<string, Row[]>
 type Catalog = {
   staff: string[]
   books: { school_year: string; book_name: string }[]
   honors: Honor[]
 }
+// These suffixes follow the same order as EVENTS so labels map to the correct database tables.
 const eventTables = [
   'drill_performance',
   'drum_performance',
@@ -40,6 +42,7 @@ const eventTables = [
   'lashing',
   'burning_twine',
 ]
+// Convert JSON arrays to picker labels; null history years are presented as Unknown.
 const strings = (value: Json | undefined) =>
   (Array.isArray(value) ? value : []).map((value) => (value === null ? 'Unknown' : String(value)))
 
@@ -62,8 +65,10 @@ export default function EditProfile({
   const [attempt, setAttempt] = useState(0)
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  // A non-null review switches from editing to confirmation and holds the exact proposed save.
   const [review, setReview] = useState<Profile | null>(null)
   const sending = useRef(false)
+  // Load the snapshot and label catalogs together; discard responses if the dialog closes or retries.
   useEffect(() => {
     const controller = new AbortController()
     async function load() {
@@ -90,6 +95,7 @@ export default function EditProfile({
         if (!controller.signal.aborted) {
           const value = profile.data as Profile
           const initial = structuredClone(value)
+          // Supply a missing registration in the draft only; it is not written until the user confirms.
           if (!initial.current_data.length) {
             const season = await client.rpc('current_club_year').abortSignal(controller.signal)
             if (season.error) throw season.error
@@ -118,6 +124,7 @@ export default function EditProfile({
     void load()
     return () => controller.abort()
   }, [id, attempt])
+  // Merge a partial row edit immutably so React detects the change; invalidate any previous receipt.
   function change(table: string, index: number, patch: Row) {
     if (pending) return
     setDraft(
@@ -130,14 +137,17 @@ export default function EditProfile({
     setReview(null)
     setError('')
   }
+  // Append an unsaved row locally. The database assigns any required IDs during the confirmed save.
   function addRow(table: string, row: Row) {
     if (pending) return
     setDraft((current) => current && { ...current, [table]: [...current[table], row] })
     setReview(null)
     setError('')
   }
+  // Use the catalog as the source of truth for the books associated with a PBE year.
   const booksFor = (year: Json) =>
     catalog?.books.filter((book) => book.school_year === year).map((book) => book.book_name) ?? []
+  // Remove from the draft only; cancelling the editor leaves the database row untouched.
   function removeRow(table: string, index: number) {
     if (pending) return
     setDraft(
@@ -146,6 +156,7 @@ export default function EditProfile({
     setReview(null)
     setError('')
   }
+  // Give each compact X button a descriptive accessible name for keyboard and screen-reader users.
   function removeButton(label: string, remove: () => void) {
     return (
       <div className="edit-entry-actions">
@@ -161,6 +172,7 @@ export default function EditProfile({
       </div>
     )
   }
+  // Validate the draft and prepare a receipt. This form submission does not yet write to the database.
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!draft || !original || pending) return
@@ -203,6 +215,7 @@ export default function EditProfile({
       sending.current = false
     }
   }
+  // Render text/date inputs or a year selector; unknown optional dates and years are stored as null.
   function text(
     label: string,
     value: Json | undefined,
@@ -246,6 +259,7 @@ export default function EditProfile({
       </label>
     )
   }
+  // Render one catalog choice, with an optional N/A entry that clears the stored value.
   function choice(
     label: string,
     value: Json | undefined,
@@ -272,6 +286,7 @@ export default function EditProfile({
       </label>
     )
   }
+  // Keep existing values visible even if absent from today's catalog, and translate Unknown back to null.
   function multiple(
     label: string,
     value: Json | undefined,
@@ -324,6 +339,7 @@ export default function EditProfile({
       </section>
     )
   }
+  // Staff, Drums, PBE, and TLT store yearly entries inside one row's history array.
   function history(
     table: string,
     label: string,
@@ -333,6 +349,7 @@ export default function EditProfile({
   ) {
     const row = draft?.[table]?.[0]
     const entries = (row?.history ?? []) as Row[]
+    // Start with the newest unused period; use an unknown year when all listed periods are occupied.
     function add() {
       const year =
         [...PERIODS].reverse().find((year) => !entries.some((entry) => entry.year === year)) ?? null
@@ -349,6 +366,7 @@ export default function EditProfile({
           </button>
         </div>
         {entries.map((entry, index) => {
+          // Replace only the edited history instance, preserving the other entries within its parent row.
           const set = (patch: Row) =>
             change(table, 0, {
               history: entries.map((item, i) => (i === index ? { ...item, ...patch } : item)),
@@ -401,6 +419,7 @@ export default function EditProfile({
       </section>
     )
   }
+  // Show every class, including unrecorded ones, without storing placeholder rows in the draft.
   function levels() {
     const entries = (draft!.pathfinders[0].levels ?? []) as Row[]
     const update = (value: Row[]) => change('pathfinders', 0, { levels: value })
@@ -411,6 +430,7 @@ export default function EditProfile({
           const matches = entries
             .map((entry, index) => ({ entry, index }))
             .filter(({ entry }) => entry.name === name)
+          // Index -1 marks a display-only placeholder; selecting an outcome turns it into a real entry.
           const shown = matches.length
             ? matches
             : [{ entry: { name, outcome: null, year: null } as Row, index: -1 }]
@@ -472,6 +492,7 @@ export default function EditProfile({
     )
   }
   const changed = draft && original && JSON.stringify(draft) !== JSON.stringify(original)
+  // The review screen replaces the form until confirmation or Back to Edit. Failed saves keep this snapshot.
   if (review && original && catalog) {
     const receipt = profileChanges(original, review, catalog.honors)
     return (
@@ -515,6 +536,7 @@ export default function EditProfile({
           </p>
         )}
         {pending && <p role="status">Saving Profile...</p>}
+        {/* Separate the receipt by change type and omit empty groups. */}
         {(['Added', 'Updated', 'Removed'] as const).map((kind) => {
           const items = receipt.filter((item) => item.kind === kind)
           return (
