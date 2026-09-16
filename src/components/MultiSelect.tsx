@@ -1,8 +1,9 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from 'react'
 import { detailKind } from '../lib/format'
 
-export default function MultiSelect({ compact = false, single = false, label, values, options, onChange, exclusiveKey, groupKey, optionGroup, variantLabel, detailOptions, emptyMessage = 'No matching options' }: {
+export default function MultiSelect({ compact = false, single = false, label, values, options, onChange, isOptionDisabled, exclusiveKey, groupKey, optionGroup, variantLabel, detailOptions, emptyMessage = 'No matching options' }: {
   single?: boolean;
+  isOptionDisabled?: (option: string) => boolean;
   optionGroup?: (option: string) => string;
   detailOptions?: Record<string, readonly string[]>; compact?: boolean; label: string; values: string[]; options: readonly string[]; onChange: (values: string[]) => void; exclusiveKey?: (option: string) => string; groupKey?: (option: string) => string; variantLabel?: (option: string) => string; emptyMessage?: string
 }) {
@@ -34,10 +35,10 @@ export default function MultiSelect({ compact = false, single = false, label, va
     const detail = option.split(' / ')[1] ?? ''
     const group = groupKey?.(option) ?? ''
     const typedDetail = detailOptions && Object.values(detailOptions).flat().some(value => text.toLowerCase().includes(value.toLowerCase()))
-    return (!detailOptions || typedDetail || detail === (detailSelections[group] ?? '')) && !values.includes(option) && option.toLowerCase().includes(text.trim().toLowerCase())
+    return (!detailOptions?.[group] || typedDetail || detail === (detailSelections[group] ?? '')) && !values.includes(option) && option.toLowerCase().includes(text.trim().toLowerCase())
   })
   function disabled(option: string) {
-    return values.includes(option) || !!groupKey && values.includes(groupKey(option)) || !!exclusiveKey && values.some(value => exclusiveKey(value) === exclusiveKey(option))
+    return !!isOptionDisabled?.(option) || values.includes(option) || !!groupKey && values.includes(groupKey(option)) || !!exclusiveKey && values.some(value => exclusiveKey(value) === exclusiveKey(option))
   }
   function add(option: string) {
     if (disabled(option)) return

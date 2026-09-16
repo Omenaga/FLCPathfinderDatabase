@@ -46,13 +46,13 @@ The September 11 migration changes `current_staff_role()` to return `editor` for
 
 Use **Add > Add New Profile** to create a person and current registration together. Enter names, Status, optional Birthday and Class/Title; Current Year comes from the configured club year. Click Add, then Confirm within five seconds. Record Added shows the saved profile summary. Failed saves preserve your inputs for retry.
 
-Use **Add > Add to Record** to choose a year and one class/title, activity, event, or honor for existing profiles. PBE automatically includes all books configured for that year. Search and check recipients in the expanded modal; selected profiles appear below the results. Click Finish / Done, review the receipt, then Confirm (no timer). Only Staff titles exclude current Pathfinders. No historical-role choice is needed. New details are merged with existing history and the year is added to Years Active. The receipt separates Added, Already had this information, and Not added with reasons, hiding empty sections. Conflicts preserve existing records. Use Review failed profiles to correct or retry failures.
+Use **Add > Add to Record** to choose a year and one class/title, activity, event, or honor for existing profiles. PBE automatically includes all books configured for that year, with optional Area, State, Union, and Divisional results (one placement per region). Search and check recipients in the expanded modal; selected profiles appear below the results. Click Finish / Done, review the receipt, then Confirm (no timer). Only Staff titles exclude current Pathfinders. No historical-role choice is needed. New details are merged with existing history and the year is added to Years Active. The receipt separates Added, Already had this information, and Not added with reasons, hiding empty sections. Conflicts preserve existing records. Use Review failed profiles to correct or retry failures.
 
 Changing existing data other than Notes remains in Supabase Table Editor; Edit Profiles is a separate placeholder. IDs remain internal. Do not commit member records or credentials.
 
 Current Data uses one `current_title` array field validated against status. New Pathfinder profiles select one of the eight levels. Staff titles come from `staff_titles`; `sort_order` follows the numbered catalog in the schema. Parent/Not Active titles are null.
 
-History years are ranges such as `2023-24`. Levels use `{ "name": "Friend", "outcome": "basic", "year": "2023-24" }`; unknown migrated dates remain null. Set `history_role` to the role when an activity/event occurred. Drill teams are Precision, Freestyle, Adult; a team does not determine the person's role automatically.
+History years are ranges such as `2023-24`. Levels use `{ "name": "Friend", "outcome": "basic", "year": "2023-24" }`; unknown migrated dates remain null. Activities and Red Zone events always appear under Pathfinder History, regardless of current status. Staff History contains titles; honors are independent of role. The activity, event, and earned-honor tables have no `history_role` column. Drill teams are Precision, Freestyle, Adult.
 
 The September 14 migration preserves a private administrator-only snapshot, converts legacy standalone 2024 to `2023-24` as approved, and keeps unknown level years and Drill teams unassigned. This is historical migration context, not a rule for guessing dates on new entries.
 
@@ -104,7 +104,7 @@ npm run build
 - `src/components/`: shared Select, MultiSelect, and Modal components.
 - `src/lib/`: Supabase access, database types, data functions, and shared formatting/error helpers.
 
-`src/features/add/` contains new-profile creation, Add to Record, and honor lookup. `App.tsx` connects page navigation and refreshes Search after saves without discarding its filters. `add_member_record` creates both registration rows atomically. `add_to_records` merges history with per-profile rollback, existing-information checks, and receipts. Apply the full migration history through `20260915180000_simplify_history_additions.sql` before using this frontend. A future Edit screen can live in `src/features/edit/`.
+`src/features/add/` contains new-profile creation, Add to Record, and honor lookup. `App.tsx` connects page navigation and refreshes Search after saves without discarding its filters. `add_member_record` creates both registration rows atomically. `add_to_records` merges history with per-profile rollback, existing-information checks, and receipts. Apply the full migration history through `20260915230000_history_duplicate_rules.sql` before using this frontend. A future Edit screen can live in `src/features/edit/`.
 
 Read [the project context](docs/project-context.md) for ministry background, source links, and terminology. The implemented data model follows [the database schema](docs/database-schema.md); preliminary ideas in the context document are not additional implemented features.
 

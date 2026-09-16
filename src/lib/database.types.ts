@@ -68,21 +68,18 @@ export type Database = {
       }
       drill: {
         Row: {
-          history_role: string
           id: number
           pathfinder_id: number
           team: string | null
           years: Json
         }
         Insert: {
-          history_role?: string
           id?: never
           pathfinder_id: number
           team?: string | null
           years: Json
         }
         Update: {
-          history_role?: string
           id?: never
           pathfinder_id?: number
           team?: string | null
@@ -115,19 +112,16 @@ export type Database = {
       drum_corps: {
         Row: {
           history: Json
-          history_role: string
           id: number
           pathfinder_id: number
         }
         Insert: {
           history: Json
-          history_role?: string
           id?: never
           pathfinder_id: number
         }
         Update: {
           history?: Json
-          history_role?: string
           id?: never
           pathfinder_id?: number
         }
@@ -135,21 +129,21 @@ export type Database = {
           {
             foreignKeyName: "drum_corps_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "member_search"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "drum_corps_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "member_search_base"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "drum_corps_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -172,21 +166,18 @@ export type Database = {
       }
       honors_earned: {
         Row: {
-          history_role: string
           honor_id: number
           id: number
           pathfinder_id: number
           year_earned: string
         }
         Insert: {
-          history_role?: string
           honor_id: number
           id?: never
           pathfinder_id: number
           year_earned: string
         }
         Update: {
-          history_role?: string
           honor_id?: number
           id?: never
           pathfinder_id?: number
@@ -265,19 +256,16 @@ export type Database = {
       pbe: {
         Row: {
           history: Json
-          history_role: string
           id: number
           pathfinder_id: number
         }
         Insert: {
           history: Json
-          history_role?: string
           id?: never
           pathfinder_id: number
         }
         Update: {
           history?: Json
-          history_role?: string
           id?: never
           pathfinder_id?: number
         }
@@ -285,21 +273,21 @@ export type Database = {
           {
             foreignKeyName: "pbe_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "member_search"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pbe_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "member_search_base"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "pbe_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },
@@ -322,21 +310,18 @@ export type Database = {
       }
       red_zone_archery: {
         Row: {
-          history_role: string
           id: number
           pathfinder_id: number
           placement: string
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           pathfinder_id: number
           placement: string
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           pathfinder_id?: number
           placement?: string
@@ -368,7 +353,6 @@ export type Database = {
       }
       red_zone_bible_events: {
         Row: {
-          history_role: string
           id: number
           name: string
           pathfinder_id: number
@@ -376,7 +360,6 @@ export type Database = {
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           name: string
           pathfinder_id: number
@@ -384,7 +367,6 @@ export type Database = {
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           name?: string
           pathfinder_id?: number
@@ -417,21 +399,18 @@ export type Database = {
       }
       red_zone_burning_twine: {
         Row: {
-          history_role: string
           id: number
           pathfinder_id: number
           placement: string
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           pathfinder_id: number
           placement: string
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           pathfinder_id?: number
           placement?: string
@@ -463,21 +442,18 @@ export type Database = {
       }
       red_zone_drill_performance: {
         Row: {
-          history_role: string
           id: number
           pathfinder_id: number
           placement: string
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           pathfinder_id: number
           placement: string
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           pathfinder_id?: number
           placement?: string
@@ -509,21 +485,18 @@ export type Database = {
       }
       red_zone_drum_performance: {
         Row: {
-          history_role: string
           id: number
           pathfinder_id: number
           placement: string
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           pathfinder_id: number
           placement: string
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           pathfinder_id?: number
           placement?: string
@@ -555,7 +528,6 @@ export type Database = {
       }
       red_zone_honor_evaluations: {
         Row: {
-          history_role: string
           id: number
           name: string
           pathfinder_id: number
@@ -563,7 +535,6 @@ export type Database = {
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           name: string
           pathfinder_id: number
@@ -571,7 +542,6 @@ export type Database = {
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           name?: string
           pathfinder_id?: number
@@ -604,21 +574,18 @@ export type Database = {
       }
       red_zone_jump_rope: {
         Row: {
-          history_role: string
           id: number
           pathfinder_id: number
           placement: string
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           pathfinder_id: number
           placement: string
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           pathfinder_id?: number
           placement?: string
@@ -650,21 +617,18 @@ export type Database = {
       }
       red_zone_knots: {
         Row: {
-          history_role: string
           id: number
           pathfinder_id: number
           placement: string
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           pathfinder_id: number
           placement: string
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           pathfinder_id?: number
           placement?: string
@@ -696,21 +660,18 @@ export type Database = {
       }
       red_zone_lashing: {
         Row: {
-          history_role: string
           id: number
           pathfinder_id: number
           placement: string
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           pathfinder_id: number
           placement: string
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           pathfinder_id?: number
           placement?: string
@@ -742,21 +703,18 @@ export type Database = {
       }
       red_zone_tents: {
         Row: {
-          history_role: string
           id: number
           pathfinder_id: number
           placement: string
           year: string
         }
         Insert: {
-          history_role?: string
           id?: never
           pathfinder_id: number
           placement: string
           year: string
         }
         Update: {
-          history_role?: string
           id?: never
           pathfinder_id?: number
           placement?: string
@@ -844,19 +802,16 @@ export type Database = {
       tlt: {
         Row: {
           history: Json
-          history_role: string
           id: number
           pathfinder_id: number
         }
         Insert: {
           history: Json
-          history_role?: string
           id?: never
           pathfinder_id: number
         }
         Update: {
           history?: Json
-          history_role?: string
           id?: never
           pathfinder_id?: number
         }
@@ -864,21 +819,21 @@ export type Database = {
           {
             foreignKeyName: "tlt_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "member_search"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tlt_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "member_search_base"
             referencedColumns: ["id"]
           },
           {
             foreignKeyName: "tlt_pathfinder_id_fkey"
             columns: ["pathfinder_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "pathfinders"
             referencedColumns: ["id"]
           },

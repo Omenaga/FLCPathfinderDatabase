@@ -32,6 +32,20 @@ test('member revision preserves history and enforces roles, ranges and access',a
    (1,'["2023-24","2024-25"]','Snare','pathfinder'),(1,'["2023-24"]','Bass','pathfinder'),(1,'["2025-26"]','Tenor','staff');`)
  }
  if(file==='20260915130000_current_title_json.sql') await db.exec(`update current_data set current_title='Club Director',current_activities='["Drill"]' where pathfinder_id=1`)
+ if(file==='20260915190000_remove_history_role.sql') await db.exec(`
+  insert into drill(pathfinder_id,team,years,history_role) values(1,null,'["2024-25"]','staff');
+  insert into drum_corps(pathfinder_id,history,history_role) values(1,'[{"year":"2023-24","drums":["Bass","Quad"]}]','staff')
+   on conflict(pathfinder_id,history_role) do update set history=drum_corps.history || excluded.history;
+  insert into pbe(pathfinder_id,history,history_role) select pathfinder_id,history,'staff' from pbe;
+  insert into tlt(pathfinder_id,history,history_role) select pathfinder_id,history,'staff' from tlt;
+  insert into honors(name) values('Migration Honor');
+  insert into honors_earned(pathfinder_id,honor_id,year_earned,history_role)
+   select 1,id,'2023-24',r from honors cross join unnest(array['pathfinder','staff']) r;
+  insert into red_zone_burning_twine(pathfinder_id,year,placement,history_role)
+   select pathfinder_id,year,placement,'staff' from red_zone_burning_twine;
+  insert into red_zone_archery(pathfinder_id,year,placement,history_role) values
+   (1,'2023-24','1st Place','pathfinder'),(1,'2023-24','2nd Place','staff');
+ `)
  const sql=await readFile(new URL(file,folder),'utf8')
  if(!/^begin;/m.test(sql)) await db.exec('begin')
  await db.exec(sql)
@@ -52,9 +66,12 @@ test('member revision preserves history and enforces roles, ranges and access',a
  assert.ok(row.search_event_details.some(r=>r.name==='Burning Twine' && r.year==='2023-24' && r.detail==='1st Place'))
  assert.deepEqual((await db.query('select history from staff_history where pathfinder_id=1')).rows[0].history,
   [{year:'2022-23',titles:[]},{year:'2023-24',titles:['Deputy','Director']},{year:'2024-25',titles:['Director']}])
- assert.deepEqual((await db.query("select history from drum_corps where pathfinder_id=1 and history_role='pathfinder'")).rows[0].history,
-  [{year:'2023-24',drums:['Bass','Snare']},{year:'2024-25',drums:['Snare']}])
- assert.deepEqual((await db.query("select history from drum_corps where history_role='staff'")).rows[0].history,[{year:'2025-26',drums:['Tenor']}])
+ assert.deepEqual((await db.query("select history from drum_corps where pathfinder_id=1")).rows[0].history,
+  [{year:'2023-24',drums:['Bass','Quad','Snare']},{year:'2024-25',drums:['Snare']},{year:'2025-26',drums:['Tenor']}])
+ assert.equal((await db.query("select count(*)::int n from information_schema.columns where table_schema='public' and column_name='history_role'")).rows[0].n,0)
+ assert.deepEqual((await db.query('select years from drill where pathfinder_id=1 and team is null')).rows[0].years,['2023-24','2024-25'])
+ for(const table of ['pbe','tlt','honors_earned','red_zone_burning_twine']) assert.equal((await db.query(`select count(*)::int n from ${table}`)).rows[0].n,1)
+ assert.equal((await db.query('select count(*)::int n from red_zone_archery')).rows[0].n,2)
  assert.equal((await db.query("select count(*)::int as n from staff_titles where title in ('Club Director','Friend Counselor','Master Guide','Trailer')")).rows[0].n,4)
  assert.ok(row.search_years.includes('2022-23'))
  assert.ok(row.search_activity_details.some(r=>r.name==='Drums' && r.year==='2023-24' && r.detail==='Bass'))
@@ -72,7 +89,7 @@ test('member revision preserves history and enforces roles, ranges and access',a
  assert.equal((await db.query('select year from red_zone_burning_twine')).rows[0].year,'2023-24')
  await db.exec(`set role authenticated; select set_config('request.jwt.claim.sub','00000000-0000-0000-0000-000000000001',false);`)
  await db.exec(`update pathfinders set notes=E'One sentence.\nAnother paragraph.',birth_date='2000-01-02' where id=1;
- insert into drill(pathfinder_id,team,years,history_role) values (1,'Adult','["2025-26"]','staff');`)
+ insert into drill(pathfinder_id,team,years) values (1,'Adult','["2025-26"]');`)
  await assert.rejects(db.exec(`update current_data set current_title='["Friend"]' where pathfinder_id=1`),e=>e.code==='23514')
  await db.exec(`update current_data set current_title='["Counselor"]' where pathfinder_id=1`)
  await db.exec(`update staff_history set history=history || '[{"year":"2025-26","titles":["Counselor"]}]' where pathfinder_id=1`)
@@ -127,6 +144,8 @@ test('member revision preserves history and enforces roles, ranges and access',a
  // Batch additions preserve earlier values and distinguish same-year details.
  const batch=async(ids,year,entry)=>(await db.query('select add_to_records($1,$2,$3) as result',[ids,year,JSON.stringify(entry)])).rows[0].result
  const staffId=created
+ assert.equal((await batch([1],'2023-24',{kind:'event',event:'Archery',placement:'1st Place'}))[0].status,'error')
+ await assert.rejects(db.exec('select * from private.history_role_removal_backup'),e=>e.code==='42501')
  const pfId=(await db.query("select id from pathfinders where first_name='Valid 3'")).rows[0].id
  let receipt=await batch([staffId,pfId],'2025-26',{kind:'drums',details:['Snare']})
  assert.deepEqual(receipt.map(r=>r.status),['added','added'])
@@ -145,8 +164,30 @@ test('member revision preserves history and enforces roles, ranges and access',a
   assert.equal((await batch([pfId],'2024-25',entry))[0].status,'added')
   assert.equal((await batch([pfId],'2024-25',entry))[0].status,'already')
  }
- assert.equal((await batch([pfId],'2024-25',{kind:'level',name:'Friend',outcome:'basic'}))[0].status,'added')
+ assert.equal((await batch([pfId],'2024-25',{kind:'level',name:'Friend',outcome:'basic'}))[0].status,'already')
  assert.equal((await batch([pfId],'2024-25',{kind:'drill',team:'Freestyle'}))[0].status,'added')
+ // Level identity ignores outcome/year, including migrated entries without a year.
+ const priorLevels=(await db.query('select levels from pathfinders where id=$1',[pfId])).rows[0].levels
+ receipt=await batch([pfId],'2010-11',{kind:'level',name:'Friend',outcome:'incomplete'})
+ assert.equal(receipt[0].status,'already'); assert.equal(receipt[0].year_added,false)
+ assert.deepEqual((await db.query('select levels from pathfinders where id=$1',[pfId])).rows[0].levels,priorLevels)
+ assert.equal((await db.query('select years_active from pathfinders where id=$1',[pfId])).rows[0].years_active.includes('2010-11'),false)
+ assert.equal((await batch([pfId],'2024-25',{kind:'level',name:'Companion',outcome:'basic'}))[0].status,'added')
+ // Team and instrument duplicates remain scoped to the year.
+ assert.equal((await batch([pfId],'2024-25',{kind:'drill',team:'Freestyle'}))[0].status,'already')
+ assert.equal((await batch([pfId],'2023-24',{kind:'drill',team:'Freestyle'}))[0].status,'added')
+ assert.equal((await batch([pfId],'2023-24',{kind:'drums',details:['Snare']}))[0].status,'added')
+ // TLT removes already-earned operations across years, but adds missing operations.
+ receipt=await batch([pfId],'2011-12',{kind:'tlt',details:['Teaching']})
+ assert.equal(receipt[0].status,'already'); assert.equal(receipt[0].year_added,false)
+ receipt=await batch([staffId,pfId],'2022-23',{kind:'tlt',details:['Teaching','Outreach']})
+ assert.ok(receipt.every(r=>r.status==='added'))
+ assert.match(receipt.find(r=>r.id===pfId).reason,/Teaching/)
+ assert.deepEqual((await db.query('select history from tlt where pathfinder_id=$1',[pfId])).rows[0].history,
+  [{year:'2022-23',operations:['Outreach']},{year:'2024-25',operations:['Teaching']}])
+ assert.deepEqual((await db.query('select history from tlt where pathfinder_id=$1',[staffId])).rows[0].history,
+  [{year:'2022-23',operations:['Outreach','Teaching']}])
+ assert.equal((await batch([pfId],'2022-23',{kind:'tlt',details:['Teaching','Outreach']}))[0].status,'already')
  const eventEntry={kind:'event',event:'Archery',placement:'1st Place'}
  assert.equal((await batch([pfId],'2022-23',eventEntry))[0].status,'added')
  receipt=await batch([staffId,pfId],'2022-23',{...eventEntry,placement:'2nd Place'})
@@ -154,6 +195,35 @@ test('member revision preserves history and enforces roles, ranges and access',a
  assert.equal((await db.query('select placement from red_zone_archery where pathfinder_id=$1',[pfId])).rows[0].placement,'1st Place')
  assert.equal((await batch([pfId],'2022-23',{kind:'event',event:'Bible Events',name:'Memory',placement:'Participation'}))[0].status,'added')
  assert.deepEqual((await db.query('select history from pbe where pathfinder_id=$1',[pfId])).rows[0].history,[{year:'2024-25',books:['1 Corinthians','2 Corinthians','Romans']}])
+ for(const region of ['State','Union','Divisional']) {
+  const invalidProgression=await batch([pfId],'2024-25',{kind:'pbe',results:{[region]:'1st Place'}})
+  assert.match(invalidProgression[0].reason,/requires placements for all earlier regions/)
+ }
+ const pbeResult={kind:'pbe',results:{Area:'1st Place',State:'Participation'}}
+ assert.equal((await batch([pfId],'2024-25',pbeResult))[0].status,'added')
+ assert.equal((await batch([pfId],'2024-25',pbeResult))[0].status,'already')
+ assert.equal((await batch([pfId],'2024-25',{kind:'pbe',results:{Union:'2nd Place',Divisional:'3rd Place'}}))[0].status,'added')
+ assert.equal((await batch([pfId],'2024-25',{kind:'pbe'}))[0].status,'already')
+ const savedPbe=(await db.query('select history from pbe where pathfinder_id=$1',[pfId])).rows[0].history
+ assert.deepEqual(savedPbe[0].results,{Area:'1st Place',State:'Participation',Union:'2nd Place',Divisional:'3rd Place'})
+ assert.deepEqual(savedPbe[0].books,['1 Corinthians','2 Corinthians','Romans'])
+ const pbeSearch=(await db.query('select search_activity_details from member_search where id=$1',[pfId])).rows[0].search_activity_details
+ assert.ok(pbeSearch.some(r=>r.name==='PBE' && r.year==='2024-25' && r.detail==='State / Participation'))
+ assert.ok(pbeSearch.some(r=>r.name==='PBE' && r.year===2025 && r.detail==='Area / 1st Place'))
+ assert.ok(pbeSearch.some(r=>r.name==='PBE' && r.year==='2024-25' && r.detail==='Union'))
+ assert.ok(!pbeSearch.some(r=>r.name==='PBE' && r.year==='2024-25' && r.detail==='State / 1st Place'))
+ assert.ok(!pbeSearch.some(r=>r.name==='PBE' && r.year==='2023-24' && r.detail==='State / Participation'))
+
+ receipt=await batch([staffId,pfId],'2024-25',{kind:'pbe',results:{Area:'3rd Place'}})
+ assert.equal(receipt.find(r=>r.id===staffId).status,'added')
+ assert.match(receipt.find(r=>r.id===pfId).reason,/different placement.*Area/)
+ assert.deepEqual((await db.query('select history from pbe where pathfinder_id=$1',[pfId])).rows[0].history,savedPbe)
+ assert.equal((await batch([pfId],'2025-26',{kind:'pbe',results:{Area:'Participation'}}))[0].status,'added')
+ assert.deepEqual((await db.query('select history from pbe where pathfinder_id=$1',[pfId])).rows[0].history[0],savedPbe[0])
+ for(const invalid of [null,[],{Local:'1st Place'},{Area:'4th Place'},{Area:['1st Place','2nd Place']},{Area:null}]) {
+  await assert.rejects(batch([pfId],'2024-25',{kind:'pbe',results:invalid}),/valid placement/)
+  await assert.rejects(db.query('update pbe set history=$1 where pathfinder_id=$2',[JSON.stringify([{...savedPbe[0],results:invalid}]),pfId]),e=>e.code==='23514')
+ }
  await assert.rejects(batch([pfId],'1900-01',{kind:'pbe',details:[]}),/No Bible books/)
  assert.equal((await db.query('select years_active from pathfinders where id=$1',[pfId])).rows[0].years_active.includes('1900-01'),false)
  const honorId=(await db.query("insert into honors(name) values('Test Honor') returning id")).rows[0].id

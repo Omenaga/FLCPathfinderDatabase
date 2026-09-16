@@ -11,8 +11,9 @@ export const PERIODS = YEARS.map(year => period(Number(year)))
 export const LEVEL_DETAILS: Record<string, readonly string[]> = Object.fromEntries(LEVELS.map(level => [level, ['Basic', 'Advanced', 'Incomplete']]))
 export const DRUMS = ['Snare', 'Quad', 'Bass', 'Tenor', 'Cymbol'] as const
 export const OPERATIONS = ['Administrative', 'Outreach', 'Teaching', 'Activity', 'Records', 'Counseling'] as const
+export const PBE_REGIONS = ['Area', 'State', 'Union', 'Divisional'] as const
 export const PLACEMENTS = ['1st Place', '2nd Place', '3rd Place', 'Participation'] as const
-export const ACTIVITY_DETAILS: Record<string, readonly string[]> = { Drill: ['Precision', 'Freestyle', 'Adult'], Drums: DRUMS, TLT: OPERATIONS }
+export const ACTIVITY_DETAILS: Record<string, readonly string[]> = { Drill: ['Precision', 'Freestyle', 'Adult'], Drums: DRUMS, PBE: PBE_REGIONS.flatMap(region => [region, ...PLACEMENTS.map(placement => `${region} / ${placement}`)]), TLT: OPERATIONS }
 export const EVENT_DETAILS: Record<string, readonly string[]> = Object.fromEntries(EVENTS.map(event => [event, PLACEMENTS]))
 function historyOptions(names: readonly string[], details: Record<string, readonly string[]>) {
   return names.flatMap(name => [name, ...(details[name] ?? []).map(detail => `${name} / ${detail}`)])
@@ -21,7 +22,8 @@ export const LEVEL_OPTIONS = historyOptions(LEVELS, LEVEL_DETAILS)
 export const ACTIVITY_OPTIONS = historyOptions(ACTIVITIES, ACTIVITY_DETAILS)
 export const EVENT_OPTIONS = historyOptions(EVENTS, EVENT_DETAILS)
 export function historyFilter(option: string) {
-  const [name, detail] = option.split(' / ')
+  const [name, ...parts] = option.split(' / ')
+  const detail = parts.join(' / ')
   return { name, ...(detail ? { detail } : {}) }
 }
 export const PAGE_SIZE = 25
@@ -94,19 +96,19 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
   if (error) throw error
   const roles = (['pathfinder', 'staff'] as const).map(role => {
     const activities = [
-      { name: 'Drill', records: data.drill.filter(r => r.history_role === role).map(r => ({ years: r.years as string[], detail: r.team ?? 'Team not recorded' })) },
-      { name: 'Drums', records: data.drum_corps.filter(r => r.history_role === role).flatMap(r => (r.history as { year: string; drums: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.drums.join(', ') || 'Instrument not recorded' }))) },
-      { name: 'PBE', records: data.pbe.filter(r => r.history_role === role).flatMap(r => (r.history as { year: string; books: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.books.join(', ') }))) },
-      { name: 'TLT', records: data.tlt.filter(r => r.history_role === role).flatMap(r => (r.history as { year: string; operations: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.operations.join(', ') }))) },
+      { name: 'Drill', records: data.drill.map(r => ({ years: r.years as string[], detail: r.team ?? 'Team not recorded' })) },
+      { name: 'Drums', records: ((data.drum_corps?.history ?? []) as { year: string; drums: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.drums.join(', ') || 'Instrument not recorded' })) },
+      { name: 'PBE', records: ((data.pbe?.history ?? []) as { year: string; books: string[]; results?: Record<string, string> }[]).map(entry => ({ years: [entry.year], detail: PBE_REGIONS.filter(region => entry.results?.[region]).map(region => `${region} (${entry.results![region] === 'Participation' ? 'P' : entry.results![region].replace(' Place', '')})`).join(', ') || 'Results not recorded' })) },
+      { name: 'TLT', records: ((data.tlt?.history ?? []) as { year: string; operations: string[] }[]).map(entry => ({ years: [entry.year], detail: entry.operations.join(', ') })) },
     ].filter(group => group.records.length > 0)
     const eventRows = [data.red_zone_drill_performance, data.red_zone_drum_performance,
       data.red_zone_honor_evaluations, data.red_zone_bible_events, data.red_zone_knots,
       data.red_zone_tents, data.red_zone_jump_rope, data.red_zone_archery,
       data.red_zone_lashing, data.red_zone_burning_twine]
-    const events = EVENTS.map((name, index) => ({ name, records: eventRows[index].filter(r => r.history_role === role).map(r => ({
+    const events = EVENTS.map((name, index) => ({ name, records: eventRows[index].map(r => ({
       year: r.year, placement: r.placement, name: 'name' in r && typeof r.name === 'string' ? r.name : undefined,
     })).sort((a, b) => b.year.localeCompare(a.year)) })).filter(group => group.records.length > 0)
-    return { role, activities, events }
+    return { role, activities: role === 'pathfinder' ? activities : [], events: role === 'pathfinder' ? events : [] }
   })
   return { member: member(data), roles, staffHistory: (data.staff_history?.history ?? []) as { year: string; titles: string[] }[] }
 }

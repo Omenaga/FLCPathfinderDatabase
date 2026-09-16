@@ -3,12 +3,12 @@ import { expect, test, type Page } from '@playwright/test'
 const member = { id: 2, first_name: 'Justin', last_name: 'Wu', name: 'Justin Wu', status: 'staff', has_current_data: true, current_title: null, current_activities: ['Drill'],
  years_active: ['2023-24'], levels: [{name:'Friend',outcome:'basic',year:'2023-24'},{name:'Companion',outcome:'incomplete',year:null}], birth_date:'2000-01-02',notes:'Existing notes' }
 const fixture = {...member,staff_history:{id:1,pathfinder_id:2,history:[{year:'2025-26',titles:['Friend Counselor','Drill Instructor']}]},
- drill:[{id:1,years:['2023-24'],team:'Precision',history_role:'pathfinder'},{id:2,years:['2025-26'],team:'Adult',history_role:'staff'}],
- drum_corps:[{history:[{year:'2023-24',drums:['Snare']}],history_role:'pathfinder'}],
- pbe:[{history:[{year:'2021-22',books:['1 Kings','Ruth']}],history_role:'pathfinder'}],
- tlt:[{history:[{year:'2023-24',operations:['Teaching']}],history_role:'pathfinder'}],
+ drill:[{id:1,years:['2023-24'],team:'Precision'},{id:2,years:['2025-26'],team:'Adult'}],
+ drum_corps:{history:[{year:'2023-24',drums:['Snare']}]},
+ pbe:{history:[{year:'2021-22',books:['1 Kings','Ruth'],results:{Area:'1st Place',State:'Participation'}}]},
+ tlt:{history:[{year:'2023-24',operations:['Teaching']}]},
  red_zone_drill_performance:[],red_zone_drum_performance:[],red_zone_honor_evaluations:[],red_zone_bible_events:[],red_zone_knots:[],red_zone_tents:[],red_zone_jump_rope:[],red_zone_archery:[],red_zone_lashing:[],
- red_zone_burning_twine:[{year:'2023-24',placement:'1st Place',history_role:'pathfinder'}]}
+ red_zone_burning_twine:[{year:'2023-24',placement:'1st Place'}]}
 async function setup(page:Page) {
  const user={id:'00000000-0000-0000-0000-000000000001',email:'staff@example.test',aud:'authenticated',role:'authenticated',app_metadata:{},user_metadata:{},created_at:'2026-01-01T00:00:00Z'}
  await page.route('http://127.0.0.1:54321/auth/v1/**',route=>route.fulfill({json:{access_token:'test-token',refresh_token:'test-refresh',token_type:'bearer',expires_in:3600,user}}))
@@ -93,6 +93,8 @@ test('PBE includes every book for the year and only Staff titles restrict recipi
  await page.getByRole('button',{name:'Add to Record',exact:true}).click()
  const dialog=page.getByRole('dialog',{name:'Add to Record',exact:true})
  await dialog.getByLabel('Information category').selectOption('staff')
+ await dialog.getByRole('combobox',{name:'Year to document',exact:true}).fill('2026-27')
+ await dialog.getByRole('combobox',{name:'Year to document',exact:true}).press('Enter')
  await dialog.getByRole('combobox',{name:'Staff title',exact:true}).fill('Club Director')
  await dialog.getByRole('combobox',{name:'Staff title',exact:true}).press('Enter')
  const staffSearch=page.waitForRequest(r=>r.url().includes('/member_search?') && new URL(r.url()).searchParams.get('status')==='neq.pathfinder')
@@ -108,6 +110,21 @@ test('PBE includes every book for the year and only Staff titles restrict recipi
  await expect(books.getByRole('combobox')).toHaveCount(0)
  await expect(books.locator('ul')).toHaveCount(0)
  await expect(books).toContainText('Romans, 1 Corinthians, 2 Corinthians')
+ await dialog.getByRole('combobox',{name:'PBE regions (optional)',exact:true}).click()
+ await expect(dialog.getByRole('option',{name:'State / Participation',exact:true})).toBeDisabled()
+ await expect(dialog.getByRole('option',{name:'Divisional / 1st Place',exact:true})).toBeDisabled()
+ await dialog.getByRole('option',{name:'Area / 1st Place',exact:true}).click()
+ await expect(dialog.getByRole('option',{name:'Area / 2nd Place',exact:true})).toBeDisabled()
+ await dialog.getByRole('option',{name:'State / Participation',exact:true}).click()
+ await dialog.getByRole('option',{name:'Union / 2nd Place',exact:true}).click()
+ await expect(dialog.getByRole('option',{name:'Divisional / 1st Place',exact:true})).toBeEnabled()
+ await page.keyboard.press('Escape')
+ await dialog.getByRole('button',{name:'Remove State / Participation from PBE regions (optional)',exact:true}).click()
+ await expect(dialog.getByRole('button',{name:'Remove Union / 2nd Place from PBE regions (optional)',exact:true})).toHaveCount(0)
+ await dialog.getByRole('combobox',{name:'PBE regions (optional)',exact:true}).fill('State / Participation')
+ await dialog.getByRole('combobox',{name:'PBE regions (optional)',exact:true}).press('Enter')
+ await page.keyboard.press('Escape')
+ await expect(dialog.getByRole('heading',{name:'Bible books',exact:true})).toHaveCount(0)
  await dialog.getByRole('button',{name:'Select profiles'}).click()
  await expect(dialog.getByRole('checkbox',{name:'Select Justin Wu'})).not.toBeChecked()
  await expect(dialog.getByRole('button',{name:'Finish / Done'})).toBeDisabled()
@@ -115,7 +132,8 @@ test('PBE includes every book for the year and only Staff titles restrict recipi
  await dialog.getByRole('button',{name:'Finish / Done'}).click()
  await page.getByRole('button',{name:'Confirm',exact:true}).click()
  await expect(page.getByRole('dialog',{name:'Records Updated'})).toBeVisible()
- expect(payload).toEqual({p_ids:[2],p_year:'2024-25',p_entry:{kind:'pbe',details:['Romans','1 Corinthians','2 Corinthians']}})
+ await expect(page.getByRole('dialog',{name:'Records Updated'})).toContainText('Area: 1st Place; State: Participation')
+ expect(payload).toEqual({p_ids:[2],p_year:'2024-25',p_entry:{kind:'pbe',details:['Romans','1 Corinthians','2 Corinthians'],results:{Area:'1st Place',State:'Participation'}}})
 })
 
 test('Honor lookup on mobile and batch errors retain the proposed addition',async({page})=>{
@@ -130,7 +148,11 @@ test('Honor lookup on mobile and batch errors retain the proposed addition',asyn
  await page.getByRole('button',{name:'Add',exact:true}).click()
  await page.getByRole('button',{name:'Add to Record',exact:true}).click()
  const dialog=page.getByRole('dialog',{name:'Add to Record',exact:true})
- await expect(dialog.getByRole('button',{name:'Remove 2026-27 from Year to document',exact:true})).toBeVisible()
+ await expect(dialog.getByRole('button',{name:'Select profiles'})).toBeEnabled()
+ await expect(dialog.getByRole('button',{name:'Remove 2026-27 from Year to document',exact:true})).toHaveCount(0)
+ await expect(dialog.getByRole('button',{name:'Remove Basic from Outcome',exact:true})).toHaveCount(0)
+ await dialog.getByRole('combobox',{name:'Year to document',exact:true}).fill('2026-27')
+ await dialog.getByRole('combobox',{name:'Year to document',exact:true}).press('Enter')
  await dialog.getByLabel('Information category').selectOption('honor')
  await expect(dialog.getByLabel('Historical role')).toHaveCount(0)
  await dialog.getByLabel('Find an honor').fill('Camping')
@@ -267,11 +289,20 @@ test('role histories retain year detail links and nested honors focus',async({pa
  await expect(pf).toContainText('Companion (Incomplete)')
  await expect(pf).toContainText('Year unknown')
  await expect(pf).toContainText('Precision')
- await expect(pf).not.toContainText('Adult')
- await expect(staff).toContainText('Adult')
+ await expect(pf).toContainText('Snare')
+ await expect(pf).not.toContainText('1 Kings, Ruth')
+ await expect(pf).toContainText('Area (1st), State (P)')
+ await expect(pf).toContainText('Teaching')
+ await expect(pf).toContainText('Adult')
+ await expect(staff).not.toContainText('Adult')
  await expect(staff).toContainText('Friend Counselor, Drill Instructor')
+ await page.route('**/rest/v1/honors_earned?**',route=>route.fulfill({json:[{id:1,year_earned:'2023-24',honors:{name:'Camping Skills I'}}]}))
  await profile.getByRole('button',{name:'View Honors'}).click()
- await expect(page.getByRole('dialog',{name:'Honors',exact:true})).toContainText('No honors recorded.')
+ const honors=page.getByRole('dialog',{name:'Honors',exact:true})
+ await expect(honors).toContainText('Camping Skills I')
+ await expect(honors).toContainText('2023-24')
+ await expect(honors).not.toContainText('Staff')
+ await expect(honors).not.toContainText('Pathfinder')
  await page.keyboard.press('Escape')
  await expect(profile.getByRole('button',{name:'View Honors'})).toBeFocused()
  await page.keyboard.press('Escape')
@@ -372,4 +403,28 @@ test('group headings and outer areas replace Any without swallowing detail click
  await event.fill('Archery')
  await page.getByRole('group',{name:'Archery',exact:true}).locator('..').click({position:{x:2,y:2}})
  await expect(page.getByRole('button',{name:'Remove Archery from Red Zone Events',exact:true})).toBeVisible()
+})
+
+
+test('PBE search links region and placement bubbles to the selected year',async({page})=>{
+ await setup(page)
+ await page.getByRole('combobox',{name:'Years',exact:true}).fill('2024-25')
+ await page.getByRole('combobox',{name:'Years',exact:true}).press('Enter')
+ await page.keyboard.press('Escape')
+ await page.getByRole('combobox',{name:'Extracurricular',exact:true}).click()
+ await page.getByRole('combobox',{name:'PBE region',exact:true}).selectOption('State')
+ await page.getByRole('option',{name:'PBE / State / 1st Place',exact:true}).click()
+ await page.getByRole('option',{name:'PBE / State / Participation',exact:true}).click()
+ await expect(page.getByRole('button',{name:'Remove PBE / State / 1st Place from Extracurricular',exact:true})).toBeVisible()
+ await page.getByRole('combobox',{name:'PBE region',exact:true}).selectOption('Union')
+ await expect(page.getByRole('option',{name:'PBE / Union / 2nd Place',exact:true})).toBeVisible()
+ await page.keyboard.press('Escape')
+ const request=page.waitForRequest(r=>r.url().includes('/member_search?') && r.url().includes('search_activity_details'))
+ await page.getByRole('button',{name:'Search records'}).click()
+ const expression=new URL((await request).url()).searchParams.get('or')!.replaceAll('\\"','"')
+ expect(expression).toContain('"name":"PBE","detail":"State / 1st Place","year":"2024-25"')
+ expect(expression).toContain('"name":"PBE","detail":"State / Participation","year":"2024-25"')
+ await page.getByRole('button',{name:'Clear filters'}).click()
+ await page.getByRole('combobox',{name:'Extracurricular',exact:true}).click()
+ await expect(page.getByRole('combobox',{name:'PBE region',exact:true})).toHaveValue('')
 })

@@ -111,14 +111,14 @@ Each object has exactly name, outcome, and year. Null year preserves unknown dat
 
 ## Activity history
 
-Every detail table references `pathfinders.id` using `pathfinder_id`. Each has `history_role` (`pathfinder` or `staff`, default Pathfinder). Set this to the role when the activity occurred, independently of today's status. This explicit association controls the two profile sections.
+Every detail table references `pathfinders.id` using `pathfinder_id`. Activities and Red Zone events always appear in Pathfinder History, regardless of current status. These tables have no `history_role` column. Staff History contains staff titles only.
 
-| Table | Columns besides pathfinder_id/history_role | Uniqueness / behavior |
+| Table | Columns besides pathfinder_id | Uniqueness / behavior |
 |---|---|---|
-| `drill` | id identity PK, team nullable text, years jsonb | One row per member/team/role, including an unknown team; nonempty years |
-| `drum_corps` | id identity PK, history jsonb | One row per member/role; each range paired with its instruments |
-| `pbe` | id identity PK, history jsonb | One row per member/role; each range paired with its books |
-| `tlt` | id identity PK, history jsonb | One row per member/role; each range paired with its operations |
+| `drill` | id identity PK, team nullable text, years jsonb | One row per member/team, including an unknown team; nonempty years |
+| `drum_corps` | id identity PK, history jsonb | One row per member; each range paired with its instruments |
+| `pbe` | id identity PK, history jsonb | One row per member; each range paired with its books and optional region placements |
+| `tlt` | id identity PK, history jsonb | One row per member; each range paired with its operations |
 
 Drill teams: **Precision, Freestyle, Adult**. Adult is a team, not automatic evidence of a Staff role.
 
@@ -144,12 +144,14 @@ PBE example:
 
 ```json
 [
-  { "year": "2021-22", "books": ["1 Kings", "Ruth"] },
+  { "year": "2021-22", "books": ["1 Kings", "Ruth"], "results": { "Area": "1st Place", "State": "Participation" } },
   { "year": "2022-23", "books": ["John"] }
 ]
 ```
 
 Staff/Drums/PBE/TLT histories are required nonempty arrays, with one object per unique period. Title/instrument/book/operation arrays contain unique valid strings; empty arrays preserve participation with unknown details. Do not combine multiple names into one comma-separated string.
+
+PBE entries may include an optional `results` object keyed by **Area**, **State**, **Union**, and **Divisional**. Each region maps to exactly one of **1st Place**, **2nd Place**, **3rd Place**, or **Participation**. Regions follow Area ? State ? Union ? Divisional: new results for a later region require placements for all earlier regions, including any already saved for that year. No regions is also allowed; existing books-only records remain valid. Add to Record offers a grouped MultiSelect with placement buttons under each region, one placement per region. Later regions are disabled until the earlier ones are selected; removing a region clears later selections. The books notice appears above Select profiles without a heading. Results appear in confirmation and receipts. Pathfinder History displays only compact region results, such as `Area (1st), State (P)`; books remain stored. Books-only entries show `Results not recorded`. Repeated results are skipped, new regions are merged, and conflicting saved placements produce a per-profile error without overwriting data. The migrations are `20260915200000_pbe_region_results.sql` and `20260915210000_pbe_region_progression.sql`. Previously saved incomplete region sequences are preserved.
 
 ### `pbe_year_books`
 
@@ -176,20 +178,20 @@ Read-only for authenticated users; administrator-managed catalog keyed by `(scho
 
 ## Red Zone Events (RZE)
 
-Each table has `id` identity PK, `pathfinder_id` FK, `year` text range, `placement` text, and `history_role`. Named events also have a required `name` for the evaluation/event. Results sort newest first in the profile.
+Each table has `id` identity PK, `pathfinder_id` FK, `year` text range, `placement` text. Named events also have a required `name` for the evaluation/event. Results sort newest first in the profile.
 
 | Label | Table | Unique per |
 |---|---|---|
-| Drill Performance | red_zone_drill_performance | person/period/role |
-| Drum Performance | red_zone_drum_performance | person/period/role |
-| Honor Evaluations | red_zone_honor_evaluations | person/period/name/role |
-| Bible Events | red_zone_bible_events | person/period/name/role |
-| Knots Relay | red_zone_knots | person/period/role |
-| Tents | red_zone_tents | person/period/role |
-| Jump Rope | red_zone_jump_rope | person/period/role |
-| Archery | red_zone_archery | person/period/role |
-| Lashing | red_zone_lashing | person/period/role |
-| Burning Twine | red_zone_burning_twine | person/period/role |
+| Drill Performance | red_zone_drill_performance | person/period/placement |
+| Drum Performance | red_zone_drum_performance | person/period/placement |
+| Honor Evaluations | red_zone_honor_evaluations | person/period/name/placement |
+| Bible Events | red_zone_bible_events | person/period/name/placement |
+| Knots Relay | red_zone_knots | person/period/placement |
+| Tents | red_zone_tents | person/period/placement |
+| Jump Rope | red_zone_jump_rope | person/period/placement |
+| Archery | red_zone_archery | person/period/placement |
+| Lashing | red_zone_lashing | person/period/placement |
+| Burning Twine | red_zone_burning_twine | person/period/placement |
 
 Placements are exactly **1st Place, 2nd Place, 3rd Place, Participation**. Each placement stays attached to its period and event. Honor Evaluation/Bible Event name catalogs remain future work: administrator-supplied names are stored on the records today. No assignments are invented.
 
@@ -203,9 +205,9 @@ Fill in names before implementing restrictions. Both will use `YYYY-YY` period k
 
 ## Honors
 
-`honors`: id identity PK, name unique text. `honors_earned`: id identity PK, pathfinder_id FK, honor_id FK, year_earned text range, history_role. Unique per person/honor/period/role. Detail rows cascade when a person is removed by an administrator; catalog honors cannot be deleted while referenced.
+`honors`: id identity PK, name unique text. `honors_earned`: id identity PK, pathfinder_id FK, honor_id FK, year_earned text range. Unique per person/honor/period. Detail rows cascade when a person is removed by an administrator; catalog honors cannot be deleted while referenced.
 
-The general Search Honors filter remains a placeholder. Add to Record searches the `honors` catalog as the user types, showing up to 20 matches at a time. View Honors fetches earned honors with their years and historical roles in a separate dialog. Catalog entries must be supplied by an administrator; the app does not invent honors.
+The general Search Honors filter remains a placeholder. Add to Record searches the `honors` catalog as the user types, showing up to 20 matches at a time. View Honors fetches earned honors with their years in a separate dialog. Catalog entries must be supplied by an administrator; the app does not invent honors.
 
 ## Search and current results
 
@@ -233,7 +235,7 @@ Visible columns: **First, Last, Status, Title, Current activities**. First opens
 - Levels offer a period and Any/Basic/Advanced/Incomplete outcome. Name/outcome/year must match one level entry; unknown years match only Any year.
 - Activity and RZE selectors offer exact ranges and single calendar years, plus Any year. All detail ranges contribute both endpoints to calendar-year searches, including TLT and RZE.
 - Drill teams, Drum instruments, TLT operations, and RZE placements refine those choices. Name/year/detail must match the same history record. Bubbles within a category combine with OR; categories combine with AND.
-- Any year and dated participation searches read the detail tables, not current registration. Activity queries search both historical roles without filtering by current Status unless explicitly selected.
+- Any year and dated participation searches read the detail tables, not current registration. Activity queries search all recorded participation without filtering by current Status unless explicitly selected.
 
 Computed view fields `search_activities`, `search_activity_years`, `search_events`, `search_event_years`, `search_activity_details`, and `search_event_details` support these filters before pagination. First/last name search is case-insensitive and escapes wildcard characters.
 
@@ -242,7 +244,7 @@ Computed view fields `search_activities`, `search_activity_years`, `search_event
 1. Full name and current Status.
 2. Birthday displayed MM/DD/YYYY, or Not recorded.
 3. **Pathfinder History**: Years Active, Levels with outcome and period, activity sections with linked details, separate RZE mini cards, and View Honors.
-4. **Staff History**: staff_history period/title entries, and activity/RZE records explicitly marked staff.
+4. **Staff History**: staff_history period/title entries only.
 5. **Notes**: multiline plain-text editor with Save Notes, pending/success/error states, and an unsaved-changes notice. Closing does not automatically save.
 
 Both role sections remain identifiable, with empty messages when their summary history is unknown. Activity/event subsections without records are omitted. Current Staff status never hides past Pathfinder records. Staff titles can be supplied later without assigning guessed titles now.
@@ -321,13 +323,13 @@ Other fields use existing database defaults and validation, including Staff curr
 | Level Earned | Select exactly one of the eight Pathfinder classes, or one existing Staff title | Pathfinder achievements use `pathfinders.levels` with name, selected Basic/Advanced/Incomplete outcome, and year. Staff class means a title from `staff_titles`, saved into `staff_history` for that year. |
 | Extracurricular | Select Drill, Drum, PBE, or TLT, then details | Drill: one team; Drum: one or more instruments; PBE: automatically include all books from the selected year's catalog, displayed for review without individual selection; TLT: one or more operations. Existing values are merged rather than replaced. PBE book selection may change in a future revision. |
 | Red Zone Events | Select one event and placement | Placements: 1st Place, 2nd Place, 3rd Place, Participation. Honor Evaluations and Bible Events also require a typed name. Different existing placements are reported as conflicts, not overwritten. |
-| Honors | Type an honor name and select one catalog match | Database-backed suggestions read `honors`; additions use `honors_earned` for person/year/role. No free-text catalog creation. |
+| Honors | Type an honor name and select one catalog match | Database-backed suggestions read `honors`; additions use `honors_earned` for person/year. No free-text catalog creation. |
 
 ### Eligibility by role
 
 The form does not ask for Historical Role. **Only Staff titles exclude profiles whose current Status is Pathfinder**, both in recipient search and at save time. Activities, events, honors, and Pathfinder levels do not apply that exclusion.
 
-Existing tables still require an internal `history_role`. The batch function assigns Staff titles to Staff history and levels to Pathfinder history; other additions use Staff history for current Staff and Pathfinder history for all other statuses (including Parent/Not Active). This is a storage convention, not a historical-role question or an eligibility restriction. Previously recorded role assignments are preserved.
+The batch function does not assign a historical role. Levels, extracurriculars, and Red Zone events belong to Pathfinder History; staff titles belong to Staff History. Honors are independent of role. Current Staff can still receive documentation of past Pathfinder participation.
 
 ### Search and select recipient profiles
 
@@ -357,24 +359,24 @@ New documentation must preserve all previously recorded years, achievements, act
 
 For each selected profile, ensure the documented year is present in **both** `pathfinders.years_active` and the relevant category's history entry. Append the year to `years_active` only if missing, retaining all previous years. Save the year with the specific information in the appropriate table/JSON history structure as well. These changes must succeed together for that profile; a failed category write must not leave only a new Years Active entry.
 
-Check each selected profile for the proposed information in the documented year and applicable historical role. If it already has all of that category information, report **Already had this information** and still add the year to `years_active` if missing; note that Years Active update in the receipt. Continue adding the information to profiles that do not have it. If a profile already has only part of the selected details, preserve those details and add only the missing ones, reporting the profile under **Added**. Do not create duplicate entries.
+Check each selected profile using the category-specific scope below (all years for levels and TLT; the documented year for other categories). If it already has all of that category information, report **Already had this information** and, except for entirely duplicate levels or TLT operations, still add the year to `years_active` if missing; note that Years Active update in the receipt. Continue adding the information to profiles that do not have it. If a profile already has only part of the selected details, preserve those details and add only the missing ones, reporting the profile under **Added**. Do not create duplicate entries.
 
-**A matching year alone never makes information a duplicate**, whether that year appears in `years_active`, the destination table, or both. Within the selected year and applicable role, compare the category-specific information:
+**A matching year alone never makes information a duplicate**, whether that year appears in `years_active`, the destination table, or both. Compare the category-specific information below, across all years where specified:
 
 | Category | Details used to identify existing information |
 |---|---|
-| Levels | Level name and outcome |
+| Levels | Level name across all years and outcomes; keep the existing version |
 | Staff titles | Selected existing Staff title |
 | Honors | Selected honor identity/name |
 | Drill | Team |
 | Drum | Instrument (`drum_played` in the user's terminology; currently stored in the period's `drums` array) |
-| PBE | Bible book |
-| TLT | Operation |
+| PBE | Bible book and each region/placement pair |
+| TLT | Operation across all years; add only operations not previously recorded |
 | Red Zone Events | Event, event/evaluation name where applicable, and placement |
 
 For example, a profile with `2026-27` in Years Active and Snare recorded for that year can still receive Bass for `2026-27`. Preserve Snare, add Bass to that year's drum history, and keep only one `2026-27` entry in Years Active.
 
-If distinct information conflicts with an existing record under the schema's uniqueness rules (for example, another placement for an event allowing only one result per person/year/role), keep the existing value and report **Not added** with the reason. Other recipients continue.
+If distinct information conflicts with an existing record under the schema's uniqueness rules (for example, another placement for an event allowing only one result per person/year), keep the existing value and report **Not added** with the reason. Other recipients continue.
 
 `add_to_records(p_ids integer[], p_year text, p_entry jsonb)` returns one receipt item per unique recipient: `id`, `name`, `status` (`added`, `already`, or `error`), `year_added`, and an error `reason` when applicable. It is a security-invoker RPC restricted to authenticated users. Profiles are locked in ID order; each recipient's work runs in a subtransaction so a failure rolls back both their category change and Years Active update. A successful batch commits all successful recipients together. Existing detail containment makes retries safe without inventing new history entries.
 
@@ -392,3 +394,21 @@ The **Years** control now applies to Levels, Extracurricular, and Red Zone Event
 The general Search Honors filter remains a placeholder; its future filtering must use shared years and within-category OR behavior. Add to Record honor lookup and profile honor display are implemented separately.
 
 Category headings and the surrounding group area select the broad level/activity/event option. Inner buttons select specific outcomes or details; there is no separate Any button.
+
+### Removal of historical role columns
+
+`20260915190000_remove_history_role.sql` removes `history_role` from all 15 activity, event, and earned-honor tables and updates the batch RPC. It keeps original rows in the private, API-inaccessible `history_role_removal_backup` table. Activity rows merge by member (and team for Drill), retaining all years and details; identical honors and event results collapse. Differing legacy placements remain separate results, so event uniqueness includes placement. The Add to Record RPC still rejects a new conflicting placement. Honors show only their name and year.
+
+### PBE region and placement search
+
+Under Extracurricular ? PBE, a region dropdown offers Area, State, Union, and Divisional. Each region shows Any placement and the four placement buttons; selections become removable bubbles. Multiple selected placements or regions combine with OR, and the shared Years filter matches the region/placement within that same recorded year. PBE without a region still finds all PBE participation, including older books-only entries. Search has no prerequisite-region selection rule. `20260915220000_pbe_search_results.sql` extends the search view while preserving existing status/title ranking and access rules.
+
+### Category-specific duplicate rules
+
+`20260915230000_history_duplicate_rules.sql` applies these rules to Add to Record under the existing per-profile lock:
+
+- Pathfinder levels: one earned version of each level name. A matching name in any year (including unknown year), with any outcome, reports Already had this information and preserves the existing entry.
+- Drill: different teams may share a year; the same team/year is skipped. A team may recur in a different year.
+- Drum: different instruments may share a year; the same instrument/year is skipped. An instrument may recur in a different year.
+- TLT: multiple operations may share a year, but an operation already present in any year is skipped. Mixed submissions add only unseen operations, with a receipt note listing those skipped.
+- Entirely duplicate level or TLT submissions do not add a new Years Active entry. Other categories retain their existing Years Active behavior. Existing historical rows are not rewritten by this migration.

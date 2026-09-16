@@ -6,6 +6,7 @@ export function statusLabel(status: string | null) {
 export function detailKind(name: string) {
   if (name === 'Drill') return 'team'
   if (name === 'Drums') return 'instrument'
+  if (name === 'PBE') return 'region'
   if (name === 'TLT') return 'operation'
   return (LEVELS as readonly string[]).includes(name) ? 'outcome' : 'placement'
 }

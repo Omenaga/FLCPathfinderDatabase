@@ -4,7 +4,7 @@ import MultiSelect from '../../components/MultiSelect'
 import ProfileOverlay from '../profile/ProfileOverlay'
 import { message } from '../../lib/errors'
 import { statusLabel } from '../../lib/format'
-import { ACTIVITY_OPTIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, PERIODS, STATUSES, PAGE_SIZE, searchPathfinders,
+import { ACTIVITY_OPTIONS, PBE_REGIONS, EMPTY_FILTERS, EVENT_OPTIONS, LEVEL_OPTIONS, PERIODS, STATUSES, PAGE_SIZE, searchPathfinders,
   type Filters, type Pathfinder } from '../../lib/pathfinders'
 
 export default function Search({ recordsVersion = 0, selection }: { recordsVersion?: number; selection?: { members: Pathfinder[]; onToggle: (member: Pathfinder) => void; excludePathfinders: boolean } }) {
@@ -40,7 +40,7 @@ export default function Search({ recordsVersion = 0, selection }: { recordsVersi
         <Select label="Status" value={draft.status} options={selection?.excludePathfinders ? STATUSES.filter(status => status !== 'Pathfinder') : STATUSES} onChange={value => update('status', value)} />
         <MultiSelect label="Years" values={draft.year} options={[...PERIODS]} onChange={value => update('year', value)} />
         <MultiSelect label="Level Earned" values={draft.level} options={LEVEL_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('level', value)} />
-        <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('activity', value)} />
+        <MultiSelect label="Extracurricular" values={draft.activity} options={ACTIVITY_OPTIONS} detailOptions={{ PBE: PBE_REGIONS }} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.startsWith('PBE / ') ? option.split(' / ')[2] ?? 'Any placement' : option.split(' / ')[1] ?? 'Any'} onChange={value => update('activity', value)} />
         <MultiSelect label="Red Zone Events" values={draft.event} options={EVENT_OPTIONS} groupKey={option => option.split(' / ')[0].split(' (')[0]} variantLabel={option => option.split(' / ')[1] ?? 'Any'} onChange={value => update('event', value)} />
         <MultiSelect label="Honors" values={honors} options={[]} onChange={setHonors} emptyMessage="No honors available yet" />
         <div className="actions"><button type="submit" disabled={busy}>Search records</button><button type="reset" className="secondary">Clear filters</button></div>
