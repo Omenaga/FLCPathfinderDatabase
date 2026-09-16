@@ -258,7 +258,44 @@ test('member revision preserves history and enforces roles, ranges and access',a
  const ranked=(await db.query('select id,sort_status,sort_title from member_search order by sort_status,sort_title,sort_last_name,sort_first_name,id')).rows
  assert.ok(ranked.findIndex(r=>r.id===pfId)<ranked.findIndex(r=>r.id===staffId))
  assert.equal(ranked.find(r=>r.id===staffId).sort_title,1)
+ // Profile edits commit together, preserve identities, and reject stale snapshots.
+ const snapshot = async id => (await db.query('select get_profile_for_edit($1) as profile',[id])).rows[0].profile
+ const edit = (id, original, profile) => db.query('select update_profile($1,$2::jsonb,$3::jsonb)',[id,JSON.stringify(original),JSON.stringify(profile)])
+ const beforeEdit=await snapshot(staffId)
+ const edited=structuredClone(beforeEdit)
+ edited.pathfinders[0].notes='First paragraph.\n\nSecond paragraph.'
+ edited.pathfinders[0].first_name='Edited'
+ edited.current_data[0].status='parent'
+ edited.current_data[0].current_title=null
+ edited.current_data[0].current_activities=[]
+ edited.drum_corps[0].history[0].drums=['Quad']
+ edited.red_zone_archery[0].placement='3rd Place'
+ await edit(staffId,beforeEdit,edited)
+ const afterEdit=await snapshot(staffId)
+ assert.equal(afterEdit.pathfinders[0].notes,edited.pathfinders[0].notes)
+ assert.equal(afterEdit.current_data[0].status,'parent')
+ assert.deepEqual(afterEdit.drum_corps[0].history[0].drums,['Quad'])
+ assert.equal(afterEdit.red_zone_archery[0].placement,'3rd Place')
+ assert.equal(afterEdit.drum_corps[0].id,beforeEdit.drum_corps[0].id)
+ assert.deepEqual(afterEdit.honors_earned,beforeEdit.honors_earned)
+ await assert.rejects(edit(staffId,beforeEdit,edited),e=>e.code==='40001')
+ const invalidEdit=structuredClone(afterEdit)
+ invalidEdit.pathfinders[0].notes='Must roll back'
+ invalidEdit.tlt[0].history[0].operations=['Invalid operation']
+ await assert.rejects(edit(staffId,afterEdit,invalidEdit))
+ assert.deepEqual(await snapshot(staffId),afterEdit)
+ const moved=structuredClone(afterEdit)
+ moved.drum_corps[0].pathfinder_id=pfId
+ await assert.rejects(edit(staffId,afterEdit,moved),/Only profile fields/)
+ const removed=structuredClone(afterEdit)
+ removed.honors_earned=[]
+ await assert.rejects(edit(staffId,afterEdit,removed),/cannot be removed/)
+ const forged=structuredClone(afterEdit)
+ forged.pathfinders[0].id=pfId
+ await assert.rejects(edit(staffId,afterEdit,forged),/identities/)
  await db.exec('reset role; set role anon;')
+ await assert.rejects(snapshot(staffId),e=>e.code==='42501')
+ await assert.rejects(edit(staffId,afterEdit,afterEdit),e=>e.code==='42501')
  await assert.rejects(batch([pfId],'2025-26',{kind:'drums',details:['Snare']}),e=>e.code==='42501')
  await assert.rejects(create('10000000-0000-0000-0000-000000000006','Denied','parent',null),e=>e.code==='42501')
  await assert.rejects(db.exec('select * from member_search'),e=>e.code==='42501')

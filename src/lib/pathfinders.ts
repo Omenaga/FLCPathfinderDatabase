@@ -87,13 +87,16 @@ export async function searchPathfinders(filters: Filters, page: number, signal: 
 }
 
 export async function getPathfinder(id: number, signal: AbortSignal) {
-  const { data, error } = await getSupabase().from('pathfinders').select(`
+  const [{ data, error }, registration] = await Promise.all([getSupabase().from('pathfinders').select(`
     *, staff_history(*), drill(*), drum_corps(*), pbe(*), tlt(*),
     red_zone_drill_performance(*), red_zone_drum_performance(*), red_zone_honor_evaluations(*),
     red_zone_bible_events(*), red_zone_knots(*), red_zone_tents(*), red_zone_jump_rope(*),
     red_zone_archery(*), red_zone_lashing(*), red_zone_burning_twine(*)
-  `).eq('id', id).abortSignal(signal).single()
+  `).eq('id', id).abortSignal(signal).single(),
+    getSupabase().from('member_search').select('status').eq('id', id).abortSignal(signal),
+  ])
   if (error) throw error
+  if (registration.error) throw registration.error
   const roles = (['pathfinder', 'staff'] as const).map(role => {
     const activities = [
       { name: 'Drill', records: data.drill.map(r => ({ years: r.years as (string | null)[], detail: r.team ?? 'Team not recorded' })) },
@@ -110,7 +113,7 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
     })).sort((a, b) => a.year === null ? (b.year === null ? 0 : 1) : b.year === null ? -1 : b.year.localeCompare(a.year)) })).filter(group => group.records.length > 0)
     return { role, activities: role === 'pathfinder' ? activities : [], events: role === 'pathfinder' ? events : [] }
   })
-  return { member: member(data), roles, staffHistory: (data.staff_history?.history ?? []) as { year: string | null; titles: string[] }[] }
+  return { member: member(data), status: registration.data?.[0]?.status ?? 'not_active', roles, staffHistory: (data.staff_history?.history ?? []) as { year: string | null; titles: string[] }[] }
 }
 export async function saveProfileNotes(id: number, notes: string, signal: AbortSignal) {
   const { data, error } = await getSupabase().from('pathfinders').update({ notes }).eq('id', id).select('id').abortSignal(signal).single()

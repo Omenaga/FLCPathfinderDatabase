@@ -66,6 +66,6 @@ export default function Search({ recordsVersion = 0, selection }: { recordsVersi
           <button className="secondary" disabled={(page + 1) * PAGE_SIZE >= count || busy} onClick={() => { beginSearch(); setPage(page + 1) }}>Next</button></div>
       </>}
     </section>
-    {selected !== null && <ProfileOverlay key={selected} id={selected} status={members.find(member => member.id === selected)?.status ?? 'not_active'} onClose={() => setSelected(null)} />}
+    {selected !== null && <ProfileOverlay key={selected} id={selected} onClose={() => setSelected(null)} onUpdated={() => setAttempt(value => value + 1)} />}
   </>
 }

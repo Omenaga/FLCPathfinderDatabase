@@ -7,7 +7,7 @@ A web application for searching current and historical member records for the Fo
 - Current results: First, Last, Status, Title, and Current activities.
 - Status choices: Pathfinder, Staff, Parent, Not Active; no current data means Not Active.
 - Search names, periods/calendar years, Basic/Advanced/Incomplete levels, activity teams/instruments/operations, and Red Zone placements. Selections within a category use OR; selected categories combine with AND.
-- Profile with Birthday, separate Pathfinder/Staff histories, editable multiline Notes, and a separate earned Honors dialog.
+- Profile with Birthday, separate Pathfinder/Staff histories, read-only multiline Notes with editing through Edit Profile, and a separate earned Honors dialog.
 - Add New Profile creates a person and current registration. Add to Record adds history to multiple selected profiles, reporting added, existing, and failed entries.
 - Member tables sort by Status, current Class/Title priority, Last Name, then First Name before pagination.
 - All stored years use `YYYY-YY`. Detailed history is explicitly associated with Pathfinder or Staff roles.
@@ -36,7 +36,7 @@ Only put a publishable key in the frontend. `VITE_` values are bundled into the 
 
 ## Staff accounts
 
-Create staff accounts in Supabase **Authentication > Users**, then sign in through the app. No allowlist entry, SQL grant, or separate approval is needed. All authenticated accounts can read, insert, and update through the API; the interface supports searching, adding records, profiles, and saving Notes. Browser deletion remains disabled.
+Create staff accounts in Supabase **Authentication > Users**, then sign in through the app. No allowlist entry, SQL grant, or separate approval is needed. All authenticated accounts can read, insert, and update through the API; the interface supports searching, adding records, profiles, and editing existing profile data. Browser deletion remains disabled.
 
 Keep **Allow new users to sign up** disabled in hosted Supabase Auth settings, and anonymous sign-ins disabled. Accounts are provisioned by administrators. Local `supabase/config.toml` also disables signup. Configure hosted Auth before applying the access migration; changing the local file alone does not update hosted settings.
 
@@ -44,11 +44,11 @@ The September 11 migration changes `current_staff_role()` to return `editor` for
 
 ## Entering records
 
-Use **Add > Add New Profile** to create a person and current registration together. Enter names, Status, optional Birthday and Class/Title; Current Year comes from the configured club year. Click Add, then Confirm within five seconds. Record Added shows the saved profile summary. Failed saves preserve your inputs for retry.
+Use **Add New Profile** in the header to create a person and current registration together. Enter names, Status, optional Birthday and Class/Title; Current Year comes from the configured club year. Click Add, then Confirm within five seconds. Record Added shows the saved profile summary. Failed saves preserve your inputs for retry.
 
-Use **Add > Add to Record** to choose a year and one class/title, activity, event, or honor for existing profiles. PBE automatically includes all books configured for that year, with optional Area, State, Union, and Divisional results (one placement per region). Search and check recipients in the expanded modal; selected profiles appear below the results. Click Finish / Done, review the receipt, then Confirm (no timer). Only Staff titles exclude current Pathfinders. No historical-role choice is needed. New details are merged with existing history and the year is added to Years Active. The receipt separates Added, Already had this information, and Not added with reasons, hiding empty sections. Conflicts preserve existing records. Use Review failed profiles to correct or retry failures.
+Use **Add to Record** in the header to choose a year and one class/title, activity, event, or honor for existing profiles. PBE automatically includes all books configured for that year, with optional Area, State, Union, and Divisional results (one placement per region). Search and check recipients in the expanded modal; selected profiles appear below the results. Click Finish / Done, review the receipt, then Confirm (no timer). Only Staff titles exclude current Pathfinders. No historical-role choice is needed. New details are merged with existing history and the year is added to Years Active. The receipt separates Added, Already had this information, and Not added with reasons, hiding empty sections. Conflicts preserve existing records. Use Review failed profiles to correct or retry failures.
 
-Changing existing data other than Notes remains in Supabase Table Editor; Edit Profiles is a separate placeholder. IDs remain internal. Do not commit member records or credentials.
+Use **Edit Profile** beside Close in a member popup to change existing personal details, current registration, history entries, honors, and Notes. Click **Save changes**, then **Confirm** within five seconds. Editing a field resets confirmation. A successful atomic save returns to the refreshed member popup and refreshes search results. Cancel returns without saving; failures keep your draft. Stale profiles must be reopened before saving so another user?s changes are not overwritten. New history still uses Add to Record; deleting whole records is not supported. IDs remain internal. Do not commit member records or credentials.
 
 Current Data uses one `current_title` array field validated against status. New Pathfinder profiles select one of the eight levels. Staff titles come from `staff_titles`; `sort_order` follows the numbered catalog in the schema. Parent/Not Active titles are null.
 
@@ -92,7 +92,7 @@ npm run build
 
 `npm test` executes the migration in PGlite (PostgreSQL in memory) and checks validation, paired histories, search predicates, foreign keys, and role permissions using a minimal Supabase Auth contract. It does not connect to or modify the hosted project.
 
-`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies current result columns, range/outcome filters, role-specific profiles, earned Honors loading, retries, Notes saves/failures, and mobile scrolling. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
+`npm run test:ui` uses Playwright with installed Microsoft Edge, launches a local Vite server on port 4173, and mocks Supabase responses. It verifies current result columns, range/outcome filters, role-specific profiles, earned Honors loading, retries, profile editing, timed confirmation, save failures, and refreshed profiles, and mobile scrolling. It requires Edge and permission to launch browser processes. The database and browser suites are complementary; browser mocks do not test hosted Auth delivery.
 
 ## Project context
 

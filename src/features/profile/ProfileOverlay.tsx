@@ -2,16 +2,18 @@ import { useEffect, useState } from 'react'
 import Modal from '../../components/Modal'
 import HistoryRecords from './HistoryRecords'
 import ProfileNotes from './ProfileNotes'
+import EditProfile from './EditProfile'
 import HonorsOverlay from './HonorsOverlay'
 import { message } from '../../lib/errors'
 import { statusLabel } from '../../lib/format'
 import { getPathfinder, LEVELS, type PathfinderDetails } from '../../lib/pathfinders'
 
-export default function ProfileOverlay({ id, status, onClose }: { id: number; status: string; onClose: () => void }) {
+export default function ProfileOverlay({ id, onClose, onUpdated }: { id: number; onClose: () => void; onUpdated: () => void }) {
   const [details, setDetails] = useState<PathfinderDetails | null>(null)
   const [error, setError] = useState('')
   const [attempt, setAttempt] = useState(0)
   const [honorsOpen, setHonorsOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
   useEffect(() => {
     const controller = new AbortController()
     getPathfinder(id, controller.signal).then(data => {
@@ -22,7 +24,7 @@ export default function ProfileOverlay({ id, status, onClose }: { id: number; st
   const years = [...new Set(details?.member.years_active ?? [])].sort()
   const levels = [...(details?.member.levels ?? [])].sort((a, b) => (a.year ?? '9999').localeCompare(b.year ?? '9999') || LEVELS.indexOf(a.name as typeof LEVELS[number]) - LEVELS.indexOf(b.name as typeof LEVELS[number]))
   const birthday = details?.member.birth_date
-  return <Modal title="Member profile" onClose={onClose} headerActions={details && <button type="button" disabled title="Profile editing is coming soon">Edit Profile</button>} header={details && <div className="profile-heading"><h2>{[details.member.first_name, details.member.last_name].filter(Boolean).join(' ')}</h2><span className="profile-status">{statusLabel(status)}</span></div>}>
+  return <Modal title="Member profile" onClose={onClose} headerActions={details && <button type="button" onClick={() => setEditing(true)}>Edit Profile</button>} header={details && <div className="profile-heading"><h2>{[details.member.first_name, details.member.last_name].filter(Boolean).join(' ')}</h2><span className="profile-status">{statusLabel(details.status)}</span></div>}>
     {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { setError(''); setDetails(null); setAttempt(value => value + 1) }}>Try again</button></> : !details ? <p role="status">Loading profile...</p> : <>
       <section className="profile-summary"><h3>Birthday</h3><p>{birthday ? `${birthday.slice(5,7)}/${birthday.slice(8,10)}/${birthday.slice(0,4)}` : 'Not recorded'}</p></section>
       <section className="profile-summary"><h3>Years Active</h3><p>{years.join(', ') || 'No years recorded'}</p></section>
@@ -42,6 +44,9 @@ export default function ProfileOverlay({ id, status, onClose }: { id: number; st
       <section className="profile-honors"><h3>Honors</h3><button className="secondary" onClick={() => setHonorsOpen(true)}>View Honors</button></section>
       <ProfileNotes notes={details.member.notes ?? ''} />
     </>}
+    {editing && <EditProfile id={id} onClose={() => setEditing(false)} onSaved={() => {
+      setEditing(false); setDetails(null); setError(''); setAttempt(value => value + 1); onUpdated()
+    }} />}
     {honorsOpen && <HonorsOverlay id={id} onClose={() => setHonorsOpen(false)} />}
   </Modal>
 }

@@ -895,6 +895,9 @@ export type Database = {
       }
     }
     Functions: {
+      get_profile_for_edit: { Args: { p_id: number }; Returns: Json }
+      update_profile: { Args: { p_id: number; p_original: Json; p_profile: Json }; Returns: undefined }
+
       add_member_record: {
         Args: {
           p_birth_date: string

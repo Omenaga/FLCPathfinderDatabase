@@ -304,7 +304,7 @@ test('role histories retain year detail links and nested honors focus',async({pa
  await expect(page.getByRole('button',{name:'Open profile for Justin Wu'})).toBeFocused()
 })
 
-test('Notes are read-only with the future Edit Profile action',async({page})=>{
+test('Notes are read-only with the Edit Profile action',async({page})=>{
  await setup(page)
  await expect(page.getByRole('button',{name:'Add New Profile',exact:true})).toBeVisible()
  await expect(page.getByRole('button',{name:'Add to Record',exact:true})).toBeVisible()
@@ -315,7 +315,7 @@ test('Notes are read-only with the future Edit Profile action',async({page})=>{
  await expect(notes.locator('p')).toHaveText('First sentence.\n\nSecond paragraph.')
  await expect(notes.getByRole('textbox')).toHaveCount(0)
  await expect(page.getByRole('button',{name:'Save Notes'})).toHaveCount(0)
- await expect(page.getByRole('button',{name:'Edit Profile',exact:true})).toBeDisabled()
+ await expect(page.getByRole('button',{name:'Edit Profile',exact:true})).toBeEnabled()
 })
 
 test('shared years constrain every category with OR bubbles and AND categories',async({page})=>{
@@ -462,4 +462,95 @@ test('Unknown PBE year saves without books and undated history follows dated rec
  await profile.getByRole('button',{name:'View Honors'}).click()
  const honors=page.getByRole('dialog',{name:'Honors',exact:true})
  await expect(honors.locator('dt').last()).toHaveText('Unknown')
+})
+
+async function setupEditor(page: Page) {
+ await setup(page)
+ const profile = {
+  pathfinders: [{ id: 2, first_name: 'Justin', last_name: 'Wu', birth_date: member.birth_date, notes: member.notes, years_active: member.years_active, levels: member.levels }],
+  current_data: [{ pathfinder_id: 2, school_year: '2026-27', status: 'staff', current_title: ['Club Director'], current_activities: ['N/A'] }],
+  staff_history: [fixture.staff_history], drill: fixture.drill,
+  drum_corps: [{ id: 1, ...fixture.drum_corps }], pbe: [{ id: 1, ...fixture.pbe }], tlt: [{ id: 1, ...fixture.tlt }],
+  ...Object.fromEntries(Object.entries(fixture).filter(([key]) => key.startsWith('red_zone_'))),
+  honors_earned: [{ id: 1, honor_id: 8, year_earned: '2023-24' }],
+ }
+ await page.route('**/rest/v1/rpc/get_profile_for_edit',r=>r.fulfill({json:profile}))
+ await page.route('**/rest/v1/staff_titles?**',r=>r.fulfill({json:[{title:'Club Director'},{title:'Friend Counselor'},{title:'Drill Instructor'}]}))
+ await page.route('**/rest/v1/pbe_year_books?**',r=>r.fulfill({json:[{school_year:'2021-22',book_name:'1 Kings'},{school_year:'2021-22',book_name:'Ruth'}]}))
+ await page.route('**/rest/v1/honors_earned?**',r=>r.fulfill({json:[{id:1,year_earned:'2023-24',honors:{id:8,name:'Camping Skills I'}}]}))
+ await page.route('**/rest/v1/honors?**',r=>r.fulfill({json:[{id:8,name:'Camping Skills I'}]}))
+ await page.getByRole('button',{name:'Open profile for Justin Wu'}).click()
+ await page.getByRole('button',{name:'Edit Profile',exact:true}).click()
+ const editor=page.getByRole('dialog',{name:'Edit Profile',exact:true})
+ await expect(editor.getByLabel('First Name',{exact:true})).toHaveValue('Justin')
+ return {editor,profile}
+}
+
+test('Edit Profile confirms once, updates history and returns to the refreshed profile',async({page})=>{
+ const {editor,profile}=await setupEditor(page)
+ let payload: { p_original: unknown; p_profile: { pathfinders: { notes: string }[]; red_zone_burning_twine: { placement: string }[]; staff_history: unknown } } | undefined
+ let release:(()=>void)|undefined
+ await page.route('**/rest/v1/rpc/update_profile',async r=>{
+  payload=r.request().postDataJSON()
+  await new Promise<void>(resolve=>{release=resolve})
+  await r.fulfill({status:204})
+ })
+ await editor.getByLabel('First Name',{exact:true}).fill('Alex')
+ await editor.getByLabel('Notes',{exact:true}).fill('Updated paragraph.\n\nMore notes.')
+ await editor.getByRole('heading',{name:'Burning Twine',exact:true}).locator('..').getByLabel('Placement').selectOption('2nd Place')
+ await editor.getByRole('button',{name:'Save changes',exact:true}).click()
+ expect(payload).toBeUndefined()
+ await editor.getByRole('button',{name:/^Confirm \(/}).click()
+ await expect(editor.getByRole('button',{name:'Close',exact:true})).toBeDisabled()
+ await expect.poll(()=>!!release).toBe(true)
+ expect(payload!.p_original).toEqual(profile)
+ expect(payload!.p_profile.pathfinders[0].notes).toBe('Updated paragraph.\n\nMore notes.')
+ expect(payload!.p_profile.red_zone_burning_twine[0].placement).toBe('2nd Place')
+ expect(payload!.p_profile.staff_history).toEqual(profile.staff_history)
+ await page.route('**/rest/v1/pathfinders?**',r=>r.fulfill({json:{...fixture,first_name:'Alex',notes:'Updated paragraph.\n\nMore notes.',red_zone_burning_twine:[{year:'2023-24',placement:'2nd Place'}]}}))
+ await page.route('**/rest/v1/member_search?**',r=>r.fulfill({json:[{...member,first_name:'Alex',name:'Alex Wu'}],headers:{'content-range':'0-0/1'}}))
+ release!()
+ await expect(editor).toHaveCount(0)
+ const profileDialog=page.getByRole('dialog',{name:'Member profile',exact:true})
+ await expect(profileDialog.getByRole('heading',{name:'Alex Wu',exact:true})).toBeVisible()
+ await expect(profileDialog.getByRole('region',{name:'Notes'})).toContainText('Updated paragraph.')
+ await expect(profileDialog).toContainText('2nd Place')
+ await profileDialog.getByRole('button',{name:'Close',exact:true}).click()
+ await expect(page.getByRole('button',{name:'Open profile for Alex Wu'})).toBeVisible()
+})
+
+test('Edit Profile expires confirmation, resets it on changes, and keeps failed edits',async({page})=>{
+ const {editor}=await setupEditor(page)
+ let writes=0
+ await page.route('**/rest/v1/rpc/update_profile',r=>{writes++;return r.fulfill({status:409,json:{message:'This profile changed since you opened the editor.'}})})
+ await editor.getByLabel('Notes',{exact:true}).fill('Keep my draft')
+ await editor.getByRole('button',{name:'Save changes',exact:true}).click()
+ await expect(editor.getByRole('button',{name:'Save changes',exact:true})).toBeVisible({timeout:7000})
+ expect(writes).toBe(0)
+ await editor.getByRole('button',{name:'Save changes',exact:true}).click()
+ await editor.getByLabel('Last Name',{exact:true}).fill('Changed')
+ await expect(editor.getByRole('button',{name:'Save changes',exact:true})).toBeVisible()
+ await editor.getByRole('button',{name:'Save changes',exact:true}).click()
+ await editor.getByRole('button',{name:/^Confirm \(/}).click()
+ await expect(editor.getByRole('alert')).toContainText('This profile changed')
+ await expect(editor.getByLabel('Notes',{exact:true})).toHaveValue('Keep my draft')
+ expect(writes).toBe(1)
+ await editor.getByRole('button',{name:'Cancel',exact:true}).click()
+ await expect(page.getByRole('dialog',{name:'Member profile',exact:true})).toContainText('Existing notes')
+})
+
+test('Edit Profile fits mobile and loads safely after a retry',async({page})=>{
+ await page.setViewportSize({width:390,height:844})
+ const {editor}=await setupEditor(page)
+ await expect(editor.getByLabel('Notes',{exact:true})).toHaveValue('Existing notes')
+ expect(await editor.evaluate(node=>node.scrollWidth<=node.clientWidth)).toBe(true)
+ await page.screenshot({path:'test-results/edit-profile-mobile.png',fullPage:true})
+ await editor.getByRole('button',{name:'Cancel',exact:true}).click()
+ let calls=0
+ await page.route('**/rest/v1/rpc/get_profile_for_edit',r=>{calls++;return r.fulfill({status:503,json:{message:'Profile unavailable'}})})
+ await page.getByRole('button',{name:'Edit Profile',exact:true}).click()
+ await expect(editor.getByRole('alert')).toContainText('Profile unavailable')
+ await expect(editor.getByRole('button',{name:'Save changes',exact:true})).toHaveCount(0)
+ await editor.getByRole('button',{name:'Retry editor'}).click()
+ await expect.poll(()=>calls).toBe(2)
 })

@@ -16,7 +16,7 @@ One permanent row per person, including Pathfinder, Staff, Parent, and inactive 
 | `years_active` | jsonb | Unique participation ranges, e.g. `["2023-24"]`; Add Record initializes this with Current Year for every status |
 | `levels` | jsonb | Level/outcome/year entries described below |
 | `birth_date` | date, nullable | Birthday; display MM/DD/YYYY without timezone conversion |
-| `notes` | text, nullable | Multiline plain text; editable through Save Notes in the profile |
+| `notes` | text, nullable | Multiline plain text; displayed as plain text in the profile; editable through Edit Profile |
 | `creation_request_id` | uuid, nullable, unique | Internal Add Record request identifier; prevents duplicate creation when the same form is retried |
 | `created_at`, `updated_at` | timestamptz | Creation and automatically updated modification time |
 
@@ -420,3 +420,12 @@ Under Extracurricular ? PBE, a region dropdown offers Area, State, Union, and Di
 PBE with an unknown year stores no automatically inferred Bible books (`books: []`), but can store region placements. Existing catalog rules remain in force for known books and years. The form explains that books cannot be determined without a year.
 
 Each profile section (levels, staff titles, activities, event results, and honors) places undated entries last, labels them **Unknown**, and inserts a margin before them when dated entries exist. General searches without a year still find unknown-year participation; searches for a specific year do not match undated entries. Existing once-per-member level and TLT rules also apply to unknown-year entries.
+
+
+## Editing existing profiles
+
+`20260916010000_edit_profile.sql` adds authenticated, security-invoker RPCs `get_profile_for_edit(p_id)` and `update_profile(p_id, p_original, p_profile)`. The editor uses ordinary labeled fields for personal details and Notes, current registration, levels, Staff history, Drill, Drums, PBE books/results, TLT, Red Zone results, and earned honors. Only sections with existing rows are offered; use Add to Record for new history. Existing row identities, ownership, and audit fields cannot be changed, and rows cannot be added or deleted through this RPC.
+
+Save changes arms a five-second Confirm button. Expiry or any field change resets confirmation; only Confirm submits. While saving, repeat submissions and closing are blocked. Success closes the editor and reloads the original profile popup and search results. Errors retain the draft. Cancel discards the draft.
+
+The save locks the profile and existing related rows, compares the original snapshot with the current database snapshot, and updates only changed rows through a fixed table/column allowlist. Existing constraints and RLS remain in force. All updates are in one transaction: an invalid field rolls back every change. A stale snapshot is rejected with instructions to reopen the editor. No existing records are rewritten by the migration, and anonymous callers cannot execute either RPC.
