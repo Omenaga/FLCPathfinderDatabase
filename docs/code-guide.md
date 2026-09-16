@@ -2,6 +2,8 @@
 
 Start with this guide, then open the files in the order below. The README explains how to run the application; this guide explains how its code fits together.
 
+For the file-by-file and function-by-function walkthrough, read [How the FLC Pathfinder application works](code-reference.md). It includes workflow explanations, a complete migration map, configuration responsibilities, and guidance on where to make changes. The reusable [explain-codebase skill](../skills/explain-codebase/SKILL.md) describes how to maintain this documentation.
+
 ## A few terms
 
 - **Component:** a function that describes a piece of the screen. React updates the screen when its state changes.

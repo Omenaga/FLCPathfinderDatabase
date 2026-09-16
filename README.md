@@ -1,5 +1,7 @@
 # FLC Pathfinder Database
 
+New to the code? Read the [short code guide](docs/code-guide.md) and the [detailed implementation walkthrough](docs/code-reference.md). The reusable [explain-codebase skill](skills/explain-codebase/SKILL.md) documents the process for updating these explanations.
+
 A web application for searching current and historical member records for the Forest Lake Seventh-day Adventist Church Pathfinder ministry in Apopka, Florida.
 
 ## Current features
