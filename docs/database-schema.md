@@ -1,6 +1,6 @@
 # FLC Pathfinder Database Schema
 
-Implemented September 14, 2026. React/Vite uses Supabase PostgreSQL and Auth. All authenticated accounts remain trusted application users; person Status is participation information, not an authorization role. Anonymous access and deletion of permanent member profiles are denied by RLS/permissions. Authenticated users can remove registration and history entries.
+Implemented September 14, 2026. React/Vite uses Supabase PostgreSQL and Auth. All authenticated accounts remain trusted application users; person Status is participation information, not an authorization role. Anonymous access and deletion of permanent member profiles are denied by RLS/permissions. Authenticated users can remove history entries through the reviewed profile save; Current Registration is required.
 
 ## Person and current data
 
@@ -441,3 +441,8 @@ PBE books are read-only in the editor and derive from the chosen year. On saving
 `20260916030000_edit_profile_removals.sql` allows the atomic editor save to remove registration and history rows omitted from the reviewed snapshot. Direct table DELETE remains denied. Only `update_profile` uses narrowly scoped security-definer privileges for the reviewed save, explicitly requiring an authenticated editor identity before accessing data. Permanent `pathfinders` rows and catalogs remain protected. The RPC still validates ownership, row identities, the full original snapshot, and all updated/added data. Deletes occur before updates within a table, and all changes roll back together if any operation fails.
 
 Each existing history instance has an X in its top-right corner. Removing the last Staff/Drums/PBE/TLT history entry removes the enclosing stored detail row. Level sections remain visible for all eight classes; they have no Add buttons, and removing an outcome resets that class to N/A. Removals stay in the draft until the user confirms the receipt. Returning from the receipt preserves the draft, and cancelling the editor discards all proposed changes. A successful save returns to the refreshed profile popup.
+
+
+`20260916040000_preserve_current_registration.sql` requires exactly one Current Registration row in a profile save and prevents removing/replacing its stored identity. The editor has no X for Current Registration. If registration was already absent, the editor supplies an editable Not Active registration for `current_club_year()` and includes it in the save receipt. No existing database records are rewritten by the migration.
+
+PBE receipt descriptions omit Bible Books and show the year and regional results. Automatic book selection and storage remain unchanged. Red Zone Events in the read-only profile use the same year/detail lists as the other history sections, retaining event names, named evaluations, placements, newest-first ordering, and Unknown entries last.

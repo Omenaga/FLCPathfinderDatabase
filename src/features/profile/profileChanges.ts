@@ -26,8 +26,8 @@ export function profileChanges(original: Profile, proposed: Profile, honors: { i
     if (key === 'status' || key === 'outcome') return statusLabel(String(value))
     return String(value)
   }
-  function describe(row: Row) {
-    return Object.entries(row).filter(([key]) => key in labels).map(([key, value]) => `${labels[key]}: ${display(value, key)}`).join('; ')
+  function describe(row: Row, omitBooks = false) {
+    return Object.entries(row).filter(([key]) => key in labels && !(omitBooks && key === 'books')).map(([key, value]) => `${labels[key]}: ${display(value, key)}`).join('; ')
   }
   function flatten(profile: Profile): Item[] {
     const items: Item[] = []
@@ -41,7 +41,7 @@ export function profileChanges(original: Profile, proposed: Profile, honors: { i
     }
     for (const [table, label] of Object.entries(tables)) for (const [index, row] of profile[table].entries()) {
       if (Array.isArray(row.history)) for (const entry of row.history as Row[]) {
-        items.push({ key: `${table}:${entry.year}`, label, text: describe(entry) })
+        items.push({ key: `${table}:${entry.year}`, label, text: describe(entry, table === 'pbe') })
       } else items.push({ key: `${table}:${row.id ?? `new-${index}`}`, label, text: describe(row) })
     }
     return items

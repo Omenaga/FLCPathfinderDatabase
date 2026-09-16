@@ -36,10 +36,11 @@ export default function ProfileOverlay({ id, onClose, onUpdated }: { id: number;
           <h4>{activity.name === 'Drums' ? 'Drum' : activity.name}</h4>
           <HistoryRecords records={activity.records.flatMap(record => record.years.map(year => ({ year, detail: record.detail || 'Details not recorded' })))} />
         </section>)}
-        {group.events.length > 0 && <section><h4>Red Zone Events</h4><div className="profile-events">
-          {group.events.map(event => <article key={event.name}><h5>{event.name}</h5><ul>{event.records.map((record, index) =>
-            <li key={`${record.year}-${index}`} className={record.year === null ? 'unknown-history' : undefined}><strong>{record.year ?? 'Unknown'}</strong>{record.name && <span>{record.name}</span>}<span>{record.placement}</span></li>)}</ul></article>)}
-        </div></section>}
+        {group.events.length > 0 && <section className="profile-activity"><h4>Red Zone Events</h4>
+          {group.events.map(event => <section className="profile-event" key={event.name} aria-label={event.name}><h5>{event.name}</h5>
+            <HistoryRecords newestFirst records={event.records.map(record => ({ year: record.year, detail: [record.name, record.placement].filter(Boolean).join(' - ') }))} />
+          </section>)}
+        </section>}
       </section>)}
       <section className="profile-honors"><h3>Honors</h3><button className="secondary" onClick={() => setHonorsOpen(true)}>View Honors</button></section>
       <ProfileNotes notes={details.member.notes ?? ''} />

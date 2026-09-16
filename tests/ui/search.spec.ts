@@ -457,8 +457,8 @@ test('Unknown PBE year saves without books and undated history follows dated rec
   await expect(section.locator('dt').last()).toHaveText('Unknown')
   expect(await section.locator('.unknown-history').first().evaluate(node=>parseFloat(getComputedStyle(node).marginTop))).toBeGreaterThan(0)
  }
- const archery=profile.locator('article').filter({has:page.getByRole('heading',{name:'Archery',exact:true})})
- await expect(archery.locator('li').last()).toContainText('Unknown')
+ const archery=profile.getByRole('region',{name:'Archery',exact:true})
+ await expect(archery.locator('dt').last()).toContainText('Unknown')
  await profile.getByRole('button',{name:'View Honors'}).click()
  const honors=page.getByRole('dialog',{name:'Honors',exact:true})
  await expect(honors.locator('dt').last()).toHaveText('Unknown')
@@ -567,6 +567,7 @@ test('Edit Profile shows all classes, year dropdowns, automatic PBE books and ne
  await expect(header.getByRole('button',{name:'Save Changes',exact:true})).toBeVisible()
  await expect(header.getByRole('button',{name:'Cancel',exact:true})).toBeVisible()
  await expect(editor.getByRole('button',{name:'Save Changes',exact:true})).toBeDisabled()
+ await expect(editor.getByRole('region',{name:'Current Registration',exact:true}).getByRole('button',{name:/^Remove Current Registration Entry/})).toHaveCount(0)
  const levels=editor.getByRole('region',{name:'Levels',exact:true})
  for(const name of ['Friend','Companion','Explorer','Ranger','Voyager','Guide','Pioneer','Navigator']) {
   await expect(levels.getByRole('region',{name,exact:true})).toBeVisible()
@@ -601,6 +602,8 @@ test('Edit Profile shows all classes, year dropdowns, automatic PBE books and ne
  let payload:any
  await page.route('**/rest/v1/rpc/update_profile',r=>{payload=r.request().postDataJSON();return r.fulfill({status:204})})
  await header.getByRole('button',{name:'Save Changes',exact:true}).click()
+ await expect(page.getByRole('dialog',{name:'Confirm Profile Changes'})).not.toContainText('Bible Books')
+ await expect(page.getByRole('dialog',{name:'Confirm Profile Changes'})).not.toContainText('1 Kings')
  await page.getByRole('dialog',{name:'Confirm Profile Changes'}).getByRole('button',{name:'Confirm',exact:true}).click()
  await expect(editor).toHaveCount(0)
  expect(payload.p_profile.pathfinders[0].levels).toContainEqual({name:'Explorer',outcome:'advanced',year:'2024-25'})
@@ -613,6 +616,7 @@ test('Edit Profile shows all classes, year dropdowns, automatic PBE books and ne
 
 test('removing instances stays in the draft and appears in the confirmation receipt',async({page})=>{
  const {editor}=await setupEditor(page)
+ await expect(editor.getByRole('region',{name:'Current Registration',exact:true}).getByRole('button',{name:/^Remove Current Registration Entry/})).toHaveCount(0)
  const levels=editor.getByRole('region',{name:'Levels',exact:true})
  await expect(levels.getByRole('button',{name:/^Add /})).toHaveCount(0)
  await levels.getByRole('button',{name:'Remove Friend Entry',exact:true}).click()
@@ -649,4 +653,26 @@ test('removing instances stays in the draft and appears in the confirmation rece
  expect(payload.p_profile.red_zone_burning_twine).toEqual([])
  expect(payload.p_profile.honors_earned).toEqual([])
  expect(payload.p_profile.pathfinders[0].levels.some((row:any)=>row.name==='Friend')).toBe(false)
+})
+
+
+test('missing current registration is shown automatically and saved with the profile',async({page})=>{
+ const {editor,profile}=await setupEditor(page)
+ await editor.getByRole('button',{name:'Cancel',exact:true}).click()
+ await page.route('**/rest/v1/rpc/get_profile_for_edit',r=>r.fulfill({json:{...profile,current_data:[]}}))
+ await page.route('**/rest/v1/rpc/current_club_year',r=>r.fulfill({json:'2026-27'}))
+ await page.getByRole('button',{name:'Edit Profile',exact:true}).click()
+ const registration=editor.getByRole('region',{name:'Current Registration',exact:true})
+ await expect(registration.getByLabel('School Year')).toHaveValue('2026-27')
+ await expect(registration.getByLabel('Status')).toHaveValue('not_active')
+ await expect(registration.getByRole('button',{name:/^Remove Current Registration/})).toHaveCount(0)
+ let payload:any
+ await page.route('**/rest/v1/rpc/update_profile',r=>{payload=r.request().postDataJSON();return r.fulfill({status:204})})
+ await editor.getByRole('button',{name:'Save Changes',exact:true}).click()
+ const review=page.getByRole('dialog',{name:'Confirm Profile Changes'})
+ await expect(review.getByRole('region',{name:'Added'})).toContainText('Current Registration')
+ await review.getByRole('button',{name:'Confirm',exact:true}).click()
+ await expect(review).toHaveCount(0)
+ expect(payload.p_original.current_data).toEqual([])
+ expect(payload.p_profile.current_data).toEqual([{school_year:'2026-27',status:'not_active',current_title:null,current_activities:[]}])
 })

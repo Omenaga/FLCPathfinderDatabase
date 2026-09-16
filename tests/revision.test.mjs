@@ -330,16 +330,21 @@ test('member revision preserves history and enforces roles, ranges and access',a
  assert.deepEqual(freshSaved.pbe[0].history[0].books,[])
  assert.equal(freshSaved.tlt.length,1)
  const deletionOriginal=await snapshot(staffId)
+ const missingRegistration=structuredClone(deletionOriginal)
+ missingRegistration.current_data=[]
+ await assert.rejects(edit(staffId,deletionOriginal,missingRegistration),/Current Registration/)
+ assert.deepEqual(await snapshot(staffId),deletionOriginal)
  const deletion=structuredClone(deletionOriginal)
- for(const table of Object.keys(deletion)) if(table!=='pathfinders') deletion[table]=[]
+ for(const table of Object.keys(deletion)) if(!['pathfinders','current_data'].includes(table)) deletion[table]=[]
  const failedDeletion=structuredClone(deletion)
  failedDeletion.pathfinders[0].first_name=''
  await assert.rejects(edit(staffId,deletionOriginal,failedDeletion))
  assert.deepEqual(await snapshot(staffId),deletionOriginal)
  await edit(staffId,deletionOriginal,deletion)
  const deleted=await snapshot(staffId)
- for(const table of Object.keys(deleted)) if(table!=='pathfinders') assert.deepEqual(deleted[table],[],table)
+ for(const table of Object.keys(deleted)) if(!['pathfinders','current_data'].includes(table)) assert.deepEqual(deleted[table],[],table)
  assert.equal(deleted.pathfinders[0].id,staffId)
+ assert.deepEqual(deleted.current_data,deletionOriginal.current_data)
  assert.equal((await snapshot(freshId)).drum_corps.length,1)
  await assert.rejects(db.query('delete from drum_corps where pathfinder_id=$1',[freshId]),e=>e.code==='42501')
  await assert.rejects(edit(staffId,deletionOriginal,deletion),e=>e.code==='40001')

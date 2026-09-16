@@ -41,7 +41,14 @@ export default function EditProfile({ id, onClose, onSaved }: { id: number; onCl
         for (const result of [profile, staff, books, honors]) if (result.error) throw result.error
         if (!controller.signal.aborted) {
           const value = profile.data as Profile
-          setOriginal(value); setDraft(structuredClone(value))
+          const initial = structuredClone(value)
+          if (!initial.current_data.length) {
+            const season = await client.rpc('current_club_year').abortSignal(controller.signal)
+            if (season.error) throw season.error
+            initial.current_data = [{ school_year: season.data, status: 'not_active', current_title: null, current_activities: [] }]
+          }
+          if (controller.signal.aborted) return
+          setOriginal(value); setDraft(initial)
           setCatalog({ staff: staff.data!.map(row => row.title), books: books.data!, honors: honors.data!.map(row => row.honors) })
         }
       } catch (error) { if (!controller.signal.aborted) setLoadError(message(error)) }
@@ -110,7 +117,7 @@ export default function EditProfile({ id, onClose, onSaved }: { id: number; onCl
     return <section className="edit-section" key={table} aria-label={label}><div className="section-heading"><h3>{label}</h3>
       {create && <button type="button" className="secondary" onClick={() => addRow(table, create())}>Add {label}</button>}
     </div>{draft?.[table]?.map((row, index) => <fieldset className="edit-entry" key={String(row.id ?? row.pathfinder_id ?? `new-${index}`)}>
-      {table !== 'pathfinders' && removeButton(`${label} Entry ${index + 1}`, () => removeRow(table, index))}
+      {!['pathfinders', 'current_data'].includes(table) && removeButton(`${label} Entry ${index + 1}`, () => removeRow(table, index))}
       <div className="record-fields">{render(row, patch => change(table, index, patch))}</div>
     </fieldset>)}</section>
   }
@@ -209,7 +216,7 @@ export default function EditProfile({ id, onClose, onSaved }: { id: number; onCl
             {choice('Status', row.status, STATUSES.map(status => status.toLowerCase().replaceAll(' ', '_')), value => update({ status: value, current_title: null, current_activities: value === 'staff' ? ['N/A'] : [] }))}
             {(row.status === 'staff' || row.status === 'pathfinder') && multiple('Class/Titles', row.current_title, row.status === 'staff' ? catalog.staff : LEVELS, value => update({ current_title: value }))}
             {row.status !== 'staff' && multiple('Current Activities', row.current_activities, ACTIVITIES, value => update({ current_activities: value }))}
-          </>, draft.current_data.length ? undefined : () => ({ school_year: PERIODS.at(-1)!, status: 'not_active', current_title: null, current_activities: [] }))}
+          </>)}
           {levels()}
           {history('staff_history', 'Staff History', 'titles', 'Titles', catalog.staff)}
           {rows('drill', 'Drill', (row, update) => <>
