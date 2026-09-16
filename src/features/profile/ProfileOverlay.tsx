@@ -22,7 +22,7 @@ export default function ProfileOverlay({ id, status, onClose }: { id: number; st
   const years = [...new Set(details?.member.years_active ?? [])].sort()
   const levels = [...(details?.member.levels ?? [])].sort((a, b) => (a.year ?? '9999').localeCompare(b.year ?? '9999') || LEVELS.indexOf(a.name as typeof LEVELS[number]) - LEVELS.indexOf(b.name as typeof LEVELS[number]))
   const birthday = details?.member.birth_date
-  return <Modal title="Member profile" onClose={onClose} header={details && <div className="profile-heading"><h2>{[details.member.first_name, details.member.last_name].filter(Boolean).join(' ')}</h2><span className="profile-status">{statusLabel(status)}</span></div>}>
+  return <Modal title="Member profile" onClose={onClose} headerActions={details && <button type="button" disabled title="Profile editing is coming soon">Edit Profile</button>} header={details && <div className="profile-heading"><h2>{[details.member.first_name, details.member.last_name].filter(Boolean).join(' ')}</h2><span className="profile-status">{statusLabel(status)}</span></div>}>
     {error ? <><p role="alert" className="error">{error}</p><button onClick={() => { setError(''); setDetails(null); setAttempt(value => value + 1) }}>Try again</button></> : !details ? <p role="status">Loading profile...</p> : <>
       <section className="profile-summary"><h3>Birthday</h3><p>{birthday ? `${birthday.slice(5,7)}/${birthday.slice(8,10)}/${birthday.slice(0,4)}` : 'Not recorded'}</p></section>
       <section className="profile-summary"><h3>Years Active</h3><p>{years.join(', ') || 'No years recorded'}</p></section>

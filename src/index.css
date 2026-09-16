@@ -79,7 +79,9 @@ li { padding: .25rem 0; line-height: 1.5; }
 .profile-overlay { width: min(800px, calc(100% - 2rem)); max-height: 85vh; overflow: auto; border: 1px solid #d8e1ee; border-radius: .8rem; padding: 1.5rem; color: #172d52; }
 .profile-overlay::backdrop { background: rgb(15 30 55 / 60%); }
 .modal-header { position: sticky; top: -1.5rem; z-index: 1; display: flex; align-items: center; gap: 1rem; margin: -1.5rem -1.5rem 1rem; padding: 1rem 1.5rem; background: #fff; border-bottom: 1px solid #d8e1ee; }
-.profile-overlay .modal-close { display: block; margin-left: auto; flex-shrink: 0; }
+.modal-header-actions { display: flex; align-items: center; gap: .6rem; margin-left: auto; flex-shrink: 0; }
+.profile-overlay .modal-close { display: block; flex-shrink: 0; }
+@media (max-width: 550px) { .modal-header { flex-wrap: wrap; } }
 .honors-wip { text-align: center; padding: 3rem 0; font-size: 1.5rem; }
 
 .multi-select { position: relative; min-width: 0; }
@@ -138,8 +140,8 @@ li { padding: .25rem 0; line-height: 1.5; }
 .profile-role h4 { margin-top: 1rem; }
 .profile-events h5 { font-size: .9rem; margin: 0 0 .6rem; }
 .profile-notes { border-top: 1px solid #d8e1ee; margin-top: 1.5rem; padding-top: 1rem; }
-.profile-notes textarea { font: inherit; width: 100%; padding: .65rem; border: 1px solid #adbbd0; border-radius: .4rem; resize: vertical; }
-.profile-notes button { margin-top: .7rem; }
+.profile-notes h3 { margin-top: 0; }
+.profile-notes p { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .option-list .group-select { width: 100%; text-align: left; border: 0; border-radius: .25rem; background: transparent; color: #172d52; padding: .2rem 0; }
 .option-list .group-select:hover, .option-list .group-select[aria-selected="true"] { background: #dfe9fa; }
