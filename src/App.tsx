@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import flcLogo from './assets/FL_Logo.png'
 import { getSupabase } from './lib/supabase'
@@ -15,15 +15,14 @@ function App() {
   return <ConnectedApp />
 }
 
-function Header() {
+function Header({ children }: { children?: ReactNode }) {
   return <header className="brand"><img src={flcLogo} alt="Forest Lake Pathfinders" />
-    <div><p className="eyebrow">Forest Lake Pathfinders</p><h1>Member records</h1>
-    <p>Explore the years, achievements, and activities of our club.</p></div></header>
+    <div className="brand-copy"><p className="eyebrow">Forest Lake Pathfinders</p><h1>Member records</h1>
+    <p>Explore the years, achievements, and activities of our club.</p></div>{children}</header>
 }
 
 function ConnectedApp() {
   const [recordsVersion, setRecordsVersion] = useState(0)
-  const [page, setPage] = useState<'search' | 'records' | 'edit'>('search')
   const [session, setSession] = useState<Session | null>()
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
@@ -57,18 +56,15 @@ function ConnectedApp() {
       setSession(null)
     } catch (error) { setError(message(error)) } finally { setPending(false) }
   }
-  return <main className="shell"><Header />
+  return <main className="shell"><Header>
+    {session && <div className="header-actions">
+      <div className="session"><span>{session.user.email}</span><button className="secondary" disabled={pending} onClick={signOut}>Sign out</button></div>
+      <AddRecords key={`add-${session.user.id}`} onAdded={() => setRecordsVersion(value => value + 1)} />
+    </div>}
+  </Header>
     {error && <p role="alert" className="error">{error}</p>}
     {session === undefined ? <p role="status">Checking your session…</p> : session ? <>
-      <div className="session"><span>{session.user.email}</span><button className="secondary" disabled={pending} onClick={signOut}>Sign out</button></div>
-      <nav className="page-tabs" aria-label="Member pages">
-        <button className={page === 'search' ? '' : 'secondary'} aria-current={page === 'search' ? 'page' : undefined} onClick={() => setPage('search')}>Search</button>
-        <button className={page === 'records' ? '' : 'secondary'} aria-current={page === 'records' ? 'page' : undefined} onClick={() => setPage('records')}>Add</button>
-        <button className={page === 'edit' ? '' : 'secondary'} aria-current={page === 'edit' ? 'page' : undefined} onClick={() => setPage('edit')}>Edit Profiles</button>
-      </nav>
-      <div hidden={page !== 'search'}><Search key={session.user.id} recordsVersion={recordsVersion} /></div>
-      {page === 'records' && <AddRecords key={session.user.id} onAdded={() => setRecordsVersion(value => value + 1)} />}
-      {page === 'edit' && <section className="panel"><h2>Edit Profiles</h2><p>Changes to existing profile data are coming later. Use Add to Record to add history, or open a profile in Search to update its notes.</p></section>}
+      <Search key={session.user.id} recordsVersion={recordsVersion} />
     </> : <section className="panel login"><h2>Staff sign in</h2><p>Use your staff account to search member records.</p>
       <form onSubmit={signIn}><label>Email<input name="email" type="email" autoComplete="username" required /></label>
       <label>Password<input name="password" type="password" autoComplete="current-password" required /></label>

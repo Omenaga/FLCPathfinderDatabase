@@ -37,7 +37,6 @@ test('Add to Record preserves recipients across searches, confirms once and repo
  let payload:Record<string,unknown>|undefined
  let release:(()=>void)|undefined
  await page.route('**/rest/v1/rpc/add_to_records',async r=>{payload=r.request().postDataJSON();await new Promise<void>(resolve=>{release=resolve});await r.fulfill({json:[{id:2,name:'Justin Wu',status:'added',year_added:true},{id:3,name:'Alex Example',status:'already',year_added:true}]})})
- await page.getByRole('button',{name:'Add',exact:true}).click()
  await page.getByRole('button',{name:'Add to Record',exact:true}).click()
  const dialog=page.getByRole('dialog',{name:'Add to Record',exact:true})
  await dialog.getByRole('combobox',{name:'Year to document',exact:true}).click()
@@ -89,7 +88,6 @@ test('PBE includes every book for the year and only Staff titles restrict recipi
  await page.route('**/rest/v1/pbe_year_books?**',r=>r.fulfill({json:[{school_year:'2024-25',book_name:'Romans'},{school_year:'2024-25',book_name:'1 Corinthians'},{school_year:'2024-25',book_name:'2 Corinthians'},{school_year:'2026-27',book_name:'Mark'}]}))
  let payload:Record<string,unknown>|undefined
  await page.route('**/rest/v1/rpc/add_to_records',r=>{payload=r.request().postDataJSON();return r.fulfill({json:[{id:2,name:'Justin Wu',status:'added',year_added:true}]})})
- await page.getByRole('button',{name:'Add',exact:true}).click()
  await page.getByRole('button',{name:'Add to Record',exact:true}).click()
  const dialog=page.getByRole('dialog',{name:'Add to Record',exact:true})
  await dialog.getByLabel('Information category').selectOption('staff')
@@ -145,7 +143,6 @@ test('Honor lookup on mobile and batch errors retain the proposed addition',asyn
  await page.route('**/rest/v1/honors?**',r=>r.fulfill({json:[{id:8,name:'Camping Skills I'}]}))
  let calls=0
  await page.route('**/rest/v1/rpc/add_to_records',r=>{calls++;return calls===1?r.fulfill({status:503,json:{message:'Connection unavailable'}}):r.fulfill({json:[{id:2,name:'Justin Wu',status:'error',reason:'Profile is no longer available.',year_added:false}]})})
- await page.getByRole('button',{name:'Add',exact:true}).click()
  await page.getByRole('button',{name:'Add to Record',exact:true}).click()
  const dialog=page.getByRole('dialog',{name:'Add to Record',exact:true})
  await expect(dialog.getByRole('button',{name:'Select profiles'})).toBeEnabled()
@@ -185,7 +182,6 @@ test('Add Record saves once, keeps failures editable, and refreshes Search',asyn
   await new Promise<void>(resolve=>{release=resolve})
   await route.fulfill({json:42})
  })
- await page.getByRole('button',{name:'Add',exact:true}).click()
  await page.getByRole('button',{name:'Add New Profile',exact:true}).click()
  const form=page.getByRole('dialog',{name:'Add New Profile',exact:true})
  await expect(form.getByLabel('Current Year')).toHaveValue('2026-2027')
@@ -238,7 +234,6 @@ test('Add confirmation expires and status changes clear incompatible titles',asy
  await page.route('**/rest/v1/staff_titles?**',route=>route.fulfill({json:[]}))
  let writes=0
  await page.route('**/rest/v1/rpc/add_member_record',route=>{writes++;return route.fulfill({json:43})})
- await page.getByRole('button',{name:'Add',exact:true}).click()
  await page.getByRole('button',{name:'Add New Profile',exact:true}).click()
  const form=page.getByRole('dialog',{name:'Add New Profile',exact:true})
  await form.getByLabel('First Name',{exact:true}).fill('Example')
@@ -309,21 +304,18 @@ test('role histories retain year detail links and nested honors focus',async({pa
  await expect(page.getByRole('button',{name:'Open profile for Justin Wu'})).toBeFocused()
 })
 
-test('Notes preserve paragraphs and report saves and failures',async({page})=>{
+test('Notes are read-only with the future Edit Profile action',async({page})=>{
  await setup(page)
+ await expect(page.getByRole('button',{name:'Add New Profile',exact:true})).toBeVisible()
+ await expect(page.getByRole('button',{name:'Add to Record',exact:true})).toBeVisible()
+ await expect(page.getByRole('navigation',{name:'Member pages'})).toHaveCount(0)
+ await page.route('**/rest/v1/pathfinders?**',route=>route.fulfill({json:{...fixture,notes:'First sentence.\n\nSecond paragraph.'}}))
  await page.getByRole('button',{name:'Open profile for Justin Wu'}).click()
  const notes=page.getByLabel('Notes',{exact:true})
- await expect(notes).toHaveValue('Existing notes')
- await notes.fill('First sentence.\n\nSecond paragraph.')
- const request=page.waitForRequest(r=>r.method()==='PATCH')
- await page.getByRole('button',{name:'Save Notes'}).click()
- expect((await request).postDataJSON()).toEqual({notes:'First sentence.\n\nSecond paragraph.'})
- await expect(page.getByText('Notes saved',{exact:true})).toBeVisible()
- await page.route('**/rest/v1/pathfinders?**',route=>route.fulfill({status:500,json:{message:'Save unavailable'}}))
- await notes.fill('Keep this unsaved text')
- await page.getByRole('button',{name:'Save Notes'}).click()
- await expect(page.getByRole('alert')).toContainText('Save unavailable')
- await expect(notes).toHaveValue('Keep this unsaved text')
+ await expect(notes).toHaveValue('First sentence.\n\nSecond paragraph.')
+ await expect(notes).not.toBeEditable()
+ await expect(page.getByRole('button',{name:'Save Notes'})).toHaveCount(0)
+ await expect(page.getByRole('button',{name:'Edit Profile',exact:true})).toBeDisabled()
 })
 
 test('shared years constrain every category with OR bubbles and AND categories',async({page})=>{
@@ -437,7 +429,6 @@ test('Unknown PBE year saves without books and undated history follows dated rec
  await page.route('**/rest/v1/pbe_year_books?**',r=>r.fulfill({json:[]}))
  let payload:Record<string,unknown>|undefined
  await page.route('**/rest/v1/rpc/add_to_records',r=>{payload=r.request().postDataJSON();return r.fulfill({json:[{id:2,name:'Justin Wu',status:'added',year_added:false}]})})
- await page.getByRole('button',{name:'Add',exact:true}).click()
  await page.getByRole('button',{name:'Add to Record',exact:true}).click()
  const dialog=page.getByRole('dialog',{name:'Add to Record',exact:true})
  await dialog.getByLabel('Information category').selectOption('pbe')
@@ -454,7 +445,6 @@ test('Unknown PBE year saves without books and undated history follows dated rec
  await expect(page.getByRole('dialog',{name:'Records Updated'})).toContainText('Unknown')
  expect(payload).toEqual({p_ids:[2],p_year:null,p_entry:{kind:'pbe',details:[],results:{Area:'1st Place'}}})
  await page.getByRole('button',{name:'Close',exact:true}).click()
- await page.getByRole('button',{name:'Search',exact:true}).click()
  await page.route('**/rest/v1/pathfinders?**',r=>r.fulfill({json:{...fixture,
   staff_history:{history:[{year:null,titles:['Club Director']},{year:'2023-24',titles:['Friend Counselor']}]},
   drum_corps:{history:[{year:null,drums:['Bass']},{year:'2024-25',drums:['Snare']}]},

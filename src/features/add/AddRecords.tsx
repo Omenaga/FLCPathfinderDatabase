@@ -20,14 +20,12 @@ function staffTitleLabel(title: string) {
 export default function AddRecords({ onAdded }: { onAdded: () => void }) {
   const [open, setOpen] = useState(false)
   const [historyOpen, setHistoryOpen] = useState(false)
-  return <section className="panel">
-    <div className="section-heading"><h2>Add</h2></div>
-    <p>Create a member profile with their personal details and current registration.</p>
+  return <div className="record-actions" role="group" aria-label="Add records">
     <button onClick={() => setOpen(true)}>Add New Profile</button>
-    <div className="records-placeholder"><h3>Add to Record</h3><p className="muted">Add achievements and participation to one or more existing profiles.</p><button onClick={() => setHistoryOpen(true)}>Add to Record</button></div>
+    <button onClick={() => setHistoryOpen(true)}>Add to Record</button>
     {open && <AddRecordModal onClose={() => setOpen(false)} onAdded={onAdded} />}
     {historyOpen && <AddToRecord onClose={() => setHistoryOpen(false)} onAdded={onAdded} />}
-  </section>
+  </div>
 }
 
 function AddRecordModal({ onClose, onAdded }: { onClose: () => void; onAdded: () => void }) {
