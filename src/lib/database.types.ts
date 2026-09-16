@@ -17,7 +17,6 @@ export type Database = {
       current_data: {
         Row: {
           created_at: string
-          current_activities: Json | null
           current_title: Json | null
           pathfinder_id: number
           school_year: string
@@ -26,7 +25,6 @@ export type Database = {
         }
         Insert: {
           created_at?: string
-          current_activities?: Json | null
           current_title?: Json | null
           pathfinder_id: number
           school_year?: string
@@ -35,7 +33,6 @@ export type Database = {
         }
         Update: {
           created_at?: string
-          current_activities?: Json | null
           current_title?: Json | null
           pathfinder_id?: number
           school_year?: string
@@ -844,7 +841,6 @@ export type Database = {
       member_search: {
         Row: {
           created_at: string | null
-          current_activities: Json | null
           current_title: Json | null
           first_name: string | null
           has_current_data: boolean | null
@@ -858,6 +854,7 @@ export type Database = {
           search_event_details: Json | null
           search_event_years: Json | null
           search_events: Json | null
+          search_staff_titles: Json | null
           search_years: Json | null
           sort_first_name: string | null
           sort_last_name: string | null
@@ -872,7 +869,6 @@ export type Database = {
       member_search_base: {
         Row: {
           created_at: string | null
-          current_activities: Json | null
           current_title: Json | null
           first_name: string | null
           has_current_data: boolean | null

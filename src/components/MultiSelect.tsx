@@ -6,6 +6,7 @@ import { detailKind } from '../lib/format'
 export default function MultiSelect({
   compact = false,
   single = false,
+  closeOnSelect = false,
   label,
   values,
   options,
@@ -19,6 +20,7 @@ export default function MultiSelect({
   emptyMessage = 'No matching options',
 }: {
   single?: boolean
+  closeOnSelect?: boolean
   isOptionDisabled?: (option: string) => boolean
   optionGroup?: (option: string) => string
   detailOptions?: Record<string, readonly string[]>
@@ -111,7 +113,8 @@ export default function MultiSelect({
     setText('')
     setActive(0)
     input.current?.focus()
-    if (single) setOpen(false)
+    // Search closes after choosing so the selected bubble is immediately visible.
+    if (single || closeOnSelect) setOpen(false)
   }
   useEffect(() => {
     // A native form reset must also clear this custom control's menu state.
@@ -169,7 +172,7 @@ export default function MultiSelect({
               (option) => option.toLowerCase() === text.trim().toLowerCase(),
             )
             if (exact || matches[active]) add(exact ?? matches[active])
-            if (!single) openOptions()
+            if (!single && !closeOnSelect) openOptions()
           } else if (event.key === 'Escape') {
             event.preventDefault()
             setOpen(false)

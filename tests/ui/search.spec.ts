@@ -10,7 +10,6 @@ const member = {
   status: 'staff',
   has_current_data: true,
   current_title: null,
-  current_activities: ['Drill'],
   years_active: ['2023-24'],
   levels: [
     { name: 'Friend', outcome: 'basic', year: '2023-24' },
@@ -495,18 +494,26 @@ test('Add confirmation expires and status changes clear incompatible titles', as
   await expect(page.getByRole('dialog', { name: 'Record Added', exact: true })).toContainText('N/A')
 })
 
-test('current results expose First Last Status Title and activities only', async ({ page }) => {
+test('current results use a separate profile button and omit retired activities', async ({
+  page,
+}) => {
   await setup(page)
   await expect(page.getByRole('columnheader')).toHaveText([
+    'Profile',
     'First Name',
     'Last Name',
     'Status',
     'Class/Titles',
-    'Current activities',
   ])
   await expect(page.getByRole('row').last()).toContainText('Staff')
   await expect(page.getByRole('row').last()).toContainText('Not recorded')
-  await expect(page.getByRole('row').last().getByRole('cell').last()).toHaveText('N/A')
+  await expect(page.getByRole('row').last().getByRole('cell').nth(1)).toHaveText('Justin')
+  await expect(
+    page.getByRole('row').last().getByRole('cell').nth(1).getByRole('button'),
+  ).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Open profile for Justin Wu' })).not.toHaveText(
+    'Justin',
+  )
   const status = page.getByRole('combobox', { name: 'Status', exact: true })
   await expect(status.locator('option')).toHaveText([
     'Any',
@@ -659,6 +666,7 @@ test('group headings and outer areas replace Any without swallowing detail click
     page.getByRole('button', { name: 'Remove Drums from Extracurricular', exact: true }),
   ).toHaveCount(0)
   await input.fill('Drums')
+  await input.click()
   await page.getByRole('option', { name: 'Drums', exact: true }).click()
   await expect(
     page.getByRole('button', { name: 'Remove Drums from Extracurricular', exact: true }),
@@ -688,6 +696,7 @@ test('PBE search links region and placement bubbles to the selected year', async
   await page.getByRole('combobox', { name: 'Extracurricular', exact: true }).click()
   await page.getByRole('combobox', { name: 'PBE region', exact: true }).selectOption('State')
   await page.getByRole('option', { name: 'PBE / State / 1st Place', exact: true }).click()
+  await page.getByRole('combobox', { name: 'Extracurricular', exact: true }).click()
   await page.getByRole('option', { name: 'PBE / State / Participation', exact: true }).click()
   await expect(
     page.getByRole('button', {
@@ -695,6 +704,7 @@ test('PBE search links region and placement bubbles to the selected year', async
       exact: true,
     }),
   ).toBeVisible()
+  await page.getByRole('combobox', { name: 'Extracurricular', exact: true }).click()
   await page.getByRole('combobox', { name: 'PBE region', exact: true }).selectOption('Union')
   await expect(
     page.getByRole('option', { name: 'PBE / Union / 2nd Place', exact: true }),
@@ -799,6 +809,39 @@ test('Unknown PBE year saves without books and undated history follows dated rec
   await expect(honors.locator('dt').last()).toHaveText('Unknown')
 })
 
+test('search keeps Staff Title below History type and Name widest', async ({ page }) => {
+  await setup(page)
+  await page.route('**/rest/v1/staff_titles?**', (route) =>
+    route.fulfill({ json: [{ title: 'Club Director' }] }),
+  )
+  await page.getByRole('combobox', { name: 'History type' }).selectOption('staff')
+  for (const width of [1280, 900, 700]) {
+    await page.setViewportSize({ width, height: 1000 })
+    const top = await Promise.all(
+      [
+        page.getByRole('searchbox', { name: 'Name', exact: true }),
+        page.getByRole('combobox', { name: 'Status', exact: true }),
+        page.getByRole('combobox', { name: 'History type', exact: true }),
+        page.getByRole('combobox', { name: 'Years', exact: true }),
+      ].map((control) => control.boundingBox()),
+    )
+    for (let i = 1; i < top.length; i++) {
+      expect(top[i]!.x).toBeGreaterThan(top[i - 1]!.x)
+      expect(Math.abs(top[i]!.y - top[0]!.y)).toBeLessThan(2)
+      expect(top[0]!.width).toBeGreaterThan(top[i]!.width)
+    }
+    const staff = await page
+      .getByRole('combobox', { name: 'Staff Title', exact: true })
+      .boundingBox()
+    const activity = await page
+      .getByRole('combobox', { name: 'Extracurricular', exact: true })
+      .boundingBox()
+    expect(staff!.y).toBeGreaterThan(top[0]!.y + top[0]!.height)
+    expect(Math.abs(staff!.y - activity!.y)).toBeLessThan(2)
+    await page.screenshot({ path: `test-results/search-layout-${width}.png`, fullPage: true })
+  }
+})
+
 async function setupEditor(page: Page) {
   await setup(page)
   const profile = {
@@ -819,7 +862,6 @@ async function setupEditor(page: Page) {
         school_year: '2026-27',
         status: 'staff',
         current_title: ['Club Director'],
-        current_activities: ['N/A'],
       },
     ],
     staff_history: [fixture.staff_history],
@@ -862,6 +904,130 @@ async function setupEditor(page: Page) {
   await expect(editor.getByLabel('First Name', { exact: true })).toHaveValue('Justin')
   return { editor, profile }
 }
+
+test('Staff history search pairs titles with years and closes selection menus', async ({
+  page,
+}) => {
+  await setup(page)
+  let catalogAttempts = 0
+  await page.route('**/rest/v1/staff_titles?**', (route) => {
+    catalogAttempts++
+    return catalogAttempts === 1
+      ? route.fulfill({ status: 500, json: { message: 'Catalog unavailable' } })
+      : route.fulfill({ json: [{ title: 'Club Director' }, { title: 'Master Guide Leader' }] })
+  })
+  const years = page.getByRole('combobox', { name: 'Years', exact: true })
+  await years.fill('2023-24')
+  await years.press('Enter')
+  await expect(years).toHaveAttribute('aria-expanded', 'false')
+  await expect(page.getByRole('button', { name: 'Remove 2023-24 from Years' })).toBeVisible()
+  await expect(years).toBeFocused()
+  const level = page.getByRole('combobox', { name: 'Level Earned', exact: true })
+  await level.fill('Master Guide')
+  await expect(page.getByRole('option', { name: 'Master Guide', exact: true })).toBeVisible()
+  await expect(page.getByRole('option', { name: /Master Guide \/ / })).toHaveCount(0)
+  await level.press('Enter')
+  await expect(level).toHaveAttribute('aria-expanded', 'false')
+  await page.getByRole('combobox', { name: 'History type' }).selectOption('staff')
+  await expect(
+    page.getByRole('button', { name: 'Remove Master Guide from Level Earned' }),
+  ).toHaveCount(0)
+  await expect(page.getByRole('alert')).toContainText('Catalog unavailable')
+  await page.getByRole('button', { name: 'Retry Staff titles' }).click()
+  const titles = page.getByRole('combobox', { name: 'Staff Title', exact: true })
+  await titles.click()
+  await page.getByRole('option', { name: 'Club Director', exact: true }).click()
+  await expect(titles).toHaveAttribute('aria-expanded', 'false')
+  await expect(
+    page.getByRole('button', { name: 'Remove Club Director from Staff Title' }),
+  ).toBeVisible()
+  await titles.fill('Master Guide Leader')
+  await titles.press('Enter')
+  await expect(titles).toHaveAttribute('aria-expanded', 'false')
+  const request = page.waitForRequest((r) => r.url().includes('or='))
+  await page.getByRole('button', { name: 'Search records' }).click()
+  const expression = new URL((await request).url()).searchParams.get('or')!.replaceAll('\\"', '"')
+  expect(expression).toContain('search_staff_titles.cs.')
+  expect(expression).toContain('"name":"Club Director","year":"2023-24"')
+  expect(expression).toContain('"name":"Master Guide Leader","year":"2023-24"')
+  expect(expression).not.toContain('levels.cs.')
+  expect(expression).not.toContain('outcome')
+  await page.getByRole('button', { name: 'Clear filters' }).click()
+  await expect(page.getByRole('combobox', { name: 'History type' })).toHaveValue('pathfinder')
+  await expect(page.getByRole('button', { name: /^Remove / })).toHaveCount(0)
+})
+
+test('Master Guide is added and displayed as an achievement with a year and no outcome', async ({
+  page,
+}) => {
+  const { editor, profile } = await setupEditor(page)
+  const masterGuide = editor.getByRole('region', { name: 'Master Guide', exact: true })
+  await expect(editor.getByLabel('Current Activities')).toHaveCount(0)
+  await masterGuide.getByRole('button', { name: 'Add Master Guide' }).click()
+  await expect(masterGuide.getByLabel('Outcome')).toHaveCount(0)
+  await masterGuide.getByLabel('Year', { exact: true }).selectOption('2024-25')
+  let saved = false
+  await page.route('**/rest/v1/rpc/update_profile', async (route) => {
+    const payload = route.request().postDataJSON()
+    expect(payload.p_original).toEqual(profile)
+    expect(payload.p_profile.pathfinders[0].levels).toContainEqual({
+      name: 'Master Guide',
+      year: '2024-25',
+    })
+    expect(payload.p_profile.current_data[0]).not.toHaveProperty('current_activities')
+    saved = true
+    await route.fulfill({ status: 204 })
+  })
+  await page.route('**/rest/v1/pathfinders?**', (route) =>
+    route.fulfill({
+      json: { ...fixture, levels: [...member.levels, { name: 'Master Guide', year: '2024-25' }] },
+    }),
+  )
+  await editor.getByRole('button', { name: 'Save Changes' }).click()
+  const receipt = page.getByRole('dialog', { name: 'Confirm Profile Changes' })
+  await expect(receipt).toContainText('Master Guide')
+  await expect(receipt).toContainText('2024-25')
+  await expect(receipt).not.toContainText('Outcome')
+  await receipt.getByRole('button', { name: 'Confirm', exact: true }).click()
+  const overview = page.getByRole('dialog', { name: 'Member profile' })
+  await expect(overview.locator('dd').filter({ hasText: /^Master Guide$/ })).toBeVisible()
+  expect(saved).toBe(true)
+  await expect(overview).not.toContainText('Master Guide (')
+})
+
+test('Add to Record submits Master Guide without an outcome and permits an unknown year', async ({
+  page,
+}) => {
+  await setup(page)
+  await page.route('**/rest/v1/rpc/current_club_year', (r) => r.fulfill({ json: '2026-27' }))
+  await page.route('**/rest/v1/staff_titles?**', (r) =>
+    r.fulfill({ json: [{ title: 'Club Director' }] }),
+  )
+  await page.route('**/rest/v1/pbe_year_books?**', (r) => r.fulfill({ json: [] }))
+  await page.getByRole('button', { name: 'Add to Record', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Add to Record', exact: true })
+  const year = dialog.getByRole('combobox', { name: 'Year to document' })
+  await year.fill('Unknown')
+  await year.press('Enter')
+  const achievement = dialog.getByRole('combobox', { name: 'Class', exact: true })
+  await achievement.fill('Master Guide')
+  await achievement.press('Enter')
+  await expect(dialog.getByRole('combobox', { name: 'Outcome' })).toHaveCount(0)
+  await dialog.getByRole('button', { name: 'Select profiles', exact: true }).click()
+  await dialog.getByRole('checkbox', { name: 'Select Justin Wu', exact: true }).check()
+  await dialog.getByRole('button', { name: 'Finish / Done' }).click()
+  const request = page.waitForRequest((r) => r.url().includes('/rpc/add_to_records'))
+  await page.route('**/rest/v1/rpc/add_to_records', (r) =>
+    r.fulfill({ json: [{ id: 2, name: 'Justin Wu', status: 'added', year_added: false }] }),
+  )
+  await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+  expect((await request).postDataJSON()).toEqual({
+    p_ids: [2],
+    p_year: null,
+    p_entry: { kind: 'level', name: 'Master Guide' },
+  })
+  await expect(page.getByRole('dialog')).toContainText('Added (1)')
+})
 
 test('Edit Profile confirms once, updates history and returns to the refreshed profile', async ({
   page,
@@ -1086,7 +1252,7 @@ test('removing instances stays in the draft and appears in the confirmation rece
       .getByRole('button', { name: /^Remove Current Registration Entry/ }),
   ).toHaveCount(0)
   const levels = editor.getByRole('region', { name: 'Levels', exact: true })
-  await expect(levels.getByRole('button', { name: /^Add / })).toHaveCount(0)
+  await expect(levels.getByRole('button', { name: /^Add / })).toHaveText(['Add Master Guide'])
   await levels.getByRole('button', { name: 'Remove Friend Entry', exact: true }).click()
   await expect(
     levels.getByRole('region', { name: 'Friend', exact: true }).getByLabel('Outcome'),
@@ -1173,6 +1339,6 @@ test('missing current registration is shown automatically and saved with the pro
   await expect(review).toHaveCount(0)
   expect(payload.p_original.current_data).toEqual([])
   expect(payload.p_profile.current_data).toEqual([
-    { school_year: '2026-27', status: 'not_active', current_title: null, current_activities: [] },
+    { school_year: '2026-27', status: 'not_active', current_title: null },
   ])
 })

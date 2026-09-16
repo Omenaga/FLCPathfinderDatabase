@@ -8,7 +8,6 @@ import { getSupabase } from '../../lib/supabase'
 import { message } from '../../lib/errors'
 import { statusLabel } from '../../lib/format'
 import {
-  ACTIVITIES,
   DRUMS,
   EVENTS,
   LEVELS,
@@ -104,7 +103,6 @@ export default function EditProfile({
                 school_year: season.data,
                 status: 'not_active',
                 current_title: null,
-                current_activities: [],
               },
             ]
           }
@@ -488,6 +486,40 @@ export default function EditProfile({
             </section>
           )
         })}
+        {/* Master Guide records presence and year only; it is not a ninth outcome-based class. */}
+        <section aria-label="Master Guide" className="edit-class">
+          <div className="section-heading">
+            <h4>Master Guide</h4>
+            {!entries.some((entry) => entry.name === 'Master Guide') && (
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => update([...entries, { name: 'Master Guide', year: null }])}
+              >
+                Add Master Guide
+              </button>
+            )}
+          </div>
+          {entries.map(
+            (entry, index) =>
+              entry.name === 'Master Guide' && (
+                <fieldset className="edit-entry" key={index}>
+                  {removeButton('Master Guide Entry', () =>
+                    update(entries.filter((_, i) => i !== index)),
+                  )}
+                  {text(
+                    'Year',
+                    entry.year,
+                    (value) =>
+                      update(
+                        entries.map((item, i) => (i === index ? { ...item, year: value } : item)),
+                      ),
+                    'year',
+                  )}
+                </fieldset>
+              ),
+          )}
+        </section>
       </section>
     )
   }
@@ -664,7 +696,6 @@ export default function EditProfile({
                     update({
                       status: value,
                       current_title: null,
-                      current_activities: value === 'staff' ? ['N/A'] : [],
                     }),
                 )}
                 {(row.status === 'staff' || row.status === 'pathfinder') &&
@@ -673,10 +704,6 @@ export default function EditProfile({
                     row.current_title,
                     row.status === 'staff' ? catalog.staff : LEVELS,
                     (value) => update({ current_title: value }),
-                  )}
-                {row.status !== 'staff' &&
-                  multiple('Current Activities', row.current_activities, ACTIVITIES, (value) =>
-                    update({ current_activities: value }),
                   )}
               </>
             ))}

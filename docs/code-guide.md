@@ -57,7 +57,7 @@ See [database-schema.md](database-schema.md) for table details and [project-cont
 
 The migrations are a sequence, not a collection of interchangeable schema files. A function may be replaced several times: earlier versions are still necessary to reproduce upgrades and migrate old data. Search for its name in `supabase/migrations`, then read the latest definition alongside any later alterations. `tests/revision.test.mjs` replays the entire sequence with legacy records.
 
-The initial migration creates the original tables and security rules. Later migrations introduce current registration, detailed year searches, revised member history, additions, and profile editing. The current sequence ends with `20260916040000_preserve_current_registration.sql`.
+The initial migration creates the original tables and security rules. Later migrations introduce current registration, detailed year searches, revised member history, additions, and profile editing. The current sequence ends with `20260916050000_achievements_staff_search.sql`.
 
 Do not rewrite applied migrations for formatting or remove superseded definitions. Add a new migration for database changes. `supabase/admin/grant-initial-staff.sql` is a retired explanatory script; account provisioning now uses Supabase Auth. `supabase/seed.sql` intentionally contains no member data.
 
@@ -80,3 +80,5 @@ npm run test:ui
 Database tests run in PGlite, a local PostgreSQL engine. Browser tests launch Edge and mock Supabase responses. Neither suite modifies the hosted database. Browser tests cover interaction behavior; database tests cover actual SQL validation and permissions.
 
 Comments explain purpose, data rules, and surprising decisions. Update them alongside behavior, and avoid narrating obvious assignments. Keep changes small enough to review; remove code only after checking callers, tests, configuration, and database dependencies. Retain original artwork unless its retirement is intentional.
+
+Master Guide is a year-linked achievement without an outcome. Pathfinder search includes it alongside the eight classes; Staff mode searches historical title/year pairs. Search menus close on selection. The results table has a separate profile icon, and current registration no longer stores activities. See the detailed reference for the new migration and tests.

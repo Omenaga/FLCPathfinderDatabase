@@ -8,7 +8,7 @@ import EditProfile from './EditProfile'
 import HonorsOverlay from './HonorsOverlay'
 import { message } from '../../lib/errors'
 import { statusLabel } from '../../lib/format'
-import { getPathfinder, LEVELS, type PathfinderDetails } from '../../lib/pathfinders'
+import { getPathfinder, ACHIEVEMENTS, type PathfinderDetails } from '../../lib/pathfinders'
 
 export default function ProfileOverlay({
   id,
@@ -42,8 +42,8 @@ export default function ProfileOverlay({
   const levels = [...(details?.member.levels ?? [])].sort(
     (a, b) =>
       (a.year ?? '9999').localeCompare(b.year ?? '9999') ||
-      LEVELS.indexOf(a.name as (typeof LEVELS)[number]) -
-        LEVELS.indexOf(b.name as (typeof LEVELS)[number]),
+      ACHIEVEMENTS.indexOf(a.name as (typeof ACHIEVEMENTS)[number]) -
+        ACHIEVEMENTS.indexOf(b.name as (typeof ACHIEVEMENTS)[number]),
   )
   const birthday = details?.member.birth_date
   return (
@@ -116,7 +116,10 @@ export default function ProfileOverlay({
                     <HistoryRecords
                       records={levels.map((level) => ({
                         year: level.year,
-                        detail: `${level.name} (${statusLabel(level.outcome)})`,
+                        detail:
+                          level.name === 'Master Guide'
+                            ? level.name
+                            : `${level.name} (${statusLabel(level.outcome ?? null)})`,
                       }))}
                     />
                   ) : (

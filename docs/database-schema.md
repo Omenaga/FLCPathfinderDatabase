@@ -2,6 +2,20 @@
 
 Implemented September 14, 2026. React/Vite uses Supabase PostgreSQL and Auth. All authenticated accounts remain trusted application users; person Status is participation information, not an authorization role. Anonymous access and deletion of permanent member profiles are denied by RLS/permissions. Authenticated users can remove history entries through the reviewed profile save; Current Registration is required.
 
+## Achievements and Staff search update
+
+Implemented in the repository by [20260916050000_achievements_staff_search.sql](../supabase/migrations/20260916050000_achievements_staff_search.sql) and its matching frontend changes. Apply the migration before deploying this frontend; repository implementation does not mean it has been applied to a hosted project.
+
+- **Master Guide** is now an achievement in `pathfinders.levels`, with exactly `name` and `year`; it has no outcome field. It appears alongside the eight classes in the profile, addition form, and editor. Master Guide Leader remains a Staff title.
+- Historical Master Guide titles become achievement entries preserving every distinct recorded year, including Unknown. A current-only Master Guide title becomes an Unknown-year achievement; the registration season is never inferred as an award date. Other titles and empty-but-dated Staff participation remain intact.
+- Before conversion, the migration saves affected people and Staff histories in `private.master_guide_members_backup` and `private.master_guide_history_backup`, and all registrations in `private.achievements_registration_backup`. These backups are unavailable to browser users.
+- **History type** selects Pathfinder or Staff search. Pathfinder offers the eight classes plus plain Master Guide; Staff loads catalog titles without variants. Switching modes clears this category's draft selections. Search still applies on submission. Staff filters match `search_staff_titles` objects containing name and year from the same historical entry, independently of current Status.
+- Search menus close after successful mouse or keyboard selection, exposing the selected bubble while retaining multi-selection through reopening. This also applies to recipient Search; other forms retain their existing picker behavior.
+- `current_data.current_activities` is removed from the table, view projections, registration editor, types, receipts, and save allowlist. All historical activity tables remain intact.
+- A dedicated accessible profile icon button sits immediately to the left of First Name. First Name is plain text. Recipient selection retains its separate checkbox.
+
+The database regression suite checks migration preservation, removed-field dependencies, title/year matching, outcome-free Master Guide validation, duplicate protection, reviewed edits, and permissions. Browser tests cover the search-mode switch, catalog retry, menu closing, profile icon, and Master Guide addition/editing/display.
+
 ## Person and current data
 
 ### `pathfinders`
@@ -32,10 +46,9 @@ At most one row per person. `current_club_year()` selects `2026-27`; this change
 | `school_year`              | text            | Required `YYYY-YY` range; defaults to current_club_year() for new rows; internal club-season selection       |
 | `status`                   | text            | Pathfinder (`pathfinder`), Staff (`staff`), Parent (`parent`), Not Active (`not_active`); default Not Active |
 | `current_title`            | jsonb, nullable | Unique array of Pathfinder classes or Staff titles, validated against status                                 |
-| `current_activities`       | jsonb           | Staff: `["N/A"]` automatically; otherwise a unique array of Drill, Drums, PBE, TLT                           |
 | `created_at`, `updated_at` | timestamptz     | Maintained timestamps                                                                                        |
 
-Grade is removed. For Pathfinder, each current_title entry must be one of the eight level names. For Staff, each title must come from `staff_titles`; the catalog is seeded with the titles below. Multiple titles/classes may be stored, e.g. `["Club Director", "Drill Instructor"]` for Staff. Unknown titles remain null or an empty array. Staff activities are normalized to `["N/A"]`; moving away from Staff clears that marker to `[]` unless replacement activities are supplied. Original current data is retained in administrator-only `private.current_title_json_backup`. Parent/Not Active must have null titles. Changing status requires a compatible title or clearing it. Current classes do not imply earned achievements.
+Grade is removed. For Pathfinder, each current_title entry must be one of the eight level names. For Staff, each title must come from `staff_titles`; the catalog is seeded with the titles below. Multiple titles/classes may be stored, e.g. `["Club Director", "Drill Instructor"]` for Staff. Unknown titles remain null or an empty array. Current activities are no longer stored in registration. Original current data is retained in administrator-only `private.current_title_json_backup`. Parent/Not Active must have null titles. Changing status requires a compatible title or clearing it. Current classes do not imply earned achievements.
 
 ### `staff_titles` and `staff_history`
 
@@ -71,8 +84,7 @@ Grade is removed. For Pathfinder, each current_title entry must be one of the ei
 28. Audio/Visual
 29. Social Media
 30. Photography
-31. Master Guide
-32. Junior Staff
+31. Junior Staff
 
 `staff_history` contains `id` (identity primary key), `pathfinder_id` (unique FK), and `history` (nonempty JSON array). One row per member, with one entry per unique period and multiple titles allowed per period. Titles come from `staff_titles` but are not restricted to particular years. Empty title arrays preserve participation with an unknown title. Validation and catalog-protection triggers prevent invalid references. Staff years are included in Years Active search.
 
@@ -97,7 +109,7 @@ The user-approved migration maps standalone 2024 to `2023-24`; long ranges such 
 
 Names in progression order: Friend, Companion, Explorer, Ranger, Voyager, Guide, Pioneer, Navigator.
 
-Outcomes: **Basic**, **Advanced**, **Incomplete**, stored as `basic`, `advanced`, `incomplete`. Any is a search choice, not a stored outcome. Incomplete is recorded progress, not an earned completion.
+For the eight classes, outcomes: **Basic**, **Advanced**, **Incomplete**, stored as `basic`, `advanced`, `incomplete`. Any is a search choice, not a stored outcome. Incomplete is recorded progress, not an earned completion.
 
 ```json
 [
@@ -107,7 +119,7 @@ Outcomes: **Basic**, **Advanced**, **Incomplete**, stored as `basic`, `advanced`
 ]
 ```
 
-Each object has exactly name, outcome, and year. Null year preserves unknown dates; new known achievements should use their actual range. Duplicate complete entries are rejected. Different outcomes for the same level/period may coexist as history; selecting Basic and Advanced requires both entries. Current enrollment is separate from this array.
+Each ordinary class object has exactly name, outcome, and year. Master Guide instead has exactly name and year, for example `{ "name": "Master Guide", "year": "2025-26" }`; its outcome property must be absent. Null year preserves unknown dates; new known achievements should use their actual range. Duplicate complete entries are rejected. Different outcomes for the same level/period may coexist as history; selecting Basic and Advanced in search matches either entry. Current enrollment is separate from this array.
 
 ## Activity history
 
@@ -233,23 +245,23 @@ Apply this order whenever a search displays a member table, including the recipi
 
 Sort the complete matching result set on the server **before pagination**, rather than sorting only the displayed page. Staff priority comes from the catalog's `sort_order` column; neither alphabetical order nor table insertion order defines Staff priority. This ordering uses current registration, not earned levels or historical titles.
 
-Visible columns: **First, Last, Status, Title, Current activities**. First opens the profile. Title is current_title for Pathfinder/Staff (Not recorded if null), and N/A for Parent/Not Active. Inactive current activities display N/A. Historical activities never masquerade as current participation.
+Visible columns: **Profile, First Name, Last Name, Status, Class/Titles**. The profile icon opens the historical popup; First Name is ordinary text. Title is current_title for Pathfinder/Staff (Not recorded if null), and N/A for Parent/Not Active.
 
 - Years Active accepts an exact range or a single calendar year. 2024 matches `2023-24` or `2024-25`.
-- Levels offer a period and Any/Basic/Advanced/Incomplete outcome. Name/outcome/year must match one level entry; unknown years match only Any year.
+- History type selects Pathfinder achievements or Staff titles. Shared Years constrain the selected achievement/title within its own entry. Ordinary classes offer Any/Basic/Advanced/Incomplete; Master Guide and Staff titles have no outcome variants. Unknown years match only searches without a specific year.
 - Activity and RZE selectors offer exact ranges and single calendar years, plus Any year. All detail ranges contribute both endpoints to calendar-year searches, including TLT and RZE.
 - Drill teams, Drum instruments, TLT operations, and RZE placements refine those choices. Name/year/detail must match the same history record. Bubbles within a category combine with OR; categories combine with AND.
 - Any year and dated participation searches read the detail tables, not current registration. Activity queries search all recorded participation without filtering by current Status unless explicitly selected.
 
-Computed view fields `search_activities`, `search_activity_years`, `search_events`, `search_event_years`, `search_activity_details`, and `search_event_details` support these filters before pagination. First/last name search is case-insensitive and escapes wildcard characters.
+Computed view fields `search_activities`, `search_activity_years`, `search_events`, `search_event_years`, `search_activity_details`, and `search_event_details`, and `search_staff_titles` support these filters before pagination. First/last name search is case-insensitive and escapes wildcard characters.
 
 ## Profile overlay
 
 1. Full name and current Status.
 2. Birthday displayed MM/DD/YYYY, or Not recorded.
-3. **Pathfinder History**: Years Active, Levels with outcome and period, activity sections with linked details, separate RZE mini cards, and View Honors.
+3. **Pathfinder History**: Years Active, Levels with outcome and period (Master Guide has only its name and year), activity sections with linked details, separate RZE mini cards, and View Honors.
 4. **Staff History**: staff_history period/title entries only.
-5. **Notes**: multiline plain-text editor with Save Notes, pending/success/error states, and an unsaved-changes notice. Closing does not automatically save.
+5. **Notes**: read-only multiline text. Use Edit Profile and its confirmation receipt to save changes.
 
 Both role sections remain identifiable, with empty messages when their summary history is unknown. Activity/event subsections without records are omitted. Current Staff status never hides past Pathfinder records. Staff titles can be supplied later without assigning guessed titles now.
 
@@ -388,7 +400,7 @@ If distinct information conflicts with an existing record under the schema's uni
 
 ## Future rollover
 
-Automatic rollover is not implemented. A future role-aware registration archive must preserve outgoing status, current_title, current activities, and period before starting a new season. Do not infer earned levels from current titles or infer operation/result dates from current registration. Birthday and Notes remain person-level fields rather than duplicated annual data.
+Automatic rollover is not implemented. A future role-aware registration archive must preserve outgoing status, current_title and period before starting a new season. Do not infer earned levels from current titles or infer operation/result dates from current registration. Birthday and Notes remain person-level fields rather than duplicated annual data.
 
 ## Shared year search
 
@@ -426,7 +438,7 @@ Each profile section (levels, staff titles, activities, event results, and honor
 
 ## Editing existing profiles
 
-`20260916010000_edit_profile.sql` originally added authenticated, security-invoker RPCs `get_profile_for_edit(p_id)` and `update_profile(p_id, p_original, p_profile)`. The editor uses ordinary labeled fields for personal details and Notes, current registration, levels, Staff history, Drill, Drums, PBE books/results, TLT, Red Zone results, and earned honors. All history sections are offered, including empty sections, with Add buttons for additional entries. Existing row identities, ownership, and audit fields cannot be changed, and permanent member profiles cannot be deleted through this RPC. History and registration entries can be removed. New rows contain editable fields only; their ownership and identities are assigned by the database.
+`20260916010000_edit_profile.sql` originally added authenticated, security-invoker RPCs `get_profile_for_edit(p_id)` and `update_profile(p_id, p_original, p_profile)`. The editor uses ordinary labeled fields for personal details and Notes, current registration, levels, Staff history, Drill, Drums, PBE books/results, TLT, Red Zone results, and earned honors. History sections support additional entries; ordinary classes use their visible outcome controls, while Master Guide has a dedicated Add button when unrecorded. Existing row identities, ownership, and audit fields cannot be changed, and permanent member profiles cannot be deleted through this RPC. History entries can be removed; registration removal was subsequently prohibited by the September 16 preservation migration. New rows contain editable fields only; their ownership and identities are assigned by the database.
 
 Save Changes in the editor header opens a receipt grouped into Added, Updated, and Removed, with before/after details. Cancel replaces Close in the editor header. The receipt has an untimed Confirm button and Back to Edit; only Confirm submits. While saving, repeat submissions and closing are blocked. Success closes the editor and reloads the original profile popup and search results. Errors retain the draft. Cancel discards the draft.
 
@@ -445,3 +457,5 @@ Each existing history instance has an X in its top-right corner. Removing the la
 `20260916040000_preserve_current_registration.sql` requires exactly one Current Registration row in a profile save and prevents removing/replacing its stored identity. The editor has no X for Current Registration. If registration was already absent, the editor supplies an editable Not Active registration for `current_club_year()` and includes it in the save receipt. No existing database records are rewritten by the migration.
 
 PBE receipt descriptions omit Bible Books and show the year and regional results. Automatic book selection and storage remain unchanged. Red Zone Events in the read-only profile use the same year/detail lists as the other history sections, retaining event names, named evaluations, placements, newest-first ordering, and Unknown entries last.
+
+Master Guide appears after the eight ordinary classes in the Levels editor. Add Master Guide creates an Unknown-year draft entry, whose year can be changed; no Outcome field is rendered. Existing migrated Master Guide entries remain individually editable/removable. Add to Record treats the achievement as already present once its name exists in any year, preserving all existing dates.

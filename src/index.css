@@ -1,6 +1,6 @@
 /* Shared application styles. Rule order is intentional: later rules refine earlier layouts. */
 
-﻿:root {
+:root {
   font-family: system-ui, sans-serif;
   color: #172d52;
   background: #f0f4fa;
@@ -222,8 +222,13 @@ h4 {
 /* Search filters, result tables, and paging controls. */
 .filters {
   display: grid;
+  gap: 1rem;
+}
+.category-filters {
+  display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
+  min-width: 0;
 }
 label {
   display: flex;
@@ -245,8 +250,14 @@ select {
 select:disabled {
   background: #f0f4fa;
 }
-.name-filter {
-  grid-column: span 2;
+.primary-filters {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 1rem;
+}
+.primary-filters > * {
+  min-width: 0;
 }
 .actions {
   grid-column: 1 / -1;
@@ -370,7 +381,7 @@ li {
   gap: 1rem;
 }
 @media (max-width: 760px) {
-  .filters {
+  .category-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .brand {
@@ -389,8 +400,15 @@ li {
     padding: 1rem;
   }
 }
+/* Keep the requested top-row order on tablets; wrap only when controls cannot fit. */
+@media (max-width: 600px) {
+  .primary-filters {
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  }
+}
 @media (max-width: 450px) {
-  .filters {
+  .category-filters,
+  .primary-filters {
     grid-template-columns: 1fr;
   }
   .name-filter {
@@ -805,4 +823,25 @@ li {
 
 .profile-event {
   margin-top: 1rem;
+}
+
+/* Keep catalog errors beside their achievement/title picker. */
+.level-search {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+.profile-open {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  line-height: 1;
+}
+.profile-cell {
+  width: 1%;
+  min-width: 0;
+  white-space: nowrap;
 }

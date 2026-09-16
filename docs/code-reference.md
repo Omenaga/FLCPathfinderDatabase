@@ -2,7 +2,7 @@
 
 This is a guided reference to the implementation, written for someone new to the repository. Read the [short code guide](code-guide.md) first for basic terminology. Use the [README](../README.md) to run the project and the [database schema](database-schema.md) for column-level rules.
 
-This reference describes the source through migration `20260916040000_preserve_current_registration.sql`. It does not establish which migrations a hosted database has applied. Historical SQL is described separately from current behavior.
+This reference describes the source through migration `20260916050000_achievements_staff_search.sql`. It does not establish which migrations a hosted database has applied. Historical SQL is described separately from current behavior.
 
 ## Contents
 
@@ -48,7 +48,7 @@ Three concepts must stay separate:
 | -------------------- | --------------------------------------------------------------- | -------------------------------------------------------------- |
 | Auth account         | Someone who can sign in and use the application                 | Access is not determined by a member's participation status.   |
 | Permanent person     | The member's name, birthday, notes, and historical achievements | A person remains in the database after becoming inactive.      |
-| Current registration | Current season, status, class/title, and activities             | Present-day information can change without rewriting the past. |
+| Current registration | Current season, status, and class/title                         | Present-day information can change without rewriting the past. |
 
 UI state is temporary. Changing an input usually changes a local draft, not the database. Confirmed writes pass through database validation; a disabled button alone is not an access-control rule.
 
@@ -96,29 +96,31 @@ Search works both as the main browse screen and as the bulk-addition recipient s
 | `submit`                   | Copies the draft to active filters and returns to page zero.                                                                            |
 | `reset`                    | Clears inputs and active filters, including the honors placeholder.                                                                     |
 | Filter form                | Presents name, status, years, levels, extracurriculars, and Red Zone choices.                                                           |
-| Results table              | Shows current registration information and optional recipient checkboxes. Member-name buttons open profile dialogs.                     |
+| Results table              | Shows current registration information and optional recipient checkboxes. A separate icon before First Name opens profile dialogs.      |
 | Pagination                 | Disables invalid navigation and navigation while busy. The display is one-based although state is zero-based.                           |
+
+The History type selector switches between Pathfinder achievements and historical Staff titles. It clears incompatible draft choices on switching; submission still applies the query. Staff titles load from the ordered catalog with a retry action on failure. `search_staff_titles` contains name/year pairs, so current Status and historical title matching stay independent. Master Guide is included as a plain Pathfinder achievement.
 
 The general Honors search control is a placeholder; it does not filter the database. Honor lookup during additions and earned-honor display are implemented independently.
 
 ### [pathfinders.ts](../src/lib/pathfinders.ts)
 
-This module combines the shared domain option lists with the main read queries.
+This module combines the shared domain option lists with the main read queries. `LEVELS` remains the eight current class choices; `ACHIEVEMENTS` adds Master Guide for historical addition, display, and search. Its optional outcome is absent for Master Guide.
 
-| Export/helper                                      | Responsibility                                                                                                                                                                |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LEVELS`, `ACTIVITIES`, `EVENTS`, `STATUSES`       | Shared labels and ordering used across screens. These must agree with database rules.                                                                                         |
-| `DRUMS`, `OPERATIONS`, `PBE_REGIONS`, `PLACEMENTS` | Allowed detail choices. Region order also expresses PBE progression. Stored spellings are data contracts, not merely display text.                                            |
-| `YEARS`, `period`, `PERIODS`                       | Build calendar options from 2010 through the browser's current year and compact periods such as `2023-24`. This is distinct from the database-configured current club season. |
-| Detail maps and `historyOptions`                   | Produce broad choices and narrower choices such as `Drums / Snare`.                                                                                                           |
-| `historyFilter`                                    | Splits a selected label into category and detail while preserving nested PBE detail text.                                                                                     |
-| `Filters`, `EMPTY_FILTERS`, `PAGE_SIZE`            | Describe the query inputs, blank starting state, and 25-row page size.                                                                                                        |
-| `member`                                           | Gives database-validated JSON fields more useful TypeScript shapes. Type assertions do not perform runtime validation.                                                        |
-| `contains`                                         | Encodes JSON containment operands for PostgREST's query grammar, including quote and backslash escaping.                                                                      |
-| `historySearchExpression`                          | Validates selected options and builds the combined history query.                                                                                                             |
-| `searchPathfinders`                                | Applies status, eligibility, literal name search, history conditions, stable ordering, pagination, and cancellation. Returns rows plus a count.                               |
-| `getPathfinder`                                    | Loads the person and related histories alongside effective status, then organizes records for the profile screen.                                                             |
-| `Pathfinder`, `PathfinderDetails`                  | Share the search-row and assembled-profile result types with callers.                                                                                                         |
+| Export/helper                                                | Responsibility                                                                                                                                                                |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LEVELS`, `ACHIEVEMENTS`, `ACTIVITIES`, `EVENTS`, `STATUSES` | Shared labels and ordering used across screens. These must agree with database rules.                                                                                         |
+| `DRUMS`, `OPERATIONS`, `PBE_REGIONS`, `PLACEMENTS`           | Allowed detail choices. Region order also expresses PBE progression. Stored spellings are data contracts, not merely display text.                                            |
+| `YEARS`, `period`, `PERIODS`                                 | Build calendar options from 2010 through the browser's current year and compact periods such as `2023-24`. This is distinct from the database-configured current club season. |
+| Detail maps and `historyOptions`                             | Produce broad choices and narrower choices such as `Drums / Snare`.                                                                                                           |
+| `historyFilter`                                              | Splits a selected label into category and detail while preserving nested PBE detail text.                                                                                     |
+| `Filters`, `EMPTY_FILTERS`, `PAGE_SIZE`                      | Describe the query inputs, blank starting state, and 25-row page size.                                                                                                        |
+| `member`                                                     | Gives database-validated JSON fields more useful TypeScript shapes. Type assertions do not perform runtime validation.                                                        |
+| `contains`                                                   | Encodes JSON containment operands for PostgREST's query grammar, including quote and backslash escaping.                                                                      |
+| `historySearchExpression`                                    | Validates selected options and builds the combined history query.                                                                                                             |
+| `searchPathfinders`                                          | Applies status, eligibility, literal name search, history conditions, stable ordering, pagination, and cancellation. Returns rows plus a count.                               |
+| `getPathfinder`                                              | Loads the person and related histories alongside effective status, then organizes records for the profile screen.                                                             |
+| `Pathfinder`, `PathfinderDetails`                            | Share the search-row and assembled-profile result types with callers.                                                                                                         |
 
 #### How combined filters work
 
@@ -169,6 +171,8 @@ The workflow is `details → people → review → saving → result`, with an e
 | `toggle`                  | Adds/removes recipients by stable member ID, preserving choices across pages and searches.                        |
 | `save`                    | Calls `add_to_records` once, converts Unknown to null, and displays per-person results.                           |
 | Result branches           | Separate added, existing, and failed entries; failed profiles can be selected for review and retry.               |
+
+The level payload omits outcome entirely for Master Guide, and its Outcome picker is hidden.
 
 PBE region selection is ordered. Removing an earlier region removes later regions from this draft, avoiding a gap in progression. Confirmation here has no five-second timer. The server handles duplicates and conflicts per person, so one failed recipient does not necessarily prevent successful additions to others.
 
@@ -227,6 +231,8 @@ The three snapshots have distinct jobs:
 | Review branch                            | Groups Added, Updated, and Removed receipt items and offers Confirm or Back to Edit.                                                                  |
 | Main form branch                         | Presents personal details, notes, current registration, levels, activities, events, and honors using the shared helpers.                              |
 
+The Levels editor also displays Master Guide as a plain achievement with year controls, an Add button when absent, and removal controls for recorded instances. Current Registration no longer has an activities input or payload field.
+
 Saving is atomic: validation failure rolls back the database operation. If another user changed the profile since loading, the database rejects the stale snapshot rather than silently overwriting that work. Confirmation has no timeout. The permanent profile and current registration cannot be removed through this editor.
 
 ### [profileChanges.ts](../src/features/profile/profileChanges.ts)
@@ -268,6 +274,8 @@ This component is more than a dropdown: it supports typing, removable selections
 | Form-reset effect                    | Clears local menu/search state when the containing form resets.                                               |
 | Keyboard handlers                    | Move the active option with arrows, select with Enter, and close with Escape.                                 |
 | Mouse/focus handlers                 | Keep focus while choosing options and let nested group buttons/selects handle their own interactions.         |
+
+Search opts into `closeOnSelect`, which closes the menu after either mouse or Enter selection while leaving the selected bubble visible. Other forms keep the default multi-select behavior.
 
 The input uses `aria-activedescendant` to identify the active option while retaining keyboard focus. Removing a selected chip uses a `type="button"` control so it does not submit a surrounding form.
 
@@ -352,6 +360,8 @@ Each filename below links to the historical step it describes. An early rule may
 | [20260916030000_edit_profile_removals.sql](../supabase/migrations/20260916030000_edit_profile_removals.sql)                 | Allows reviewed history removal through a restricted definer RPC.                                       |
 | [20260916040000_preserve_current_registration.sql](../supabase/migrations/20260916040000_preserve_current_registration.sql) | Requires registration in the reviewed save and prevents its removal.                                    |
 
+| [20260916050000_achievements_staff_search.sql](../supabase/migrations/20260916050000_achievements_staff_search.sql) | Backs up affected records, moves Master Guide into dated achievements, retires current activities, and exposes historical Staff title/year search. |
+
 ## Tests and configuration
 
 ### Tests
@@ -363,6 +373,8 @@ Each filename below links to the historical step it describes. An early rule may
 | [search.spec.ts](../tests/ui/search.spec.ts)    | Search, additions, profile dialogs, editing receipts, failures, retries, and mobile interaction | Uses mocked Supabase responses to isolate browser behavior; it cannot prove hosted database permissions. |
 
 Database tests create a minimal Auth schema/role contract inside a local PostgreSQL engine. Browser fixtures create synthetic sessions and route responses. Neither test suite is intended to modify hosted member records. Individual named tests explain the scenario; setup helpers build the common starting state.
+
+[achievements.test.mjs](../tests/achievements.test.mjs) upgrades dated, undated, current-only, and unaffected fixtures through the new migration. It checks historical preservation, private backups, removed columns, title/year matching, Master Guide validation and duplicate handling, and reviewed saves.
 
 ### Project files
 

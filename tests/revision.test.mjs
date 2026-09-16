@@ -66,7 +66,7 @@ test('member revision preserves history and enforces roles, ranges and access', 
       '2026-27',
     )
     assert.deepEqual(row.current_title, ['Club Director'])
-    assert.deepEqual(row.current_activities, ['N/A'])
+    assert.equal('current_activities' in row, false)
     assert.equal(row.first_name, 'Justin')
     assert.equal(row.last_name, 'Wu')
     assert.equal(row.status, 'staff')
@@ -121,7 +121,7 @@ test('member revision preserves history and enforces roles, ranges and access', 
     assert.equal(
       (
         await db.query(
-          "select count(*)::int as n from staff_titles where title in ('Club Director','Friend Counselor','Master Guide','Trailer')",
+          "select count(*)::int as n from staff_titles where title in ('Club Director','Friend Counselor','Master Guide Leader','Trailer')",
         )
       ).rows[0].n,
       4,
@@ -193,12 +193,7 @@ test('member revision preserves history and enforces roles, ranges and access', 
       `update staff_history set history=history || '[{"year":"2025-26","titles":["Counselor"]}]' where pathfinder_id=1`,
     )
     await db.exec(
-      `update current_data set current_title='["Club Director","Drill Instructor"]',current_activities='["Drums"]' where pathfinder_id=1`,
-    )
-    assert.deepEqual(
-      (await db.query('select current_activities from current_data where pathfinder_id=1')).rows[0]
-        .current_activities,
-      ['N/A'],
+      `update current_data set current_title='["Club Director","Drill Instructor"]' where pathfinder_id=1`,
     )
     for (const title of [
       '"Club Director"',
@@ -214,11 +209,6 @@ test('member revision preserves history and enforces roles, ranges and access', 
     }
     await db.exec(
       `update current_data set status='pathfinder',current_title='["Friend"]' where pathfinder_id=1`,
-    )
-    assert.deepEqual(
-      (await db.query('select current_activities from current_data where pathfinder_id=1')).rows[0]
-        .current_activities,
-      [],
     )
     await assert.rejects(
       db.exec(`update current_data set status='parent' where pathfinder_id=1`),
@@ -284,7 +274,7 @@ test('member revision preserves history and enforces roles, ranges and access', 
     assert.equal(added.last_name, 'Example')
     assert.equal(added.status, 'staff')
     assert.deepEqual(added.current_title, ['Club Director', 'Drill Instructor'])
-    assert.deepEqual(added.current_activities, ['N/A'])
+    assert.equal('current_activities' in added, false)
     assert.deepEqual(added.years_active, ['2026-27'])
     assert.deepEqual(added.levels, [])
     await assert.rejects(
@@ -699,7 +689,6 @@ test('member revision preserves history and enforces roles, ranges and access', 
     edited.pathfinders[0].first_name = 'Edited'
     edited.current_data[0].status = 'parent'
     edited.current_data[0].current_title = null
-    edited.current_data[0].current_activities = []
     edited.drum_corps[0].history[0].drums = ['Quad']
     edited.red_zone_archery[0].placement = '3rd Place'
     await edit(staffId, beforeEdit, edited)

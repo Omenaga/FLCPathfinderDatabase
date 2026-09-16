@@ -22,7 +22,6 @@ const labels: Record<string, string> = {
   school_year: 'School Year',
   status: 'Status',
   current_title: 'Class/Titles',
-  current_activities: 'Current Activities',
   year: 'Year',
   year_earned: 'Year',
   outcome: 'Outcome',
@@ -103,7 +102,7 @@ export function profileChanges(
         text: describe(entry),
       })
     for (const row of profile.current_data)
-      for (const key of ['school_year', 'status', 'current_title', 'current_activities']) {
+      for (const key of ['school_year', 'status', 'current_title']) {
         items.push({
           key: `registration:${key}`,
           label: `Current Registration / ${labels[key]}`,

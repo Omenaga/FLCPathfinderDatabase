@@ -14,6 +14,8 @@ export const LEVELS = [
   'Pioneer',
   'Navigator',
 ] as const
+// Master Guide is earned with a year but has no outcome variants.
+export const ACHIEVEMENTS = [...LEVELS, 'Master Guide'] as const
 export const ACTIVITIES = ['Drill', 'Drums', 'PBE', 'TLT'] as const
 export const EVENTS = [
   'Drill Performance',
@@ -70,7 +72,7 @@ function historyOptions(names: readonly string[], details: Record<string, readon
     ...(details[name] ?? []).map((detail) => `${name} / ${detail}`),
   ])
 }
-export const LEVEL_OPTIONS = historyOptions(LEVELS, LEVEL_DETAILS)
+export const LEVEL_OPTIONS = historyOptions(ACHIEVEMENTS, LEVEL_DETAILS)
 export const ACTIVITY_OPTIONS = historyOptions(ACTIVITIES, ACTIVITY_DETAILS)
 export const EVENT_OPTIONS = historyOptions(EVENTS, EVENT_DETAILS)
 // Keep all text after the category together: a PBE detail can itself contain a separator.
@@ -82,7 +84,7 @@ export function historyFilter(option: string) {
 export const PAGE_SIZE = 25
 type EarnedLevel = {
   name: string
-  outcome: 'basic' | 'advanced' | 'incomplete'
+  outcome?: 'basic' | 'advanced' | 'incomplete'
   year: string | null
 }
 type MemberRow = Database['public']['Tables']['pathfinders']['Row']
@@ -97,6 +99,7 @@ export type Filters = {
   name: string
   year: string[]
   level: string[]
+  staff: string[]
   activity: string[]
   event: string[]
 }
@@ -105,6 +108,7 @@ export const EMPTY_FILTERS: Filters = {
   name: '',
   year: [],
   level: [],
+  staff: [],
   activity: [],
   event: [],
 }
@@ -149,6 +153,17 @@ export function historySearchExpression(filters: Filters) {
             ? periods.map((year) => contains('levels', { ...base, year }))
             : [contains('levels', base)]
         }),
+      ),
+    )
+  // Staff titles use the same shared periods, independent of current registration status.
+  if (filters.staff?.length)
+    groups.push(
+      any(
+        filters.staff.flatMap((name) =>
+          periods.length
+            ? periods.map((year) => contains('search_staff_titles', { name, year }))
+            : [contains('search_staff_titles', { name })],
+        ),
       ),
     )
   for (const [options, prefix, namesColumn] of [

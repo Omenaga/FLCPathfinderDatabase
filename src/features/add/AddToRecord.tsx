@@ -8,7 +8,7 @@ import HonorPicker, { type Honor } from './HonorPicker'
 import { getSupabase } from '../../lib/supabase'
 import { message } from '../../lib/errors'
 import {
-  LEVELS,
+  ACHIEVEMENTS,
   DRUMS,
   OPERATIONS,
   EVENTS,
@@ -121,7 +121,7 @@ export default function AddToRecord({
   // Build the category-specific payload expected by add_to_records; irrelevant form fields are omitted.
   const entry: Json =
     kind === 'level'
-      ? { kind, name, outcome }
+      ? { kind, name, ...(name === 'Master Guide' ? {} : { outcome }) }
       : kind === 'staff'
         ? { kind, details: [name] }
         : kind === 'drill'
@@ -140,7 +140,9 @@ export default function AddToRecord({
   // Describe the same proposed entry in plain language for the review and result screens.
   const description =
     kind === 'level'
-      ? `${name} (${statusLabel(outcome)})`
+      ? name === 'Master Guide'
+        ? name
+        : `${name} (${statusLabel(outcome)})`
       : kind === 'staff' || kind === 'drill'
         ? name
         : kind === 'event'
@@ -162,7 +164,7 @@ export default function AddToRecord({
       !catalog ||
       !year ||
       (['level', 'staff', 'drill'].includes(kind) && !name) ||
-      (kind === 'level' && !outcome) ||
+      (kind === 'level' && name !== 'Master Guide' && !outcome) ||
       (kind === 'event' && (!event || !placement || (namedEvent && !name.trim()))) ||
       (kind === 'honor' && !honor) ||
       ((['drums', 'tlt'].includes(kind) || (kind === 'pbe' && year !== 'Unknown')) &&
@@ -464,14 +466,14 @@ export default function AddToRecord({
                   onChange={(values) => setName(values[0] ?? '')}
                   options={
                     kind === 'level'
-                      ? LEVELS
+                      ? ACHIEVEMENTS
                       : kind === 'staff'
                         ? (catalog?.staff ?? [])
                         : ['Precision', 'Freestyle', 'Adult']
                   }
                 />
               )}
-              {kind === 'level' && (
+              {kind === 'level' && name !== 'Master Guide' && (
                 <MultiSelect
                   single
                   label="Outcome"
