@@ -221,9 +221,68 @@ Fill in names before implementing restrictions. Both will use `YYYY-YY` period k
 
 ## Honors
 
-`honors`: id identity PK, name unique text. `honors_earned`: id identity PK, pathfinder_id FK, honor_id FK, year_earned text range. Unique per person/honor/period. Detail rows cascade when a person is removed by an administrator; catalog honors cannot be deleted while referenced.
+`honors`: id identity PK, name unique text, category text, skill_level smallint (1, 2, or 3), and year integer. Catalog year is the honor's introduction year, independent of club seasons and year earned; null means **Unknown**. Skill level remains null when the source does not publish it. Category may be null for an unmatched legacy entry; populated categories must be nonempty and trimmed. Master Award relationships are planned below and are not yet implemented.
 
-The general Search Honors filter remains a placeholder. Add to Record searches the `honors` catalog as the user types, showing up to 20 matches at a time. View Honors fetches earned honors with their years in a separate dialog. Catalog entries must be supplied by an administrator; the app does not invent honors.
+The September 18 migration prepares the three metadata columns without importing honors. A separate staged import contains 602 NAD-listed and Florida Conference honors. Different-year editions have the year appended to their names, including Unknown where applicable. Existing IDs and earned-honor references are retained; ambiguous legacy names are not reassigned to an edition. See [catalog sources and import decisions](honors-catalog.md).
+
+`honors_earned`: id identity PK, pathfinder_id FK, honor_id FK, year_earned text range. Unique per person/honor/period. Detail rows cascade when a person is removed by an administrator; catalog honors cannot be deleted while referenced.
+
+The general Search Honors filter remains a placeholder. Add to Record searches the `honors` catalog as the user types, showing up to 20 matches at a time. View Honors fetches earned honors with their years in a separate dialog. Catalog entries are supplied by migrations or an administrator; the app does not invent honors.
+
+### Planned honors selection — schema notes only
+
+These requirements apply when searching for honors, adding earned honors, and editing earned honors. They are recorded for later implementation; this note does not change the current UI, stored catalog, or database constraints.
+
+- When the honor search bar is empty (including whitespace-only input), show no honor results and do not fetch the catalog. Once the user types a non-whitespace character, show related matching honors. Clearing the bar hides results again and prevents an earlier request from repopulating them. Existing selections remain visible.
+- Try a grouped **MultiSelect**: category names are the group headings, and individual honor names appear as small selectable bubbles within their groups. Use the edition-qualified name, including its year suffix when needed, so different honors remain distinguishable.
+- The grouped MultiSelect is provisional and may be replaced immediately after trying it. Keep its presentation easy to swap without changing honor IDs, catalog data, or earned-honor records.
+
+Use these category labels and this order:
+
+1. Arts & Crafts
+2. Health & Science
+3. Household Arts
+4. Nature
+5. Outdoor Industries
+6. Outreach
+7. Recreation
+8. Vocational
+9. Florida
+10. Master Award
+
+For future grouping, map source **Arts, Crafts and Hobbies** to **Arts & Crafts**, **Health and Science** to **Health & Science**, and **Spiritual Growth, Outreach and Heritage** to **Outreach**. Florida Conference honors belong under **Florida** (the staged source catalog currently labels them Regional and identifies their Florida scope). The other standard category names already match. These are planned display labels; no live catalog values are rewritten yet. Use **Master Award**, replacing the earlier label Masters.
+
+### Planned Master Award catalog and requirements
+
+Use the [wiki Master Awards index](https://wiki.pathfindersonline.org/w/AY_Honors/Masters/en) and each linked award's requirement list. Keep the existing NAD scope: include its 15 current NAD awards, exclude awards explicitly marked unavailable in NAD, and omit the retired Witnessing Master Award. This is separate from the Master Guide class/achievement.
+
+Reserve one catalog entry per award, categorized **Master Award**, even if its requirements need manual input later. The prepared catalog at `supabase/catalogs/honors.json` now has a `master_awards` section containing all 15 awards and their retrieved requirement groups. Here, honors_catalog refers to the prepared catalog; the live table is still named `honors`, and no table rename or award import is being applied.
+
+Each award requires **seven distinct eligible honors**, drawn from its own list. Several awards also impose group minimums, so a single unrestricted seven-of-list check would be insufficient:
+
+| Award                           | Requirement groups                               |
+| ------------------------------- | ------------------------------------------------ |
+| Aquatic                         | Any 7 listed honors                              |
+| Artisan                         | Any 7 listed honors                              |
+| Conservation                    | Any 7 listed honors                              |
+| Family, Origins, and Heritage   | 2 Heritage choices + 5 additional choices        |
+| Farming                         | Any 7 listed honors                              |
+| Health                          | 3 from group 1 + 2 from group 2 + 2 from group 3 |
+| Homemaking                      | Any 7 listed honors                              |
+| Modern Technology               | Any 7 listed honors                              |
+| Naturalist                      | 4 flora + 2 wild fauna + 1 domestic fauna        |
+| Recreation                      | Any 7 listed honors                              |
+| Spiritual Growth and Ministries | 3 Spiritual Growth + 4 Ministries                |
+| Sportsman                       | Any 7 listed honors                              |
+| Technician                      | Any 7 listed honors                              |
+| Wilderness                      | Any 7 listed honors                              |
+| Zoology                         | 1 foundation + 4 wild fauna + 2 domestic fauna   |
+
+The future database model must support an award's total requirement, ordered requirement groups with their own required counts, and links from each group to eligible honor IDs. Honor membership is many-to-many and must reference the exact catalog edition, not just a category or unqualified name. Repeated earned records for the same honor do not count as multiple distinct honors toward one award.
+
+Preserve source URLs and a requirements/mapping status. If an award list cannot be retrieved, retain its award entry, total of seven, and empty requirement groups marked pending manual input; an empty list must never imply that any honor qualifies. All 15 lists were retrieved in this pass. Some source choices refer to other regional editions or honors outside the prepared catalog: preserve those source references with `catalog_name: null` and `mapping_status: needs_review` for later manual resolution, without adding out-of-scope honors or guessing equivalent editions. Source-listed substitutions and example-based lists also need review before automated eligibility checks.
+
+Only schema notes and prepared catalog data are updated here. Award selection, eligibility calculations, automatic awarding, earned-award storage, and cross-award honor reuse policies remain unimplemented.
 
 ## Search and current results
 

@@ -148,16 +148,25 @@ export type Database = {
       }
       honors: {
         Row: {
+          category: string | null
           id: number
           name: string
+          skill_level: number | null
+          year: number | null
         }
         Insert: {
+          category?: string | null
           id?: never
           name: string
+          skill_level?: number | null
+          year?: number | null
         }
         Update: {
+          category?: string | null
           id?: never
           name?: string
+          skill_level?: number | null
+          year?: number | null
         }
         Relationships: []
       }
@@ -891,9 +900,6 @@ export type Database = {
       }
     }
     Functions: {
-      get_profile_for_edit: { Args: { p_id: number }; Returns: Json }
-      update_profile: { Args: { p_id: number; p_original: Json; p_profile: Json }; Returns: undefined }
-
       add_member_record: {
         Args: {
           p_birth_date: string
@@ -912,6 +918,11 @@ export type Database = {
       }
       current_club_year: { Args: never; Returns: string }
       current_staff_role: { Args: never; Returns: string }
+      get_profile_for_edit: { Args: { p_id: number }; Returns: Json }
+      update_profile: {
+        Args: { p_id: number; p_original: Json; p_profile: Json }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
