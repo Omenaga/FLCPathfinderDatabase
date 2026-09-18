@@ -82,6 +82,7 @@ async function setup(page: Page) {
     route.fulfill({ json: route.request().method() === 'PATCH' ? { id: 2 } : fixture }),
   )
   await page.route('**/rest/v1/honors_earned?**', (route) => route.fulfill({ json: [] }))
+  await page.route('**/rest/v1/rpc/get_master_award_status', (route) => route.fulfill({ json: [] }))
   await page.goto('/')
   await page.getByLabel('Email', { exact: true }).fill('staff@example.test')
   await page.getByLabel('Password', { exact: true }).fill('test-password')
@@ -338,7 +339,7 @@ test('Honor lookup on mobile and batch errors retain the proposed addition', asy
   await dialog.getByLabel('Information category').selectOption('honor')
   await expect(dialog.getByLabel('Historical role')).toHaveCount(0)
   await dialog.getByLabel('Find an honor').fill('Camping')
-  await dialog.getByRole('button', { name: 'Camping Skills I', exact: true }).click()
+  await dialog.getByRole('option', { name: 'Camping Skills I', exact: true }).click()
   await page.screenshot({ path: 'test-results/history-mobile.png', fullPage: true })
   await dialog.getByRole('button', { name: 'Select profiles' }).click()
   await dialog.getByRole('checkbox', { name: 'Select Justin Wu' }).check()
@@ -904,6 +905,204 @@ async function setupEditor(page: Page) {
   await expect(editor.getByLabel('First Name', { exact: true })).toHaveValue('Justin')
   return { editor, profile }
 }
+
+test('honor search stays empty until typing, groups bubbles, and pairs selected IDs with years', async ({
+  page,
+}) => {
+  await setup(page)
+  const catalog = [
+    { id: 8, name: 'Camping Skills I', category: 'Recreation' },
+    { id: 9, name: 'Abraham & Sand Art', category: 'Florida' },
+    { id: 10, name: 'Basketry', category: 'Arts & Crafts' },
+    { id: 600, name: 'Aquatic Master Award', category: 'Master Award' },
+  ]
+  let reads = 0
+  await page.route('**/rest/v1/honors?**', (r) => {
+    reads++
+    return r.fulfill({ json: catalog })
+  })
+  const input = page.getByRole('combobox', { name: 'Honors', exact: true })
+  await input.click()
+  await input.fill('   ')
+  await page.waitForTimeout(300) // Longer than the lookup debounce: blank input must not request data.
+  expect(reads).toBe(0)
+  await expect(page.getByRole('listbox', { name: 'Honors options' })).toHaveCount(0)
+  await input.fill('a')
+  const options = page.getByRole('listbox', { name: 'Honors options' })
+  await expect(options.getByRole('group')).toHaveCount(4)
+  await expect(options.locator('.level-name')).toHaveText([
+    'Arts & Crafts',
+    'Recreation',
+    'Florida',
+    'Master Award',
+  ])
+  await page.screenshot({ path: 'test-results/grouped-honors-desktop.png', fullPage: true })
+  await page.setViewportSize({ width: 390, height: 844 })
+  await input.scrollIntoViewIfNeeded()
+  await page.screenshot({ path: 'test-results/grouped-honors-mobile.png', fullPage: true })
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390)
+  // Adding whitespace does not erase an already fetched result or leave loading stuck.
+  await input.fill('a ')
+  await expect(options.getByRole('option', { name: 'Camping Skills I', exact: true })).toBeVisible()
+  await options.getByRole('option', { name: 'Camping Skills I', exact: true }).click()
+  await expect(input).toHaveAttribute('aria-expanded', 'false')
+  await input.fill('Aquatic')
+  await expect(
+    page.getByRole('button', { name: 'Remove Camping Skills I from Honors' }),
+  ).toBeVisible()
+  await page.getByRole('option', { name: 'Aquatic Master Award', exact: true }).click()
+  const years = page.getByRole('combobox', { name: 'Years', exact: true })
+  await years.fill('2024')
+  await page.getByRole('option', { name: '2024-25', exact: true }).click()
+  const request = page.waitForRequest(
+    (r) => r.url().includes('member_search?') && r.url().includes('or='),
+  )
+  await page.getByRole('button', { name: 'Search records' }).click()
+  const expression = new URL((await request).url()).searchParams.get('or')!.replaceAll('\\"', '"')
+  expect(expression).toContain('"honor_id":8,"year":"2024-25"')
+  expect(expression).toContain('"honor_id":600,"year":"2024-25"')
+  await page.getByRole('button', { name: 'Clear filters' }).click()
+  await expect(page.getByRole('button', { name: /Remove .* from Honors/ })).toHaveCount(0)
+})
+
+test('clearing honor text suppresses an in-flight response and lookup errors can retry', async ({
+  page,
+}) => {
+  await setup(page)
+  let release: (() => void) | undefined
+  let entered: (() => void) | undefined
+  const started = new Promise<void>((resolve) => {
+    entered = resolve
+  })
+  let calls = 0
+  await page.route('**/rest/v1/honors?**', async (route) => {
+    calls++
+    if (calls === 1) {
+      entered!()
+      await new Promise<void>((resolve) => {
+        release = resolve
+      })
+      return route.fulfill({ json: [{ id: 8, name: 'Camping Skills I', category: 'Recreation' }] })
+    }
+    if (calls === 2)
+      return route.fulfill({ status: 400, json: { message: 'Honor lookup unavailable' } })
+    return route.fulfill({ json: [{ id: 8, name: 'Camping Skills I', category: 'Recreation' }] })
+  })
+  const input = page.getByRole('combobox', { name: 'Honors', exact: true })
+  await input.fill('Camping')
+  await started
+  await input.fill('')
+  release!()
+  await expect(page.getByRole('listbox', { name: 'Honors options' })).toHaveCount(0)
+  await input.fill('Camping')
+  await expect(page.getByRole('alert')).toContainText('Honor lookup unavailable')
+  await page.getByRole('button', { name: 'Retry honors', exact: true }).click()
+  await input.click()
+  await expect(page.getByRole('option', { name: 'Camping Skills I', exact: true })).toBeVisible()
+})
+
+test('Honors dialog sorts all earned honors alphabetically and separates earned and eligible awards', async ({
+  page,
+}) => {
+  await setup(page)
+  await page.route('**/rest/v1/honors_earned?**', (r) =>
+    r.fulfill({
+      json: [
+        { id: 1, year_earned: '2025-26', honors: { name: 'Zoology', is_master_award: false } },
+        { id: 2, year_earned: null, honors: { name: 'Abseiling', is_master_award: false } },
+        {
+          id: 3,
+          year_earned: '2022-23',
+          honors: { name: 'Camping Skills I', is_master_award: false },
+        },
+        {
+          id: 4,
+          year_earned: '2024-25',
+          honors: { name: 'Camping Skills I', is_master_award: false },
+        },
+        {
+          id: 5,
+          year_earned: '2020-21',
+          honors: { name: 'Artisan Master Award', is_master_award: true },
+        },
+      ],
+    }),
+  )
+  let attempts = 0
+  await page.route('**/rest/v1/rpc/get_master_award_status', (r) => {
+    attempts++
+    expect(r.request().postDataJSON()).toEqual({ p_pathfinder_id: 2 })
+    return attempts === 1
+      ? r.fulfill({ status: 503, json: { message: 'Awards temporarily unavailable' } })
+      : r.fulfill({
+          json: [
+            {
+              honor_id: 600,
+              name: 'Artisan Master Award',
+              earned_years: ['2020-21'],
+              eligible: false,
+            },
+            { honor_id: 601, name: 'Aquatic Master Award', earned_years: [], eligible: true },
+          ],
+        })
+  })
+  await page.getByRole('button', { name: 'Open profile for Justin Wu' }).click()
+  await page.getByRole('button', { name: 'View Honors' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Honors', exact: true })
+  await expect(dialog.getByRole('alert')).toContainText('Awards temporarily unavailable')
+  await dialog.getByRole('button', { name: 'Retry honors' }).click()
+  await expect(dialog.locator('dd')).toHaveText([
+    'Abseiling',
+    'Camping Skills I',
+    'Camping Skills I',
+    'Zoology',
+  ])
+  await expect(dialog.locator('dt')).toHaveText(['Unknown', '2024-25', '2022-23', '2025-26'])
+  const awards = dialog.getByRole('region', { name: 'Master Award', exact: true })
+  await expect(awards.locator('li')).toHaveText([
+    'Aquatic Master AwardEligible — not yet earned',
+    'Artisan Master AwardEarned — 2020-21',
+  ])
+  const gap = await awards.evaluate((element) => parseFloat(getComputedStyle(element).marginTop))
+  expect(gap).toBeGreaterThanOrEqual(24)
+  await page.screenshot({ path: 'test-results/honors-and-master-awards.png', fullPage: true })
+})
+
+test('Edit Profile selects a Master Award with the grouped picker and saves an explicit earned record', async ({
+  page,
+}) => {
+  const { editor, profile } = await setupEditor(page)
+  let lookups = 0
+  await page.route('**/rest/v1/honors?**', (r) => {
+    lookups++
+    return r.fulfill({
+      json: [{ id: 600, name: 'Aquatic Master Award', category: 'Master Award' }],
+    })
+  })
+  const honorSection = editor.getByRole('region', { name: 'Honors', exact: true })
+  const input = honorSection.getByRole('combobox', { name: 'Find an honor' })
+  await input.click()
+  await page.waitForTimeout(300)
+  expect(lookups).toBe(0)
+  await expect(
+    honorSection.getByRole('button', { name: 'Remove Camping Skills I from Find an honor' }),
+  ).toBeVisible()
+  await input.fill('Aquatic')
+  await expect(honorSection.getByRole('group', { name: 'Master Award', exact: true })).toBeVisible()
+  await honorSection.getByRole('option', { name: 'Aquatic Master Award', exact: true }).click()
+  let saved: { p_original: unknown; p_profile: { honors_earned: unknown[] } } | undefined
+  await page.route('**/rest/v1/rpc/update_profile', (r) => {
+    saved = r.request().postDataJSON()
+    return r.fulfill({ json: null })
+  })
+  await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+  const receipt = page.getByRole('dialog', { name: 'Confirm Profile Changes', exact: true })
+  await expect(receipt).toContainText('Aquatic Master Award')
+  await receipt.getByRole('button', { name: 'Confirm', exact: true }).click()
+  await expect(receipt).toHaveCount(0)
+  expect(saved?.p_original).toEqual(profile)
+  expect(saved?.p_profile.honors_earned).toEqual([{ id: 1, honor_id: 600, year_earned: '2023-24' }])
+})
 
 test('Staff history search pairs titles with years and closes selection menus', async ({
   page,

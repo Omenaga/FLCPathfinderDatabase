@@ -6532,9 +6532,10 @@
             {
               "source_name": "Guitar",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Guitar_(SAD)",
-              "catalog_name": null,
+              "catalog_name": "Guitar",
               "source_year": 2012,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Guitar - Advanced",
@@ -7545,7 +7546,7 @@
       "scope": "NAD",
       "required_honor_count": 7,
       "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Health_Master_Award",
-      "requirements_status": "retrieved_needs_mapping_review",
+      "requirements_status": "retrieved",
       "requirement_groups": [
         {
           "name": "Health group 1",
@@ -7589,9 +7590,10 @@
             {
               "source_name": "Health and Healing",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Health_and_Healing_(GC)",
-              "catalog_name": null,
+              "catalog_name": "Health and Healing",
               "source_year": 1928,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Home Nursing",
@@ -7716,7 +7718,7 @@
       "scope": "NAD",
       "required_honor_count": 7,
       "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Homemaking_Master_Award",
-      "requirements_status": "retrieved_needs_mapping_review",
+      "requirements_status": "retrieved",
       "requirement_groups": [
         {
           "name": "Eligible honors",
@@ -7802,9 +7804,10 @@
             {
               "source_name": "Household Budgeting",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Household_Budgeting_(SAD)",
-              "catalog_name": null,
+              "catalog_name": "Household Budgeting",
               "source_year": 2012,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Housekeeping",
@@ -7823,9 +7826,10 @@
             {
               "source_name": "Making Pizza",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Making_Pizza",
-              "catalog_name": null,
+              "catalog_name": "Pizza Maker",
               "source_year": 2025,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Mat Making",
@@ -7889,7 +7893,7 @@
       "scope": "NAD",
       "required_honor_count": 7,
       "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Modern_Technology_Master_Award",
-      "requirements_status": "retrieved_needs_mapping_review",
+      "requirements_status": "retrieved",
       "requirement_groups": [
         {
           "name": "Eligible honors",
@@ -7996,9 +8000,10 @@
             {
               "source_name": "Video",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Video_(GC)",
-              "catalog_name": null,
+              "catalog_name": "Video",
               "source_year": 2001,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Video - Advanced",
@@ -8020,7 +8025,7 @@
       "scope": "NAD",
       "required_honor_count": 7,
       "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Naturalist_Master_Award",
-      "requirements_status": "retrieved_needs_mapping_review",
+      "requirements_status": "retrieved",
       "requirement_groups": [
         {
           "name": "Flora",
@@ -8245,9 +8250,10 @@
             {
               "source_name": "Odonates",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Odonates_(SAD)",
-              "catalog_name": null,
+              "catalog_name": "Odonates",
               "source_year": 2012,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Odonates - Advanced",
@@ -8266,9 +8272,10 @@
             {
               "source_name": "Sharks",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Sharks_(SAD)",
-              "catalog_name": null,
+              "catalog_name": "Sharks",
               "source_year": 2012,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Spiders",
@@ -8345,7 +8352,7 @@
       "scope": "NAD",
       "required_honor_count": 7,
       "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Recreation_Master_Award",
-      "requirements_status": "retrieved_needs_mapping_review",
+      "requirements_status": "retrieved",
       "requirement_groups": [
         {
           "name": "Eligible honors",
@@ -8445,9 +8452,10 @@
             {
               "source_name": "Orienteering",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Orienteering_(SPD)",
-              "catalog_name": null,
+              "catalog_name": "Orienteering",
               "source_year": null,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Outdoor Leadership",
@@ -8487,9 +8495,10 @@
             {
               "source_name": "Snowshoeing",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Snowshoeing_(SAD)",
-              "catalog_name": null,
+              "catalog_name": "Snowshoeing",
               "source_year": 2010,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Snowshoeing - Advanced",
@@ -8501,16 +8510,18 @@
             {
               "source_name": "Snowshoeing - Advanced",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Snowshoeing_-_Advanced_(GC)",
-              "catalog_name": null,
+              "catalog_name": "Snowshoeing - Advanced",
               "source_year": 2010,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Snowshoeing - Advanced",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Snowshoeing_-_Advanced_(SAD)",
-              "catalog_name": null,
+              "catalog_name": "Snowshoeing - Advanced",
               "source_year": 2010,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Unicycling",
@@ -8860,7 +8871,7 @@
       "scope": "NAD",
       "required_honor_count": 7,
       "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Technician_Master_Award",
-      "requirements_status": "retrieved_needs_mapping_review",
+      "requirements_status": "retrieved",
       "requirement_groups": [
         {
           "name": "Eligible honors",
@@ -9086,9 +9097,10 @@
             {
               "source_name": "Welding",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Welding_(GC)",
-              "catalog_name": null,
+              "catalog_name": "Welding",
               "source_year": 1978,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Woodworking",
@@ -9117,7 +9129,7 @@
       "scope": "NAD",
       "required_honor_count": 7,
       "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Wilderness_Master_Award",
-      "requirements_status": "retrieved_needs_mapping_review",
+      "requirements_status": "retrieved",
       "requirement_groups": [
         {
           "name": "Eligible honors",
@@ -9203,9 +9215,10 @@
             {
               "source_name": "Orienteering",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Orienteering_(SPD)",
-              "catalog_name": null,
+              "catalog_name": "Orienteering",
               "source_year": null,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Outdoor Leadership",
@@ -9264,7 +9277,7 @@
       "scope": "NAD",
       "required_honor_count": 7,
       "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Zoology_Master_Award",
-      "requirements_status": "retrieved_needs_mapping_review",
+      "requirements_status": "retrieved",
       "requirement_groups": [
         {
           "name": "Foundation",
@@ -9398,9 +9411,10 @@
             {
               "source_name": "Odonates",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Odonates_(SAD)",
-              "catalog_name": null,
+              "catalog_name": "Odonates",
               "source_year": 2012,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Odonates - Advanced",
@@ -9419,9 +9433,10 @@
             {
               "source_name": "Sharks",
               "source_url": "https://wiki.pathfindersonline.org/w/AY_Honors/Sharks_(SAD)",
-              "catalog_name": null,
+              "catalog_name": "Sharks",
               "source_year": 2012,
-              "mapping_status": "needs_review"
+              "mapping_status": "matched",
+              "mapping_basis": "NAD catalog counterpart accepted for Master Award eligibility by club policy (2026-09-18)."
             },
             {
               "source_name": "Spiders",
@@ -9527,5 +9542,6 @@
         "The wild and domestic fauna lists are presented as examples, not necessarily exhaustive. The source attributes a no-reuse restriction involving Naturalist to the South Pacific Division; do not apply that regional rule automatically to NAD."
       ]
     }
-  ]
+  ],
+  "master_awards_mapping_policy": "Use the corresponding NAD catalog honor when a source requirement links to another division or GC edition; duplicate references count as one distinct earned honor. Preserve separate honor editions in the catalog."
 }

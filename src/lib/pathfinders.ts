@@ -102,6 +102,7 @@ export type Filters = {
   staff: string[]
   activity: string[]
   event: string[]
+  honors: number[]
 }
 export const EMPTY_FILTERS: Filters = {
   status: '',
@@ -111,6 +112,7 @@ export const EMPTY_FILTERS: Filters = {
   staff: [],
   activity: [],
   event: [],
+  honors: [],
 }
 
 // Quote the entire JSON operand for PostgREST's logical-expression grammar.
@@ -142,6 +144,18 @@ export function historySearchExpression(filters: Filters) {
   // Build one alternative group per selected category, then require every category group to match.
   const groups: string[] = []
   const any = (clauses: string[]) => `or(${[...new Set(clauses)].join(',')})`
+  if (filters.honors?.some((id) => !Number.isSafeInteger(id) || id <= 0))
+    throw new Error('Select a valid honor.')
+  if (filters.honors?.length)
+    groups.push(
+      any(
+        filters.honors.flatMap((honor_id) =>
+          periods.length
+            ? periods.map((year) => contains('search_honors', { honor_id, year }))
+            : [contains('search_honors', { honor_id })],
+        ),
+      ),
+    )
   // Put the outcome and year in one JSON object so both must belong to the same earned level.
   if (filters.level.length)
     groups.push(

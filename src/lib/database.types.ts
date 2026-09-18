@@ -150,6 +150,7 @@ export type Database = {
         Row: {
           category: string | null
           id: number
+          is_master_award: boolean
           name: string
           skill_level: number | null
           year: number | null
@@ -157,6 +158,7 @@ export type Database = {
         Insert: {
           category?: string | null
           id?: never
+          is_master_award?: boolean
           name: string
           skill_level?: number | null
           year?: number | null
@@ -164,6 +166,7 @@ export type Database = {
         Update: {
           category?: string | null
           id?: never
+          is_master_award?: boolean
           name?: string
           skill_level?: number | null
           year?: number | null
@@ -216,6 +219,112 @@ export type Database = {
             columns: ["pathfinder_id"]
             isOneToOne: false
             referencedRelation: "pathfinders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      master_award_groups: {
+        Row: {
+          award_id: number
+          id: number
+          name: string
+          required_count: number
+          sort_order: number
+        }
+        Insert: {
+          award_id: number
+          id?: never
+          name: string
+          required_count: number
+          sort_order: number
+        }
+        Update: {
+          award_id?: number
+          id?: never
+          name?: string
+          required_count?: number
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_award_groups_award_id_fkey"
+            columns: ["award_id"]
+            isOneToOne: false
+            referencedRelation: "master_awards"
+            referencedColumns: ["honor_id"]
+          },
+        ]
+      }
+      master_award_honors: {
+        Row: {
+          group_id: number
+          honor_id: number | null
+          mapping_status: string
+          source_name: string
+          source_url: string
+          source_year: number | null
+        }
+        Insert: {
+          group_id: number
+          honor_id?: number | null
+          mapping_status: string
+          source_name: string
+          source_url: string
+          source_year?: number | null
+        }
+        Update: {
+          group_id?: number
+          honor_id?: number | null
+          mapping_status?: string
+          source_name?: string
+          source_url?: string
+          source_year?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_award_honors_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "master_award_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "master_award_honors_honor_id_fkey"
+            columns: ["honor_id"]
+            isOneToOne: false
+            referencedRelation: "honors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      master_awards: {
+        Row: {
+          honor_id: number
+          notes: Json
+          required_honor_count: number
+          requirements_status: string
+          source_url: string
+        }
+        Insert: {
+          honor_id: number
+          notes?: Json
+          required_honor_count: number
+          requirements_status: string
+          source_url: string
+        }
+        Update: {
+          honor_id?: number
+          notes?: Json
+          required_honor_count?: number
+          requirements_status?: string
+          source_url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "master_awards_honor_id_fkey"
+            columns: ["honor_id"]
+            isOneToOne: true
+            referencedRelation: "honors"
             referencedColumns: ["id"]
           },
         ]
@@ -863,6 +972,7 @@ export type Database = {
           search_event_details: Json | null
           search_event_years: Json | null
           search_events: Json | null
+          search_honors: Json | null
           search_staff_titles: Json | null
           search_years: Json | null
           sort_first_name: string | null
@@ -918,7 +1028,20 @@ export type Database = {
       }
       current_club_year: { Args: never; Returns: string }
       current_staff_role: { Args: never; Returns: string }
+      get_master_award_status: {
+        Args: { p_pathfinder_id: number }
+        Returns: {
+          earned_years: Json
+          eligible: boolean
+          honor_id: number
+          name: string
+        }[]
+      }
       get_profile_for_edit: { Args: { p_id: number }; Returns: Json }
+      master_award_requirements_met: {
+        Args: { p_earned: number[]; p_groups: Json }
+        Returns: boolean
+      }
       update_profile: {
         Args: { p_id: number; p_original: Json; p_profile: Json }
         Returns: undefined

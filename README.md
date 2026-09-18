@@ -116,7 +116,7 @@ Read [the project context](docs/project-context.md) for ministry background, sou
 
 The **Years** control now applies to Levels, Extracurricular, and Red Zone Events together. Category dropdowns contain only the names and their outcome/team/instrument/operation/placement choices, never years. For example, Years = 2023-24, Levels = Basic or Advanced Friend, and Extracurricular = Snare or Teaching finds people with either selected Friend outcome AND either activity detail, each recorded in 2023-24. Multiple years match any selected year. Without years, the selected categories search all history. With only years selected, browse participation years. Calendar-year selections retain adjacent-period matching. Unknown level years cannot match a specific year.
 
-The general Search Honors filter remains a placeholder; its future filtering must use shared years and within-category OR behavior. Add to Record honor lookup and profile honor display are implemented separately.
+Honors are integrated across Search, Add to Record, Edit Profile, and View Honors. The catalog contains 602 honors and 15 Master Awards. Empty honor searches show no results; typed searches show grouped category bubbles. Shared years filter completed honors/awards. View Honors lists completions alphabetically, followed by earned and eligible-but-unearned Master Awards. Eligibility requires seven distinct eligible honors and the award-specific group quotas; it never creates an earned record. See [catalog sources and mapping limitations](docs/honors-catalog.md).
 
 Add to Record supports **Unknown** years for every category. Undated history appears last with an Unknown label and does not add a Years Active entry. PBE cannot infer Bible books for an unknown year.
 

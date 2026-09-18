@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import Select from '../../components/Select'
 import MultiSelect from '../../components/MultiSelect'
+import HonorSelect, { type Honor } from '../../components/HonorSelect'
 import ProfileOverlay from '../profile/ProfileOverlay'
 import { getSupabase } from '../../lib/supabase'
 import { message } from '../../lib/errors'
@@ -60,8 +61,8 @@ export default function Search({
       )
     return () => controller.abort()
   }, [levelRole, catalogAttempt])
-  // Honors are a UI placeholder until search integration is added.
-  const [honors, setHonors] = useState<string[]>([])
+  // Retain labels for the selected IDs without loading the entire honor catalog.
+  const [honors, setHonors] = useState<Honor[]>([])
   // Keep editing separate from fetching: only submit copies the draft into the active filters.
   const [draft, setDraft] = useState<Filters>(EMPTY_FILTERS)
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
@@ -111,7 +112,7 @@ export default function Search({
     setFilters({ ...draft })
     setPage(0)
   }
-  // Reset both visible inputs and the active query, including the placeholder honors selection.
+  // Reset both visible inputs and the active query, including the selected honors.
   function reset() {
     setHonors([])
     setLevelRole('pathfinder')
@@ -223,13 +224,16 @@ export default function Search({
               variantLabel={(option) => option.split(' / ')[1] ?? 'Any'}
               onChange={(value) => update('event', value)}
             />
-            <MultiSelect
-              closeOnSelect
+            <HonorSelect
               label="Honors"
               values={honors}
-              options={[]}
-              onChange={setHonors}
-              emptyMessage="No honors available yet"
+              onChange={(values) => {
+                setHonors(values)
+                update(
+                  'honors',
+                  values.map((honor) => honor.id),
+                )
+              }}
             />
           </div>
           <div className="actions">

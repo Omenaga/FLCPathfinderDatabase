@@ -86,7 +86,7 @@ export default function EditProfile({
             .abortSignal(controller.signal),
           client
             .from('honors_earned')
-            .select('honors(id,name)')
+            .select('honors(id,name,category)')
             .eq('pathfinder_id', id)
             .abortSignal(controller.signal),
         ])

@@ -17,8 +17,16 @@ export default function MultiSelect({
   optionGroup,
   variantLabel,
   detailOptions,
+  minQueryLength = 0,
+  onSearchChange,
+  placeholder = 'Type or choose?',
+  className = '',
   emptyMessage = 'No matching options',
 }: {
+  minQueryLength?: number
+  onSearchChange?: (query: string) => void
+  placeholder?: string
+  className?: string
   single?: boolean
   closeOnSelect?: boolean
   isOptionDisabled?: (option: string) => boolean
@@ -42,6 +50,7 @@ export default function MultiSelect({
   const [detailSelections, setDetailSelections] = useState<Record<string, string>>({})
   const [text, setText] = useState('')
   const [open, setOpen] = useState(false)
+  const showOptions = open && text.trim().length >= minQueryLength
   const [active, setActive] = useState(0)
   const [position, setPosition] = useState<CSSProperties>({})
   // Place the menu in viewport coordinates so it remains usable inside scrolling dialogs.
@@ -79,6 +88,7 @@ export default function MultiSelect({
   }, [open])
   // Hide selected choices and apply the typed search plus any group-specific detail filter.
   const matches = options.filter((option) => {
+    if (text.trim().length < minQueryLength) return false
     const detail = option.split(' / ')[1] ?? ''
     const group = groupKey?.(option) ?? ''
     // Typing a detail directly bypasses the detail dropdown so those matching options remain discoverable.
@@ -111,6 +121,7 @@ export default function MultiSelect({
         : values
     onChange(single ? [option] : [...remaining, option])
     setText('')
+    onSearchChange?.('')
     setActive(0)
     input.current?.focus()
     // Search closes after choosing so the selected bubble is immediately visible.
@@ -122,15 +133,16 @@ export default function MultiSelect({
     const clear = () => {
       setDetailSelections({})
       setText('')
+      onSearchChange?.('')
       setOpen(false)
       setActive(0)
     }
     form?.addEventListener('reset', clear)
     return () => form?.removeEventListener('reset', clear)
-  }, [])
+  }, [onSearchChange])
   return (
     <div
-      className={compact ? 'multi-select compact-options' : 'multi-select'}
+      className={`${compact ? 'multi-select compact-options' : 'multi-select'} ${className}`.trim()}
       onBlur={(event) => {
         if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
       }}
@@ -143,15 +155,18 @@ export default function MultiSelect({
         role="combobox"
         autoComplete="off"
         value={text}
-        placeholder="Type or choose?"
-        aria-expanded={open}
+        placeholder={placeholder}
+        aria-expanded={showOptions}
         aria-controls={`${id}-options`}
         aria-autocomplete="list"
-        aria-activedescendant={open && matches[active] ? `${id}-option-${active}` : undefined}
+        aria-activedescendant={
+          showOptions && matches[active] ? `${id}-option-${active}` : undefined
+        }
         onFocus={openOptions}
         onClick={openOptions}
         onChange={(event) => {
           setText(event.target.value)
+          onSearchChange?.(event.target.value)
           setActive(0)
           openOptions()
         }}
@@ -194,7 +209,7 @@ export default function MultiSelect({
         ))}
       </div>
       {/* Render either grouped choices with variants or a flat list, using the same selection rules. */}
-      {open && (
+      {showOptions && (
         <ul
           id={`${id}-options`}
           role="listbox"

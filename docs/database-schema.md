@@ -221,20 +221,20 @@ Fill in names before implementing restrictions. Both will use `YYYY-YY` period k
 
 ## Honors
 
-`honors`: id identity PK, name unique text, category text, skill_level smallint (1, 2, or 3), and year integer. Catalog year is the honor's introduction year, independent of club seasons and year earned; null means **Unknown**. Skill level remains null when the source does not publish it. Category may be null for an unmatched legacy entry; populated categories must be nonempty and trimmed. Master Award relationships are planned below and are not yet implemented.
+`honors`: id identity PK, name unique text, category text, skill_level smallint (1, 2, or 3), and year integer. Catalog year is the honor's introduction year, independent of club seasons and year earned; null means **Unknown**. Skill level remains null when the source does not publish it. Category may be null for an unmatched legacy entry; populated categories must be nonempty and trimmed. `is_master_award` distinguishes ordinary honors from Master Awards; both use explicit `honors_earned` records. Requirement relationships and eligibility are described below.
 
-The September 18 migration prepares the three metadata columns without importing honors. A separate staged import contains 602 NAD-listed and Florida Conference honors. Different-year editions have the year appended to their names, including Unknown where applicable. Existing IDs and earned-honor references are retained; ambiguous legacy names are not reassigned to an edition. See [catalog sources and import decisions](honors-catalog.md).
+The September 18 columns migration prepares the metadata. `20260918010000_honors_integration.sql` imports 602 NAD-listed/Florida honors and 15 Master Awards, with the ten display categories below. Different-year editions have the year appended to their names, including Unknown where applicable. Existing IDs and earned-honor references are retained; ambiguous legacy names are not reassigned to an edition. See [catalog sources and import decisions](honors-catalog.md).
 
 `honors_earned`: id identity PK, pathfinder_id FK, honor_id FK, year_earned text range. Unique per person/honor/period. Detail rows cascade when a person is removed by an administrator; catalog honors cannot be deleted while referenced.
 
-The general Search Honors filter remains a placeholder. Add to Record searches the `honors` catalog as the user types, showing up to 20 matches at a time. View Honors fetches earned honors with their years in a separate dialog. Catalog entries are supplied by migrations or an administrator; the app does not invent honors.
+Search, Add to Record, and Edit Profile use the shared database-backed grouped honor picker. Empty/whitespace-only input shows no results and makes no catalog request. Typed names fetch up to 50 matches; selecting or clearing text hides the results while retaining selected honors. Search permits multiple honor/award selections, combined with OR and with other filter categories using AND. Shared years match `honors_earned.year_earned` for the selected honor ID, never its catalog introduction year. Search matches earned awards, not merely eligible ones. Add to Record and each Edit Profile entry select one honor or award at a time. View Honors fetches all completion records in pages and displays them alphabetically with earned years. Catalog entries are supplied by migrations or an administrator; the app does not invent honors.
 
 ### Planned honors selection — schema notes only
 
-These requirements apply when searching for honors, adding earned honors, and editing earned honors. They are recorded for later implementation; this note does not change the current UI, stored catalog, or database constraints.
+These rules apply when searching for honors, adding earned honors, and editing earned honors. `HonorSelect` owns lookup and category ordering; `MultiSelect` supplies the replaceable grouped presentation.
 
 - When the honor search bar is empty (including whitespace-only input), show no honor results and do not fetch the catalog. Once the user types a non-whitespace character, show related matching honors. Clearing the bar hides results again and prevents an earlier request from repopulating them. Existing selections remain visible.
-- Try a grouped **MultiSelect**: category names are the group headings, and individual honor names appear as small selectable bubbles within their groups. Use the edition-qualified name, including its year suffix when needed, so different honors remain distinguishable.
+- Use a grouped **MultiSelect**: category names are the group headings, and individual honor names appear as small selectable bubbles within their groups. Use the edition-qualified name, including its year suffix when needed, so different honors remain distinguishable.
 - The grouped MultiSelect is provisional and may be replaced immediately after trying it. Keep its presentation easy to swap without changing honor IDs, catalog data, or earned-honor records.
 
 Use these category labels and this order:
@@ -250,13 +250,13 @@ Use these category labels and this order:
 9. Florida
 10. Master Award
 
-For future grouping, map source **Arts, Crafts and Hobbies** to **Arts & Crafts**, **Health and Science** to **Health & Science**, and **Spiritual Growth, Outreach and Heritage** to **Outreach**. Florida Conference honors belong under **Florida** (the staged source catalog currently labels them Regional and identifies their Florida scope). The other standard category names already match. These are planned display labels; no live catalog values are rewritten yet. Use **Master Award**, replacing the earlier label Masters.
+The integration maps source **Arts, Crafts and Hobbies** to **Arts & Crafts**, **Health and Science** to **Health & Science**, and **Spiritual Growth, Outreach and Heritage** to **Outreach**. Florida Conference honors belong under **Florida** (the source snapshot labels them Regional and identifies their Florida scope). The other standard category names already match. The imported database categories use these display labels; the JSON snapshot retains the original source labels. Use **Master Award**, replacing the earlier label Masters.
 
-### Planned Master Award catalog and requirements
+### Master Award catalog and requirements
 
 Use the [wiki Master Awards index](https://wiki.pathfindersonline.org/w/AY_Honors/Masters/en) and each linked award's requirement list. Keep the existing NAD scope: include its 15 current NAD awards, exclude awards explicitly marked unavailable in NAD, and omit the retired Witnessing Master Award. This is separate from the Master Guide class/achievement.
 
-Reserve one catalog entry per award, categorized **Master Award**, even if its requirements need manual input later. The prepared catalog at `supabase/catalogs/honors.json` now has a `master_awards` section containing all 15 awards and their retrieved requirement groups. Here, honors_catalog refers to the prepared catalog; the live table is still named `honors`, and no table rename or award import is being applied.
+Each award has a catalog entry categorized **Master Award**, including awards with source choices awaiting manual mapping review. The prepared catalog at `supabase/catalogs/honors.json` now has a `master_awards` section containing all 15 awards and their retrieved requirement groups. Here, honors_catalog refers to the source catalog; the live table remains `honors`.
 
 Each award requires **seven distinct eligible honors**, drawn from its own list. Several awards also impose group minimums, so a single unrestricted seven-of-list check would be insufficient:
 
@@ -278,11 +278,21 @@ Each award requires **seven distinct eligible honors**, drawn from its own list.
 | Wilderness                      | Any 7 listed honors                              |
 | Zoology                         | 1 foundation + 4 wild fauna + 2 domestic fauna   |
 
-The future database model must support an award's total requirement, ordered requirement groups with their own required counts, and links from each group to eligible honor IDs. Honor membership is many-to-many and must reference the exact catalog edition, not just a category or unqualified name. Repeated earned records for the same honor do not count as multiple distinct honors toward one award.
+`master_awards` stores the award catalog ID, total of seven, source URL, requirement status, and notes. `master_award_groups` stores ordered groups with their required counts. `master_award_honors` links source choices to exact honor IDs, with nullable IDs and needs_review status for unresolved mappings. These three tables use RLS: authenticated staff can read them, and administrators maintain them. Honor membership is many-to-many and must reference the exact catalog edition, not just a category or unqualified name. Repeated earned records for the same honor do not count as multiple distinct honors toward one award.
 
-Preserve source URLs and a requirements/mapping status. If an award list cannot be retrieved, retain its award entry, total of seven, and empty requirement groups marked pending manual input; an empty list must never imply that any honor qualifies. All 15 lists were retrieved in this pass. Some source choices refer to other regional editions or honors outside the prepared catalog: preserve those source references with `catalog_name: null` and `mapping_status: needs_review` for later manual resolution, without adding out-of-scope honors or guessing equivalent editions. Source-listed substitutions and example-based lists also need review before automated eligibility checks.
+Preserve source URLs and a requirements/mapping status. If an award list cannot be retrieved, retain its award entry, total of seven, and empty requirement groups marked pending manual input; an empty list must never imply that any honor qualifies. All 15 lists were retrieved in this pass. Some source choices refer to other regional editions or honors outside the prepared catalog: preserve those source references with `catalog_name: null` and `mapping_status: needs_review` for later manual resolution, without adding out-of-scope honors. Per club policy, identified NAD counterparts satisfy regional/GC references even when the source introduction year differs; the September 18 counterpart migration maps 15 such references while preserving their source metadata. Sixteen references without an identified counterpart remain unresolved. Source-listed substitutions and example-based lists also need review before automated eligibility checks.
 
-Only schema notes and prepared catalog data are updated here. Award selection, eligibility calculations, automatic awarding, earned-award storage, and cross-award honor reuse policies remain unimplemented.
+`get_master_award_status(member_id)` returns earned awards with recorded years and eligible-but-unearned awards. It reads through RLS and uses `master_award_requirements_met` to assign distinct earned honors to the seven required group slots, including overlapping groups. Only resolved source mappings count; unresolved alternatives do not block qualification from sufficient known eligible honors. Pending/manual rules and empty groups never qualify. Award eligibility is calculated across all recorded completion years and does not automatically write an earned record. Existing Add to Record and reviewed Edit Profile save flows document earned awards through `honors_earned`, including historical awards whose underlying honors have not yet been entered. No South Pacific-specific cross-award reuse restriction is applied to NAD.
+
+### Honors dialog from past data
+
+From a member's past-data/profile pop-out, clicking **Honors / View Honors** opens their earned-honors dialog. The dialog loads ordinary completions and earned/eligible Master Award status together, with retry and cancellation of obsolete requests.
+
+- List all honors earned by that member in **alphabetical order by honor name**, using the edition-qualified catalog name where applicable. Show the completion year from `honors_earned.year_earned` beside each honor; an unknown completion year displays **Unknown**. The catalog's introduction year is not the completion year. Alphabetical ordering takes precedence over the earlier year-based ordering for this dialog; retain every recorded completion year when an honor has multiple earned records.
+- After the earned-honors list, leave visible space and show a **Master Award** section at the bottom.
+- Show both the member's **earned Master Awards** and awards they are **eligible to earn but have not earned yet**, with those statuses clearly distinguished. An already-earned award appears only as earned, not again as eligible.
+- Determine eligibility from the member's recorded honors and each award's seven-honor requirement, including its required groups and exact eligible editions. Incomplete or unresolved requirements must not produce an unsupported eligible status. Do not list unearned awards whose requirements are not met as eligible.
+- Earned awards require an explicit stored award record; eligibility is derived separately and does not automatically record an award as earned or assign a completion year. The catalog flag and explicit `honors_earned` records preserve that distinction.
 
 ## Search and current results
 
@@ -324,7 +334,7 @@ Computed view fields `search_activities`, `search_activity_years`, `search_event
 
 Both role sections remain identifiable, with empty messages when their summary history is unknown. Activity/event subsections without records are omitted. Current Staff status never hides past Pathfinder records. Staff titles can be supplied later without assigning guessed titles now.
 
-The overlay preserves filters/results/pagination, supports loading/retry and mobile scrolling, prevents stale requests from rendering, and returns focus to its opener. Honors preserves the underlying profile and closes independently with Escape or Close.
+The overlay preserves filters/results/pagination, supports loading/retry and mobile scrolling, prevents stale requests from rendering, and returns focus to its opener. Honors preserves the underlying profile and closes independently with Escape or Close. Its alphabetical earned-honor ordering and earned/eligible Master Award section are specified under **Honors dialog from past data** above.
 
 ## Add page sections and labels
 
@@ -465,7 +475,7 @@ Automatic rollover is not implemented. A future role-aware registration archive 
 
 The **Years** control now applies to Levels, Extracurricular, and Red Zone Events together. Category dropdowns contain only the names and their outcome/team/instrument/operation/placement choices, never years. For example, Years = 2023-24, Levels = Basic or Advanced Friend, and Extracurricular = Snare or Teaching finds people with either selected Friend outcome AND either activity detail, each recorded in 2023-24. Multiple years match any selected year. Without years, the selected categories search all history. With only years selected, browse participation years. Calendar-year selections retain adjacent-period matching. Unknown level years cannot match a specific year.
 
-The general Search Honors filter remains a placeholder; its future filtering must use shared years and within-category OR behavior. Add to Record honor lookup and profile honor display are implemented separately.
+The Search Honors filter uses shared years and within-category OR behavior. `member_search.search_honors` pairs exact honor IDs with completion periods for ordinary honors and explicitly earned Master Awards. Eligible-but-unearned awards do not match earned-award searches.
 
 Category headings and the surrounding group area select the broad level/activity/event option. Inner buttons select specific outcomes or details; there is no separate Any button.
 
