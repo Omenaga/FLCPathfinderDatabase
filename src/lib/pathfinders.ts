@@ -276,7 +276,10 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
           (data.drum_corps?.history ?? []) as { year: string | null; drums: string[] }[]
         ).map((entry) => ({
           years: [entry.year],
-          detail: entry.drums.join(', ') || 'Instrument not recorded',
+          detail:
+            [...entry.drums]
+              .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+              .join(', ') || 'Instrument not recorded',
         })),
       },
       {
@@ -291,6 +294,7 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
           years: [entry.year],
           detail:
             PBE_REGIONS.filter((region) => entry.results?.[region])
+              .sort((a, b) => a.localeCompare(b))
               .map(
                 (region) =>
                   `${region} (${entry.results![region] === 'Participation' ? 'P' : entry.results![region].replace(' Place', '')})`,
@@ -301,7 +305,12 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
       {
         name: 'TLT',
         records: ((data.tlt?.history ?? []) as { year: string | null; operations: string[] }[]).map(
-          (entry) => ({ years: [entry.year], detail: entry.operations.join(', ') }),
+          (entry) => ({
+            years: [entry.year],
+            detail: [...entry.operations]
+              .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+              .join(', '),
+          }),
         ),
       },
     ].filter((group) => group.records.length > 0)
@@ -320,21 +329,11 @@ export async function getPathfinder(id: number, signal: AbortSignal) {
     ]
     const events = EVENTS.map((name, index) => ({
       name,
-      records: eventRows[index]
-        .map((r) => ({
-          year: r.year,
-          placement: r.placement,
-          name: 'name' in r && typeof r.name === 'string' ? r.name : undefined,
-        }))
-        .sort((a, b) =>
-          a.year === null
-            ? b.year === null
-              ? 0
-              : 1
-            : b.year === null
-              ? -1
-              : b.year.localeCompare(a.year),
-        ),
+      records: eventRows[index].map((r) => ({
+        year: r.year,
+        placement: r.placement,
+        name: 'name' in r && typeof r.name === 'string' ? r.name : undefined,
+      })),
     })).filter((group) => group.records.length > 0)
     return {
       role,

@@ -1,25 +1,15 @@
 // Display dated history in order, always placing unknown years after known years.
 
-import type { ReactNode } from 'react'
-
 export default function HistoryRecords({
   records,
-  newestFirst = false,
 }: {
-  records: { year: string | null; detail: ReactNode }[]
-  newestFirst?: boolean
+  records: { year: string | null; detail: string }[]
 }) {
-  // Copy before sorting to preserve the caller's order. Null years stay last in either date direction.
-  const sorted = [...records].sort((a, b) =>
-    a.year === null
-      ? b.year === null
-        ? 0
-        : 1
-      : b.year === null
-        ? -1
-        : newestFirst
-          ? b.year.localeCompare(a.year)
-          : a.year.localeCompare(b.year),
+  // Sort a copy so display ordering never changes the underlying profile data.
+  const sorted = [...records].sort(
+    (a, b) =>
+      (a.year ?? '9999').localeCompare(b.year ?? '9999') ||
+      a.detail.localeCompare(b.detail, undefined, { sensitivity: 'base' }),
   )
   return (
     <dl className="profile-records">

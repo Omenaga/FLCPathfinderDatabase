@@ -546,7 +546,7 @@ test('role histories retain year detail links and nested honors focus', async ({
   await expect(pf).toContainText('Teaching')
   await expect(pf).toContainText('Adult')
   await expect(staff).not.toContainText('Adult')
-  await expect(staff).toContainText('Friend Counselor, Drill Instructor')
+  await expect(staff).toContainText('Drill Instructor, Friend Counselor')
   await page.route('**/rest/v1/honors_earned?**', (route) =>
     route.fulfill({
       json: [{ id: 1, year_earned: '2023-24', honors: { name: 'Camping Skills I' } }],
@@ -1001,7 +1001,7 @@ test('clearing honor text suppresses an in-flight response and lookup errors can
   await expect(page.getByRole('option', { name: 'Camping Skills I', exact: true })).toBeVisible()
 })
 
-test('Honors dialog sorts all earned honors alphabetically and separates earned and eligible awards', async ({
+test('Honors dialog groups years earliest first with alphabetical honors and separates awards', async ({
   page,
 }) => {
   await setup(page)
@@ -1009,6 +1009,7 @@ test('Honors dialog sorts all earned honors alphabetically and separates earned 
     r.fulfill({
       json: [
         { id: 1, year_earned: '2025-26', honors: { name: 'Zoology', is_master_award: false } },
+        { id: 6, year_earned: '2025-26', honors: { name: 'Archery', is_master_award: false } },
         { id: 2, year_earned: null, honors: { name: 'Abseiling', is_master_award: false } },
         {
           id: 3,
@@ -1051,13 +1052,18 @@ test('Honors dialog sorts all earned honors alphabetically and separates earned 
   const dialog = page.getByRole('dialog', { name: 'Honors', exact: true })
   await expect(dialog.getByRole('alert')).toContainText('Awards temporarily unavailable')
   await dialog.getByRole('button', { name: 'Retry honors' }).click()
-  await expect(dialog.locator('dd')).toHaveText([
+  await expect(dialog.locator('.honors-year-list li')).toHaveText([
+    'Camping Skills I',
+    'Camping Skills I',
+    'Archery',
+    'Zoology',
     'Abseiling',
-    'Camping Skills I',
-    'Camping Skills I',
+  ])
+  await expect(dialog.locator('dt')).toHaveText(['2022-23', '2024-25', '2025-26', 'Unknown'])
+  await expect(dialog.getByRole('list', { name: 'Honors earned 2025-26' }).locator('li')).toHaveText([
+    'Archery',
     'Zoology',
   ])
-  await expect(dialog.locator('dt')).toHaveText(['Unknown', '2024-25', '2022-23', '2025-26'])
   const awards = dialog.getByRole('region', { name: 'Master Award', exact: true })
   await expect(awards.locator('li')).toHaveText([
     'Aquatic Master AwardEligible — not yet earned',
@@ -1079,7 +1085,9 @@ test('Edit Profile selects a Master Award with the grouped picker and saves an e
       json: [{ id: 600, name: 'Aquatic Master Award', category: 'Master Award' }],
     })
   })
-  const honorSection = editor.getByRole('region', { name: 'Honors', exact: true })
+  await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
+  const honorsEditor = page.getByRole('dialog', { name: 'Edit Honors', exact: true })
+  const honorSection = honorsEditor.getByRole('region', { name: 'Honors', exact: true })
   const input = honorSection.getByRole('combobox', { name: 'Find an honor' })
   await input.click()
   await page.waitForTimeout(300)
@@ -1090,6 +1098,12 @@ test('Edit Profile selects a Master Award with the grouped picker and saves an e
   await input.fill('Aquatic')
   await expect(honorSection.getByRole('group', { name: 'Master Award', exact: true })).toBeVisible()
   await honorSection.getByRole('option', { name: 'Aquatic Master Award', exact: true }).click()
+  await honorsEditor.getByRole('button', { name: 'Back to Edit Profile' }).click()
+  await expect(editor.getByRole('button', { name: 'Edit Honors', exact: true })).toBeFocused()
+  await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
+  await expect(honorSection).toContainText('Aquatic Master Award')
+  await page.keyboard.press('Escape')
+  await expect(honorsEditor).toHaveCount(0)
   let saved: { p_original: unknown; p_profile: { honors_earned: unknown[] } } | undefined
   await page.route('**/rest/v1/rpc/update_profile', (r) => {
     saved = r.request().postDataJSON()
@@ -1467,10 +1481,11 @@ test('removing instances stays in the draft and appears in the confirmation rece
     .getByRole('region', { name: 'Burning Twine', exact: true })
     .getByRole('button', { name: 'Remove Burning Twine Entry 1', exact: true })
     .click()
-  await editor
-    .getByRole('region', { name: 'Honors', exact: true })
-    .getByRole('button', { name: 'Remove Honors Entry 1', exact: true })
-    .click()
+  await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
+  const honorsEditor = page.getByRole('dialog', { name: 'Edit Honors', exact: true })
+  await honorsEditor.getByRole('button', { name: 'Remove Honors Entry 1', exact: true }).click()
+  await expect(honorsEditor).toContainText('No honors recorded.')
+  await honorsEditor.getByRole('button', { name: 'Back to Edit Profile' }).click()
   const archery = editor.getByRole('region', { name: 'Archery', exact: true })
   await archery.getByRole('button', { name: 'Add Archery', exact: true }).click()
   await archery.getByLabel('Year').selectOption('2024-25')
@@ -1540,4 +1555,56 @@ test('missing current registration is shown automatically and saved with the pro
   expect(payload.p_profile.current_data).toEqual([
     { school_year: '2026-27', status: 'not_active', current_title: null },
   ])
+})
+
+
+test('every profile history sorts years ascending and same-year details alphabetically', async ({ page }) => {
+  await setup(page)
+  const years = ['2026-27', null, '2023-24']
+  const history = years.flatMap((year) => [
+    { year, titles: ['Zulu', 'Alpha'], drums: ['Snare', 'Bass'], operations: ['Teaching', 'Leadership'] },
+  ])
+  const events = Object.fromEntries(
+    Object.keys(fixture).filter((key) => key.startsWith('red_zone_')).map((key) => [key,
+      years.flatMap((year) => [
+        { year, name: 'Zulu', placement: 'Participation' },
+        { year, name: 'Alpha', placement: '1st Place' },
+      ]),
+    ]),
+  )
+  await page.route('**/rest/v1/pathfinders?**', (route) => route.fulfill({ json: {
+    ...fixture,
+    ...events,
+    years_active: ['2026-27', '2023-24'],
+    levels: years.flatMap((year) => [
+      { year, name: 'Friend', outcome: 'basic' },
+      { year, name: 'Companion', outcome: 'basic' },
+    ]),
+    staff_history: { history },
+    drum_corps: { history },
+    tlt: { history },
+    drill: [
+      { years, team: 'Precision' },
+      { years, team: 'Adult' },
+    ],
+    pbe: { history: years.map((year) => ({ year, books: [], results: { State: '1st Place', Area: 'Participation' } })) },
+  } }))
+  await page.getByRole('button', { name: 'Open profile for Justin Wu' }).click()
+  const profile = page.getByRole('dialog', { name: 'Member profile' })
+  await expect(profile.locator('.profile-records')).toHaveCount(16)
+  for (const records of await profile.locator('.profile-records').all()) {
+    const rows = await records.locator(':scope > div').evaluateAll((elements) => elements.map((element) => ({
+      year: element.querySelector('dt')!.textContent!,
+      detail: element.querySelector('dd')!.textContent!,
+    })))
+    expect(rows.map((row) => row.year)).toContain('2026-27')
+    expect(rows).toEqual([...rows].sort((a, b) =>
+      (a.year === 'Unknown' ? '9999' : a.year).localeCompare(b.year === 'Unknown' ? '9999' : b.year) ||
+      a.detail.localeCompare(b.detail, undefined, { sensitivity: 'base' }),
+    ))
+  }
+  await expect(profile).toContainText('Alpha, Zulu')
+  await expect(profile).toContainText('Bass, Snare')
+  await expect(profile).toContainText('Leadership, Teaching')
+  await expect(profile).toContainText('Area (P), State (1st)')
 })

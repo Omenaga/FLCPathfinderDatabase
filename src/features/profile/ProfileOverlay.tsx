@@ -8,7 +8,7 @@ import EditProfile from './EditProfile'
 import HonorsOverlay from './HonorsOverlay'
 import { message } from '../../lib/errors'
 import { statusLabel } from '../../lib/format'
-import { getPathfinder, ACHIEVEMENTS, type PathfinderDetails } from '../../lib/pathfinders'
+import { getPathfinder, type PathfinderDetails } from '../../lib/pathfinders'
 
 export default function ProfileOverlay({
   id,
@@ -38,13 +38,7 @@ export default function ProfileOverlay({
   }, [id, attempt])
   // Deduplicate display years without modifying the fetched record.
   const years = [...new Set(details?.member.years_active ?? [])].sort()
-  // Sort by year, then class order; the sentinel places unknown dates after recorded years.
-  const levels = [...(details?.member.levels ?? [])].sort(
-    (a, b) =>
-      (a.year ?? '9999').localeCompare(b.year ?? '9999') ||
-      ACHIEVEMENTS.indexOf(a.name as (typeof ACHIEVEMENTS)[number]) -
-        ACHIEVEMENTS.indexOf(b.name as (typeof ACHIEVEMENTS)[number]),
-  )
+  const levels = details?.member.levels ?? []
   const birthday = details?.member.birth_date
   return (
     <Modal
@@ -133,7 +127,10 @@ export default function ProfileOverlay({
                     <HistoryRecords
                       records={details.staffHistory.map((record) => ({
                         year: record.year,
-                        detail: record.titles.join(', ') || 'Title not recorded',
+                        detail:
+                          [...record.titles]
+                            .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+                            .join(', ') || 'Title not recorded',
                       }))}
                     />
                   ) : (
@@ -161,7 +158,6 @@ export default function ProfileOverlay({
                     <section className="profile-event" key={event.name} aria-label={event.name}>
                       <h5>{event.name}</h5>
                       <HistoryRecords
-                        newestFirst
                         records={event.records.map((record) => ({
                           year: record.year,
                           detail: [record.name, record.placement].filter(Boolean).join(' - '),

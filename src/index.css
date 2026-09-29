@@ -639,6 +639,13 @@ li {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.honors-year-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4rem;
+}
 .profile-events {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr));

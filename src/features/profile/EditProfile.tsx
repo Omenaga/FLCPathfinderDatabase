@@ -64,6 +64,7 @@ export default function EditProfile({
   const [attempt, setAttempt] = useState(0)
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
+  const [honorsOpen, setHonorsOpen] = useState(false)
   // A non-null review switches from editing to confirmation and holds the exact proposed save.
   const [review, setReview] = useState<Profile | null>(null)
   const sending = useRef(false)
@@ -762,6 +763,36 @@ export default function EditProfile({
                 }),
               ),
             )}
+            <section className="edit-section" aria-label="Honors">
+              <div className="section-heading">
+                <h3>Honors</h3>
+                <button type="button" className="secondary" onClick={() => setHonorsOpen(true)}>
+                  Edit Honors
+                </button>
+              </div>
+              <p>{draft.honors_earned.length} honor entries in this profile.</p>
+            </section>
+          </fieldset>
+        </form>
+      )}
+      {honorsOpen && draft && catalog && (
+        <Modal
+          title="Edit Honors"
+          header={<h2>Edit Honors</h2>}
+          onClose={() => setHonorsOpen(false)}
+          hideClose
+          headerActions={
+            <button type="button" onClick={() => setHonorsOpen(false)}>
+              Back to Edit Profile
+            </button>
+          }
+        >
+          <p>
+            Honor changes stay in your profile draft. Save Changes in Edit Profile to review and
+            confirm them.
+          </p>
+          <div className="record-form profile-editor">
+            {draft.honors_earned.length === 0 && <p>No honors recorded.</p>}
             {rows(
               'honors_earned',
               'Honors',
@@ -789,8 +820,8 @@ export default function EditProfile({
               ),
               () => ({ honor_id: null, year_earned: PERIODS.at(-1)! }),
             )}
-          </fieldset>
-        </form>
+          </div>
+        </Modal>
       )}
     </Modal>
   )

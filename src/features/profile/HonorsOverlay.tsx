@@ -56,8 +56,8 @@ export default function HonorsOverlay({ id, onClose }: { id: number; onClose: ()
           const records = earned.filter((row) => !row.honors.is_master_award)
           records.sort(
             (a, b) =>
+              (a.year_earned ?? '9999').localeCompare(b.year_earned ?? '9999') ||
               a.honors.name.localeCompare(b.honors.name, undefined, { sensitivity: 'base' }) ||
-              (b.year_earned ?? '').localeCompare(a.year_earned ?? '') ||
               a.id - b.id,
           )
           setData({ memberId: id, records, awards: (awards.data ?? []) as AwardStatus[] })
@@ -70,6 +70,13 @@ export default function HonorsOverlay({ id, onClose }: { id: number; onClose: ()
     void load()
     return () => controller.abort()
   }, [id, attempt])
+  // Sorted records keep year groups earliest first, unknown years last, and honors alphabetical.
+  const years = new Map<string | null, EarnedHonor[]>()
+  for (const record of data?.records ?? []) {
+    const entries = years.get(record.year_earned) ?? []
+    entries.push(record)
+    years.set(record.year_earned, entries)
+  }
   return (
     <Modal title="Honors" header={<h2>Honors</h2>} onClose={onClose}>
       {error ? (
@@ -93,10 +100,22 @@ export default function HonorsOverlay({ id, onClose }: { id: number; onClose: ()
         <>
           {data.records.length ? (
             <dl className="profile-records" aria-label="Earned honors">
-              {data.records.map((record) => (
-                <div key={record.id}>
-                  <dt>{record.year_earned ?? 'Unknown'}</dt>
-                  <dd>{record.honors.name}</dd>
+              {[...years].map(([year, records]) => (
+                <div
+                  key={year ?? 'unknown'}
+                  className={year === null ? 'unknown-history' : undefined}
+                >
+                  <dt>{year ?? 'Unknown'}</dt>
+                  <dd>
+                    <ul
+                      className="honors-year-list"
+                      aria-label={`Honors earned ${year ?? 'in an unknown year'}`}
+                    >
+                      {records.map((record) => (
+                        <li key={record.id}>{record.honors.name}</li>
+                      ))}
+                    </ul>
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -114,7 +133,10 @@ export default function HonorsOverlay({ id, onClose }: { id: number; onClose: ()
                       <strong>{award.name}</strong>
                       {award.earned_years.length > 0 ? (
                         <span>
-                          Earned — {award.earned_years.map((year) => year ?? 'Unknown').join(', ')}
+                          Earned — {[...award.earned_years]
+                            .sort((a, b) => (a ?? '9999').localeCompare(b ?? '9999'))
+                            .map((year) => year ?? 'Unknown')
+                            .join(', ')}
                         </span>
                       ) : (
                         <span>Eligible — not yet earned</span>
