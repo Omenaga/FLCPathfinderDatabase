@@ -507,9 +507,29 @@ Each profile section (levels, staff titles, activities, event results, and honor
 
 ## Editing existing profiles
 
+### Section pop-out editors
+
+Each section summary shows its current draft entry count before opening the pop-out. Counts include recorded class entries, individual Staff/Drums/PBE/TLT history entries, and individual Drill/event/honor rows; unrecorded class placeholders do not count. Adding or removing entries updates the summary when returning to Edit Profile.
+
+- The main editor uses **Edit (Section)** buttons instead of **Add (Section)** buttons. Each button opens a separate pop-out for adding, editing, and removing entries in that specific section, following the existing **Edit Honors** pattern.
+- Validate incomplete entries when choosing **Back to Edit Profile** in each section pop-out. Keep the pop-out open and show a warning explaining how to complete or remove incomplete entries. Apply the same check to Escape/other return paths; do not defer this feedback until Save Changes in the main editor. Unknown is a valid year, not an incomplete entry.
+- Keep section pop-outs linked to the shared Edit Profile draft. Returning to Edit Profile preserves edits; the existing Save Changes and confirmation flow saves them together.
+- Display validation and duplicate warnings in a footer pinned to the bottom of the section pop-out, always visible while its entries scroll.
+- Dismiss any existing warning on the next click anywhere in the pop-out, without consuming that click or blocking its normal action. A newly blocked return or duplicate attempt shows a fresh warning; the click that triggers it must not immediately dismiss it.
+
+Implemented for Levels, Staff History, Drill, Drums, PBE, TLT, every Red Zone event section, and Honors. Personal Details and Current Registration stay in the main editor. Section headers and warning footers remain fixed while entry lists scroll. Empty detail arrays that represent unknown participation remain valid; missing honor selections, blank required event names, and Drill entries without any year are checked when returning.
+
+### Current implementation
+
+Edit Honors checks for entries without a selected honor when returning with **Back to Edit Profile** or Escape. It keeps the pop-out open with a warning until those entries are completed or removed. Save Changes retains a defensive validation check.
+
 `20260916010000_edit_profile.sql` originally added authenticated, security-invoker RPCs `get_profile_for_edit(p_id)` and `update_profile(p_id, p_original, p_profile)`. The editor uses ordinary labeled fields for personal details and Notes, current registration, levels, Staff history, Drill, Drums, PBE books/results, TLT, Red Zone results, and earned honors. History sections support additional entries; ordinary classes use their visible outcome controls, while Master Guide has a dedicated Add button when unrecorded. Existing row identities, ownership, and audit fields cannot be changed, and permanent member profiles cannot be deleted through this RPC. History entries can be removed; registration removal was subsequently prohibited by the September 16 preservation migration. New rows contain editable fields only; their ownership and identities are assigned by the database.
 
 Save Changes in the editor header opens a receipt grouped into Added, Updated, and Removed, with before/after details. Cancel replaces Close in the editor header. The receipt has an untimed Confirm button and Back to Edit; only Confirm submits. While saving, repeat submissions and closing are blocked. Success closes the editor and reloads the original profile popup and search results. Errors retain the draft. Cancel discards the draft.
+
+Within each receipt group, changes follow profile section order, then earliest-to-latest year and alphabetical details; Unknown years appear last. The editor sorts dated entries earliest first within each section (and within each class), alphabetizes same-year entries, and places Unknown last without changing draft identities. Duplicate attempts show a small warning in the section pop-out footer; the next click dismisses it without consuming that action. New history entries default to Unknown. Multiple Unknown-year entries are allowed; duplicate checks apply only to known years. The editor rejects duplicate known-year entries as they are entered, including overlapping Drill team/year pairs, repeated honors for the same year, and repeated Staff/Drums/PBE/TLT year entries. Multiple details for these yearly histories belong in the existing entry. The same data in a different year remains allowed.
+
+Before review, Edit Profile adds known years from added or changed documentation to Years Active, deduplicates and sorts the years, and shows the resulting change in the receipt. This includes levels, staff history, activities, events, honors, and changed active Pathfinder/Staff registration. Unknown years never enter Years Active. Removing history does not remove active years, and unchanged historical entries do not override manual Years Active edits. The reviewed Years Active value is saved atomically with the rest of the profile.
 
 The save locks the profile and existing related rows, compares the original snapshot with the current database snapshot, and updates only changed rows through a fixed table/column allowlist. Existing constraints and RLS remain in force. All updates are in one transaction: an invalid field rolls back every change. A stale snapshot is rejected with instructions to reopen the editor. No existing records are rewritten by the migration, and anonymous callers cannot execute either RPC.
 
@@ -517,7 +537,7 @@ The save locks the profile and existing related rows, compares the original snap
 
 The editor displays all eight classes by name. Missing outcomes display N/A without creating placeholder database entries; selecting N/A removes that particular level entry. Multiple recorded entries for a class remain individually editable. Year selectors offer 2010-11 through the current calendar year's club period, plus Unknown for nullable history, and preserve any existing older value. Current Registration is below Notes and above Levels. Entry fieldsets retain their boundaries without numbered headings.
 
-PBE books are read-only in the editor and derive from the chosen year. On saving a changed PBE section, the server derives every entry's books from `pbe_year_books`; submitted book lists cannot override the catalog. Unknown years have no books. Each history section can add a new instance without leaving the editor.
+PBE books are read-only in the editor and derive from the chosen year. On saving a changed PBE section, the server derives every entry's books from `pbe_year_books`; submitted book lists cannot override the catalog. Unknown years have no books. Each history section can add a new instance inside its section pop-out.
 
 `20260916030000_edit_profile_removals.sql` allows the atomic editor save to remove registration and history rows omitted from the reviewed snapshot. Direct table DELETE remains denied. Only `update_profile` uses narrowly scoped security-definer privileges for the reviewed save, explicitly requiring an authenticated editor identity before accessing data. Permanent `pathfinders` rows and catalogs remain protected. The RPC still validates ownership, row identities, the full original snapshot, and all updated/added data. Deletes occur before updates within a table, and all changes roll back together if any operation fails.
 
@@ -525,6 +545,8 @@ Each existing history instance has an X in its top-right corner. Removing the la
 
 `20260916040000_preserve_current_registration.sql` requires exactly one Current Registration row in a profile save and prevents removing/replacing its stored identity. The editor has no X for Current Registration. If registration was already absent, the editor supplies an editable Not Active registration for `current_club_year()` and includes it in the save receipt. No existing database records are rewritten by the migration.
 
-PBE receipt descriptions omit Bible Books and show the year and regional results. Automatic book selection and storage remain unchanged. Red Zone Events in the read-only profile use the same year/detail lists as the other history sections, retaining event names, named evaluations, placements, newest-first ordering, and Unknown entries last.
+PBE receipt descriptions omit Bible Books and show the year and regional results. Automatic book selection and storage remain unchanged. Red Zone Events in the read-only profile use the same year/detail lists as the other history sections, retaining event names, named evaluations, placements, earliest-first ordering with alphabetical details within each year, and Unknown entries last.
 
 Master Guide appears after the eight ordinary classes in the Levels editor. Add Master Guide creates an Unknown-year draft entry, whose year can be changed; no Outcome field is rendered. Existing migrated Master Guide entries remain individually editable/removable. Add to Record treats the achievement as already present once its name exists in any year, preserving all existing dates.
+
+`20260929000000_multiple_unknown_entries.sql` permits repeated undated history and honor/event rows while retaining known-year validation. Bulk history merges preserve additional undated instances. Apply this migration before using multiple Unknown entries in Edit Profile.

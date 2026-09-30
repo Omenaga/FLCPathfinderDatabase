@@ -11,6 +11,8 @@ export default function Modal({
   closeDisabled = false,
   hideClose = false,
   wide = false,
+  footer,
+  onClickCapture,
 }: {
   title: string
   header?: ReactNode
@@ -20,6 +22,8 @@ export default function Modal({
   closeDisabled?: boolean
   hideClose?: boolean
   wide?: boolean
+  footer?: ReactNode
+  onClickCapture?: () => void
 }) {
   const dialog = useRef<HTMLDialogElement>(null)
   // A new dialog step may change its title; start that step at the top and focus a header action.
@@ -48,8 +52,9 @@ export default function Modal({
   return (
     <dialog
       ref={dialog}
-      className={`profile-overlay${wide ? ' wide-overlay' : ''}`}
+      className={`profile-overlay${wide ? ' wide-overlay' : ''}${footer !== undefined ? ' footer-overlay' : ''}`}
       aria-label={title}
+      onClickCapture={onClickCapture}
       onCancel={(event) => {
         // Handle Escape through the parent callback so React state stays in sync with the native dialog.
         event.preventDefault()
@@ -73,7 +78,8 @@ export default function Modal({
           )}
         </div>
       </header>
-      {children}
+      {footer !== undefined ? <div className="modal-body">{children}</div> : children}
+      {footer !== undefined && <footer className="modal-footer">{footer}</footer>}
     </dialog>
   )
 }

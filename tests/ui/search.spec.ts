@@ -843,6 +843,25 @@ test('search keeps Staff Title below History type and Name widest', async ({ pag
   }
 })
 
+async function returnToEditor(page: Page) {
+  const section = page.locator('dialog.footer-overlay')
+  if (await section.count()) {
+    await section.getByRole('button', { name: 'Back to Edit Profile', exact: true }).click()
+    await expect(section).toHaveCount(0)
+  }
+}
+async function editSection(page: Page, name: string) {
+  const dialog = page.getByRole('dialog', { name: `Edit ${name}`, exact: true })
+  if (!(await dialog.count())) {
+    await returnToEditor(page)
+    await page
+      .getByRole('dialog', { name: 'Edit Profile', exact: true })
+      .getByRole('button', { name: `Edit ${name}`, exact: true })
+      .click()
+  }
+  return dialog.getByRole('region', { name, exact: true })
+}
+
 async function setupEditor(page: Page) {
   await setup(page)
   const profile = {
@@ -1060,10 +1079,9 @@ test('Honors dialog groups years earliest first with alphabetical honors and sep
     'Abseiling',
   ])
   await expect(dialog.locator('dt')).toHaveText(['2022-23', '2024-25', '2025-26', 'Unknown'])
-  await expect(dialog.getByRole('list', { name: 'Honors earned 2025-26' }).locator('li')).toHaveText([
-    'Archery',
-    'Zoology',
-  ])
+  await expect(
+    dialog.getByRole('list', { name: 'Honors earned 2025-26' }).locator('li'),
+  ).toHaveText(['Archery', 'Zoology'])
   const awards = dialog.getByRole('region', { name: 'Master Award', exact: true })
   await expect(awards.locator('li')).toHaveText([
     'Aquatic Master AwardEligible — not yet earned',
@@ -1085,6 +1103,7 @@ test('Edit Profile selects a Master Award with the grouped picker and saves an e
       json: [{ id: 600, name: 'Aquatic Master Award', category: 'Master Award' }],
     })
   })
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
   const honorsEditor = page.getByRole('dialog', { name: 'Edit Honors', exact: true })
   const honorSection = honorsEditor.getByRole('region', { name: 'Honors', exact: true })
@@ -1100,6 +1119,7 @@ test('Edit Profile selects a Master Award with the grouped picker and saves an e
   await honorSection.getByRole('option', { name: 'Aquatic Master Award', exact: true }).click()
   await honorsEditor.getByRole('button', { name: 'Back to Edit Profile' }).click()
   await expect(editor.getByRole('button', { name: 'Edit Honors', exact: true })).toBeFocused()
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
   await expect(honorSection).toContainText('Aquatic Master Award')
   await page.keyboard.press('Escape')
@@ -1109,6 +1129,7 @@ test('Edit Profile selects a Master Award with the grouped picker and saves an e
     saved = r.request().postDataJSON()
     return r.fulfill({ json: null })
   })
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
   const receipt = page.getByRole('dialog', { name: 'Confirm Profile Changes', exact: true })
   await expect(receipt).toContainText('Aquatic Master Award')
@@ -1174,7 +1195,10 @@ test('Master Guide is added and displayed as an achievement with a year and no o
   page,
 }) => {
   const { editor, profile } = await setupEditor(page)
-  const masterGuide = editor.getByRole('region', { name: 'Master Guide', exact: true })
+  const masterGuide = (await editSection(page, 'Levels')).getByRole('region', {
+    name: 'Master Guide',
+    exact: true,
+  })
   await expect(editor.getByLabel('Current Activities')).toHaveCount(0)
   await masterGuide.getByRole('button', { name: 'Add Master Guide' }).click()
   await expect(masterGuide.getByLabel('Outcome')).toHaveCount(0)
@@ -1196,6 +1220,7 @@ test('Master Guide is added and displayed as an achievement with a year and no o
       json: { ...fixture, levels: [...member.levels, { name: 'Master Guide', year: '2024-25' }] },
     }),
   )
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Save Changes' }).click()
   const receipt = page.getByRole('dialog', { name: 'Confirm Profile Changes' })
   await expect(receipt).toContainText('Master Guide')
@@ -1266,10 +1291,8 @@ test('Edit Profile confirms once, updates history and returns to the refreshed p
   })
   await editor.getByLabel('First Name', { exact: true }).fill('Alex')
   await editor.getByLabel('Notes', { exact: true }).fill('Updated paragraph.\n\nMore notes.')
-  await editor
-    .getByRole('region', { name: 'Burning Twine', exact: true })
-    .getByLabel('Placement')
-    .selectOption('2nd Place')
+  await (await editSection(page, 'Burning Twine')).getByLabel('Placement').selectOption('2nd Place')
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
   expect(payload).toBeUndefined()
   await page
@@ -1327,6 +1350,7 @@ test('Edit Profile receipt keeps failed edits and supports going back without sa
     })
   })
   await editor.getByLabel('Notes', { exact: true }).fill('Keep my draft')
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
   const review = page.getByRole('dialog', { name: 'Confirm Profile Changes' })
   await expect(review.getByRole('region', { name: 'Updated' })).toContainText('Keep my draft')
@@ -1335,6 +1359,7 @@ test('Edit Profile receipt keeps failed edits and supports going back without sa
   expect(writes).toBe(0)
   await review.getByRole('button', { name: 'Back to Edit' }).click()
   await editor.getByLabel('Last Name', { exact: true }).fill('Changed')
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
   await expect(review).toContainText('Changed')
   await review.getByRole('button', { name: 'Confirm', exact: true }).click()
@@ -1381,7 +1406,7 @@ test('Edit Profile shows all classes, year dropdowns, automatic PBE books and ne
       .getByRole('region', { name: 'Current Registration', exact: true })
       .getByRole('button', { name: /^Remove Current Registration Entry/ }),
   ).toHaveCount(0)
-  const levels = editor.getByRole('region', { name: 'Levels', exact: true })
+  const levels = await editSection(page, 'Levels')
   for (const name of [
     'Friend',
     'Companion',
@@ -1411,17 +1436,21 @@ test('Edit Profile shows all classes, year dropdowns, automatic PBE books and ne
   const headings = await editor.locator('h3').allTextContents()
   expect(headings.indexOf('Current Registration')).toBeLessThan(headings.indexOf('Levels'))
   await expect(editor.locator('legend')).toHaveCount(0)
-  const pbe = editor.getByRole('region', { name: 'PBE', exact: true })
+  const pbe = await editSection(page, 'PBE')
   await expect(pbe.getByRole('combobox', { name: 'Bible Books' })).toHaveCount(0)
   await expect(pbe).toContainText('1 Kings, Ruth')
   await pbe.getByRole('button', { name: 'Add PBE', exact: true }).click()
-  await pbe.getByLabel('Year', { exact: true }).last().selectOption('2021-22')
-  // Pick a distinct year before submission; the existing entry already uses 2021-22.
+  // Free the existing year before assigning it to the new entry.
   await pbe.getByLabel('Year', { exact: true }).first().selectOption('')
-  const drums = editor.getByRole('region', { name: 'Drums', exact: true })
+  await pbe
+    .locator('fieldset')
+    .filter({ has: page.getByRole('button', { name: 'Remove PBE Entry 2', exact: true }) })
+    .getByLabel('Year', { exact: true })
+    .selectOption('2021-22')
+  const drums = await editSection(page, 'Drums')
   await drums.getByRole('button', { name: 'Add Drums', exact: true }).click()
   await drums.getByLabel('Year', { exact: true }).last().selectOption('2024-25')
-  const archery = editor.getByRole('region', { name: 'Archery', exact: true })
+  const archery = await editSection(page, 'Archery')
   await archery.getByRole('button', { name: 'Add Archery', exact: true }).click()
   await archery.getByLabel('Year', { exact: true }).selectOption('2023-24')
   await archery.getByLabel('Placement').selectOption('1st Place')
@@ -1430,6 +1459,7 @@ test('Edit Profile shows all classes, year dropdowns, automatic PBE books and ne
     payload = r.request().postDataJSON()
     return r.fulfill({ status: 204 })
   })
+  await returnToEditor(page)
   await header.getByRole('button', { name: 'Save Changes', exact: true }).click()
   await expect(page.getByRole('dialog', { name: 'Confirm Profile Changes' })).not.toContainText(
     'Bible Books',
@@ -1464,37 +1494,40 @@ test('removing instances stays in the draft and appears in the confirmation rece
       .getByRole('region', { name: 'Current Registration', exact: true })
       .getByRole('button', { name: /^Remove Current Registration Entry/ }),
   ).toHaveCount(0)
-  const levels = editor.getByRole('region', { name: 'Levels', exact: true })
+  const levels = await editSection(page, 'Levels')
   await expect(levels.getByRole('button', { name: /^Add / })).toHaveText(['Add Master Guide'])
   await levels.getByRole('button', { name: 'Remove Friend Entry', exact: true }).click()
   await expect(
     levels.getByRole('region', { name: 'Friend', exact: true }).getByLabel('Outcome'),
   ).toHaveValue('')
-  await editor
-    .getByRole('region', { name: 'Drums', exact: true })
+  await (
+    await editSection(page, 'Drums')
+  )
     .getByRole('button', { name: 'Remove Drums Entry 1', exact: true })
     .click()
-  await expect(
-    editor.getByRole('region', { name: 'Drums', exact: true }).getByLabel('Year'),
-  ).toHaveCount(0)
-  await editor
-    .getByRole('region', { name: 'Burning Twine', exact: true })
+  await expect((await editSection(page, 'Drums')).getByLabel('Year')).toHaveCount(0)
+  await (
+    await editSection(page, 'Burning Twine')
+  )
     .getByRole('button', { name: 'Remove Burning Twine Entry 1', exact: true })
     .click()
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
   const honorsEditor = page.getByRole('dialog', { name: 'Edit Honors', exact: true })
   await honorsEditor.getByRole('button', { name: 'Remove Honors Entry 1', exact: true }).click()
   await expect(honorsEditor).toContainText('No honors recorded.')
   await honorsEditor.getByRole('button', { name: 'Back to Edit Profile' }).click()
-  const archery = editor.getByRole('region', { name: 'Archery', exact: true })
+  const archery = await editSection(page, 'Archery')
   await archery.getByRole('button', { name: 'Add Archery', exact: true }).click()
   await archery.getByLabel('Year').selectOption('2024-25')
+  await returnToEditor(page)
   await editor.getByLabel('Notes', { exact: true }).fill('Reviewed note')
   let payload: any
   await page.route('**/rest/v1/rpc/update_profile', (r) => {
     payload = r.request().postDataJSON()
     return r.fulfill({ status: 204 })
   })
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
   const review = page.getByRole('dialog', { name: 'Confirm Profile Changes' })
   expect(payload).toBeUndefined()
@@ -1511,9 +1544,8 @@ test('removing instances stays in the draft and appears in the confirmation rece
   )
   await page.screenshot({ path: 'test-results/profile-change-receipt.png', fullPage: true })
   await review.getByRole('button', { name: 'Back to Edit' }).click()
-  await expect(
-    editor.getByRole('region', { name: 'Drums', exact: true }).getByLabel('Year'),
-  ).toHaveCount(0)
+  await expect((await editSection(page, 'Drums')).getByLabel('Year')).toHaveCount(0)
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
   await review.getByRole('button', { name: 'Confirm', exact: true }).click()
   await expect(review).toHaveCount(0)
@@ -1546,6 +1578,7 @@ test('missing current registration is shown automatically and saved with the pro
     payload = r.request().postDataJSON()
     return r.fulfill({ status: 204 })
   })
+  await returnToEditor(page)
   await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
   const review = page.getByRole('dialog', { name: 'Confirm Profile Changes' })
   await expect(review.getByRole('region', { name: 'Added' })).toContainText('Current Registration')
@@ -1557,54 +1590,412 @@ test('missing current registration is shown automatically and saved with the pro
   ])
 })
 
-
-test('every profile history sorts years ascending and same-year details alphabetically', async ({ page }) => {
+test('every profile history sorts years ascending and same-year details alphabetically', async ({
+  page,
+}) => {
   await setup(page)
   const years = ['2026-27', null, '2023-24']
   const history = years.flatMap((year) => [
-    { year, titles: ['Zulu', 'Alpha'], drums: ['Snare', 'Bass'], operations: ['Teaching', 'Leadership'] },
+    {
+      year,
+      titles: ['Zulu', 'Alpha'],
+      drums: ['Snare', 'Bass'],
+      operations: ['Teaching', 'Leadership'],
+    },
   ])
   const events = Object.fromEntries(
-    Object.keys(fixture).filter((key) => key.startsWith('red_zone_')).map((key) => [key,
-      years.flatMap((year) => [
-        { year, name: 'Zulu', placement: 'Participation' },
-        { year, name: 'Alpha', placement: '1st Place' },
+    Object.keys(fixture)
+      .filter((key) => key.startsWith('red_zone_'))
+      .map((key) => [
+        key,
+        years.flatMap((year) => [
+          { year, name: 'Zulu', placement: 'Participation' },
+          { year, name: 'Alpha', placement: '1st Place' },
+        ]),
       ]),
-    ]),
   )
-  await page.route('**/rest/v1/pathfinders?**', (route) => route.fulfill({ json: {
-    ...fixture,
-    ...events,
-    years_active: ['2026-27', '2023-24'],
-    levels: years.flatMap((year) => [
-      { year, name: 'Friend', outcome: 'basic' },
-      { year, name: 'Companion', outcome: 'basic' },
-    ]),
-    staff_history: { history },
-    drum_corps: { history },
-    tlt: { history },
-    drill: [
-      { years, team: 'Precision' },
-      { years, team: 'Adult' },
-    ],
-    pbe: { history: years.map((year) => ({ year, books: [], results: { State: '1st Place', Area: 'Participation' } })) },
-  } }))
+  await page.route('**/rest/v1/pathfinders?**', (route) =>
+    route.fulfill({
+      json: {
+        ...fixture,
+        ...events,
+        years_active: ['2026-27', '2023-24'],
+        levels: years.flatMap((year) => [
+          { year, name: 'Friend', outcome: 'basic' },
+          { year, name: 'Companion', outcome: 'basic' },
+        ]),
+        staff_history: { history },
+        drum_corps: { history },
+        tlt: { history },
+        drill: [
+          { years, team: 'Precision' },
+          { years, team: 'Adult' },
+        ],
+        pbe: {
+          history: years.map((year) => ({
+            year,
+            books: [],
+            results: { State: '1st Place', Area: 'Participation' },
+          })),
+        },
+      },
+    }),
+  )
   await page.getByRole('button', { name: 'Open profile for Justin Wu' }).click()
   const profile = page.getByRole('dialog', { name: 'Member profile' })
   await expect(profile.locator('.profile-records')).toHaveCount(16)
   for (const records of await profile.locator('.profile-records').all()) {
-    const rows = await records.locator(':scope > div').evaluateAll((elements) => elements.map((element) => ({
-      year: element.querySelector('dt')!.textContent!,
-      detail: element.querySelector('dd')!.textContent!,
-    })))
+    const rows = await records.locator(':scope > div').evaluateAll((elements) =>
+      elements.map((element) => ({
+        year: element.querySelector('dt')!.textContent!,
+        detail: element.querySelector('dd')!.textContent!,
+      })),
+    )
     expect(rows.map((row) => row.year)).toContain('2026-27')
-    expect(rows).toEqual([...rows].sort((a, b) =>
-      (a.year === 'Unknown' ? '9999' : a.year).localeCompare(b.year === 'Unknown' ? '9999' : b.year) ||
-      a.detail.localeCompare(b.detail, undefined, { sensitivity: 'base' }),
-    ))
+    expect(rows).toEqual(
+      [...rows].sort(
+        (a, b) =>
+          (a.year === 'Unknown' ? '9999' : a.year).localeCompare(
+            b.year === 'Unknown' ? '9999' : b.year,
+          ) || a.detail.localeCompare(b.detail, undefined, { sensitivity: 'base' }),
+      ),
+    )
   }
   await expect(profile).toContainText('Alpha, Zulu')
   await expect(profile).toContainText('Bass, Snare')
   await expect(profile).toContainText('Leadership, Teaching')
   await expect(profile).toContainText('Area (P), State (1st)')
+})
+
+test('Edit Profile blocks duplicate entries and confirms sorted changes with Years Active', async ({
+  page,
+}) => {
+  const { editor } = await setupEditor(page)
+  const events = await editSection(page, 'Bible Events')
+  let entryNumber = 0
+  for (const [year, name] of [
+    ['2026-27', 'Zulu'],
+    ['2020-21', 'Zulu'],
+    ['2020-21', 'Alpha'],
+  ]) {
+    await events.getByRole('button', { name: 'Add Bible Events', exact: true }).click()
+    const entry = events.locator('fieldset').filter({
+      has: page.getByRole('button', {
+        name: `Remove Bible Events Entry ${++entryNumber}`,
+        exact: true,
+      }),
+    })
+    await entry.getByLabel('Year', { exact: true }).selectOption(year)
+    await entry.getByLabel('Event / Evaluation Name').fill(name)
+  }
+  expect(
+    await events
+      .getByLabel('Year', { exact: true })
+      .evaluateAll((nodes) => nodes.map((node) => (node as HTMLSelectElement).value)),
+  ).toEqual(['2020-21', '2020-21', '2026-27'])
+  expect(
+    await events
+      .getByLabel('Event / Evaluation Name')
+      .evaluateAll((nodes) => nodes.map((node) => (node as HTMLInputElement).value)),
+  ).toEqual(['Alpha', 'Zulu', 'Zulu'])
+  // Reject an edit that would duplicate another named event in the same year.
+  await events.getByLabel('Event / Evaluation Name').first().fill('Zulu')
+  await expect(editor.getByRole('alert')).toContainText('already exists')
+  await expect(events.getByLabel('Event / Evaluation Name').first()).toHaveValue('Alpha')
+  await expect(page.locator('.modal-footer').getByRole('alert')).toBeInViewport()
+  const drums = await editSection(page, 'Drums')
+  await drums.getByRole('button', { name: 'Add Drums', exact: true }).click()
+  await drums.getByLabel('Year', { exact: true }).last().selectOption('2023-24')
+  await expect(editor.getByRole('alert')).toContainText('already exists')
+  await expect(drums.getByLabel('Year', { exact: true }).last()).not.toHaveValue('2023-24')
+  await drums.getByRole('button', { name: 'Remove Drums Entry 2', exact: true }).click()
+  let saved: any
+  await page.route('**/rest/v1/rpc/update_profile', (route) => {
+    saved = route.request().postDataJSON()
+    return route.fulfill({ json: null })
+  })
+  await returnToEditor(page)
+  await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+  const receipt = page.getByRole('dialog', { name: 'Confirm Profile Changes', exact: true })
+  const changes = receipt
+    .locator('article')
+    .filter({ has: page.getByRole('heading', { name: 'Bible Events', exact: true }) })
+  await expect(changes).toHaveText([
+    'Bible EventsDetails: Year: 2020-21; Name: Alpha; Placement: Participation',
+    'Bible EventsDetails: Year: 2020-21; Name: Zulu; Placement: Participation',
+    'Bible EventsDetails: Year: 2026-27; Name: Zulu; Placement: Participation',
+  ])
+  await expect(
+    receipt
+      .locator('article')
+      .filter({ has: page.getByRole('heading', { name: 'Years Active', exact: true }) }),
+  ).toContainText('2020-21, 2023-24, 2026-27')
+  await receipt.getByRole('button', { name: 'Confirm', exact: true }).click()
+  await expect(receipt).toHaveCount(0)
+  expect(saved.p_profile.pathfinders[0].years_active).toEqual(['2020-21', '2023-24', '2026-27'])
+})
+
+test('profile draft year and duplicate rules cover each documentation shape', async ({ page }) => {
+  const { profile } = await setupEditor(page)
+  const result = await page.evaluate(async (original) => {
+    const modulePath = '/src/features/profile/profileDraft.ts'
+    const { withDocumentedYears, introducesDuplicate } = await import(/* @vite-ignore */ modulePath)
+    const draft = structuredClone(original) as any
+    draft.pathfinders[0].levels.push({ name: 'Explorer', outcome: 'basic', year: '2010-11' })
+    draft.staff_history[0].history.push({ year: '2011-12', titles: ['Club Director'] })
+    draft.drill.push({ team: 'Freestyle', years: ['2012-13', null] })
+    draft.drum_corps[0].history.push({ year: '2013-14', drums: ['Bass'] })
+    draft.pbe[0].history.push({ year: '2014-15', books: [] })
+    draft.tlt[0].history.push({ year: '2015-16', operations: ['Teaching'] })
+    draft.red_zone_archery.push({ year: '2016-17', placement: 'Participation' })
+    draft.honors_earned.push({ honor_id: 8, year_earned: '2017-18' })
+    draft.honors_earned.push({ honor_id: 8, year_earned: null })
+    const proposed = withDocumentedYears(original, draft)
+    const duplicates = [
+      'pathfinders',
+      'staff_history',
+      'drill',
+      'drum_corps',
+      'pbe',
+      'tlt',
+      'red_zone_archery',
+      'honors_earned',
+    ].map((table) => {
+      const next = structuredClone(draft)
+      if (table === 'pathfinders')
+        next.pathfinders[0].levels.push({ ...next.pathfinders[0].levels[0] })
+      else if (next[table][0]?.history)
+        next[table][0].history.push({ ...next[table][0].history[0] })
+      else {
+        const row = { ...next[table][0] }
+        delete row.id
+        delete row.pathfinder_id
+        next[table].push(row)
+      }
+      return introducesDuplicate(draft, next)
+    })
+    const removed = structuredClone(original) as any
+    removed.pathfinders[0].levels = []
+    removed.drill = []
+    return {
+      years: proposed.pathfinders[0].years_active,
+      draftYears: draft.pathfinders[0].years_active,
+      removedYears: withDocumentedYears(original, removed).pathfinders[0].years_active,
+      duplicates,
+      distinctYearsAllowed: !introducesDuplicate(original, draft),
+    }
+  }, profile)
+  expect(result.years).toEqual([
+    '2010-11',
+    '2011-12',
+    '2012-13',
+    '2013-14',
+    '2014-15',
+    '2015-16',
+    '2016-17',
+    '2017-18',
+    '2023-24',
+  ])
+  expect(result.draftYears).toEqual(['2023-24'])
+  expect(result.removedYears).toEqual(['2023-24'])
+  expect(result.duplicates).toEqual(Array(8).fill(true))
+  expect(result.distinctYearsAllowed).toBe(true)
+})
+
+test('Edit Profile sorts loaded histories and honors without changing edit or removal targets', async ({
+  page,
+}) => {
+  const { editor, profile } = await setupEditor(page)
+  await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+  profile.drum_corps[0].history = [
+    { year: '2026-27', drums: ['Snare'] },
+    { year: '2020-21', drums: ['Bass'] },
+  ]
+  profile.honors_earned = [
+    { id: 1, honor_id: 8, year_earned: '2026-27' },
+    { id: 2, honor_id: 8, year_earned: '2020-21' },
+  ]
+  await page.getByRole('button', { name: 'Edit Profile', exact: true }).click()
+  const drums = await editSection(page, 'Drums')
+  await expect(drums.getByLabel('Year', { exact: true }).first()).toHaveValue('2020-21')
+  // Moving the early entry to Unknown moves it last, retaining its own instruments.
+  await drums.getByLabel('Year', { exact: true }).first().selectOption('')
+  await expect(drums.getByLabel('Year', { exact: true }).last()).toHaveValue('')
+  await expect(drums.locator('fieldset').last()).toContainText('Bass')
+  await drums.getByRole('button', { name: 'Remove Drums Entry 2', exact: true }).click()
+  await expect(drums.locator('fieldset')).toHaveCount(1)
+  await expect(drums).toContainText('Snare')
+  await returnToEditor(page)
+  await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
+  const honors = page.getByRole('dialog', { name: 'Edit Honors', exact: true })
+  await expect(honors.getByLabel('Year', { exact: true }).first()).toHaveValue('2020-21')
+  await honors.getByLabel('Year', { exact: true }).first().selectOption('2026-27')
+  await expect(honors.getByRole('alert')).toContainText('already exists for this year')
+  await expect(honors.getByRole('alert')).toBeInViewport()
+  await honors.getByRole('button', { name: 'Remove Honors Entry 2', exact: true }).click()
+  await expect(honors.getByLabel('Year', { exact: true })).toHaveValue('2026-27')
+  await honors.getByRole('button', { name: 'Back to Edit Profile' }).click()
+  let saved: any
+  await page.route('**/rest/v1/rpc/update_profile', (route) => {
+    saved = route.request().postDataJSON()
+    return route.fulfill({ json: null })
+  })
+  await returnToEditor(page)
+  await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+  const receipt = page.getByRole('dialog', { name: 'Confirm Profile Changes', exact: true })
+  await receipt.getByRole('button', { name: 'Confirm', exact: true }).click()
+  await expect(receipt).toHaveCount(0)
+  expect(saved.p_profile.honors_earned).toEqual([{ id: 1, honor_id: 8, year_earned: '2026-27' }])
+  expect(saved.p_profile.drum_corps[0].history).toEqual([{ year: '2026-27', drums: ['Snare'] }])
+})
+
+test('new editor entries default to Unknown and allow multiple undated entries', async ({
+  page,
+}) => {
+  const { editor } = await setupEditor(page)
+  for (const name of ['Staff History', 'Drums', 'PBE', 'TLT', 'Archery']) {
+    const section = await editSection(page, name)
+    const count = await section.getByLabel('Year', { exact: true }).count()
+    for (let i = 0; i < 2; i++) {
+      await section.getByRole('button', { name: `Add ${name}`, exact: true }).click()
+      await expect(section.getByLabel('Year', { exact: true }).last()).toHaveValue('')
+    }
+    await expect(section.getByLabel('Year', { exact: true })).toHaveCount(count + 2)
+    await expect(page.locator('.modal-footer').getByRole('alert')).toHaveCount(0)
+  }
+  const drill = await editSection(page, 'Drill')
+  await drill.getByRole('button', { name: 'Add Drill', exact: true }).click()
+  await drill.getByRole('button', { name: 'Add Drill', exact: true }).click()
+  await expect(drill.getByRole('button', { name: 'Remove Unknown from Years' })).toHaveCount(2)
+  await returnToEditor(page)
+  await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
+  const honors = page.getByRole('dialog', { name: 'Edit Honors', exact: true })
+  await honors.getByRole('button', { name: 'Add Honors', exact: true }).click()
+  await honors.getByRole('button', { name: 'Add Honors', exact: true }).click()
+  await expect(honors.getByLabel('Year', { exact: true }).last()).toHaveValue('')
+  await expect(honors.getByRole('alert')).toHaveCount(0)
+})
+
+test('Edit Honors validates empty entries before returning to Edit Profile', async ({ page }) => {
+  const { editor } = await setupEditor(page)
+  await returnToEditor(page)
+  await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
+  const honors = page.getByRole('dialog', { name: 'Edit Honors', exact: true })
+  await honors.getByRole('button', { name: 'Add Honors', exact: true }).click()
+  await honors.getByRole('button', { name: 'Back to Edit Profile' }).click()
+  await expect(honors).toBeVisible()
+  await expect(honors.getByRole('alert')).toContainText('remove empty entries')
+  await expect(honors.getByRole('alert')).toBeInViewport()
+  await page.keyboard.press('Escape')
+  await expect(honors).toBeVisible()
+  await honors.getByRole('button', { name: 'Remove Honors Entry 2', exact: true }).click()
+  await honors.getByRole('button', { name: 'Back to Edit Profile' }).click()
+  await expect(honors).toHaveCount(0)
+  await returnToEditor(page)
+  await editor.getByRole('button', { name: 'Edit Honors', exact: true }).click()
+  await honors.getByRole('button', { name: 'Add Honors', exact: true }).click()
+  await honors.getByRole('button', { name: 'Back to Edit Profile' }).click()
+  const entry = honors
+    .locator('fieldset')
+    .filter({ has: page.getByRole('button', { name: 'Remove Honors Entry 2', exact: true }) })
+  await entry.getByRole('combobox', { name: 'Find an honor' }).fill('Camping')
+  await entry.getByRole('option', { name: 'Camping Skills I', exact: true }).click()
+  await expect(honors.getByRole('alert')).toHaveCount(0)
+  await honors.getByRole('button', { name: 'Back to Edit Profile' }).click()
+  await expect(honors).toHaveCount(0)
+  await returnToEditor(page)
+  await editor.getByRole('button', { name: 'Save Changes', exact: true }).click()
+  await expect(
+    page.getByRole('dialog', { name: 'Confirm Profile Changes', exact: true }),
+  ).toContainText('Camping Skills I')
+})
+
+test('section pop-ups keep validation and duplicate warnings in a dismissible fixed footer', async ({
+  page,
+}) => {
+  const { editor, profile } = await setupEditor(page)
+  await expect(editor.getByRole('button', { name: /^Add / })).toHaveCount(0)
+  const names = [
+    'Levels',
+    'Staff History',
+    'Drill',
+    'Drums',
+    'PBE',
+    'TLT',
+    'Drill Performance',
+    'Drum Performance',
+    'Honor Evaluations',
+    'Bible Events',
+    'Knots Relay',
+    'Tents',
+    'Jump Rope',
+    'Archery',
+    'Lashing',
+    'Burning Twine',
+    'Honors',
+  ]
+  for (const name of names) {
+    await editSection(page, name)
+    await expect(
+      page.getByRole('dialog', { name: `Edit ${name}`, exact: true }).locator('footer'),
+    ).toBeInViewport()
+    await returnToEditor(page)
+    await expect(editor.getByRole('button', { name: `Edit ${name}`, exact: true })).toBeFocused()
+  }
+  const events = await editSection(page, 'Bible Events')
+  await events.getByRole('button', { name: 'Add Bible Events', exact: true }).click()
+  const eventDialog = page.getByRole('dialog', { name: 'Edit Bible Events', exact: true })
+  await eventDialog.getByRole('button', { name: 'Back to Edit Profile' }).click()
+  await expect(eventDialog.locator('footer').getByRole('alert')).toContainText(
+    'Event / Evaluation Name',
+  )
+  await eventDialog.getByRole('heading', { name: 'Edit Bible Events', exact: true }).click()
+  await expect(eventDialog.getByRole('alert')).toHaveCount(0)
+  await page.keyboard.press('Escape')
+  await expect(eventDialog.locator('footer').getByRole('alert')).toBeVisible()
+  await events.getByLabel('Event / Evaluation Name').fill('New event')
+  await returnToEditor(page)
+  await editor.getByRole('button', { name: 'Cancel', exact: true }).click()
+  profile.honors_earned = Array.from({ length: 40 }, (_, i) => ({
+    id: i + 1,
+    honor_id: 8,
+    year_earned: '2023-24',
+  }))
+  await page.getByRole('button', { name: 'Edit Profile', exact: true }).click()
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 800 })
+    const honors = await editSection(page, 'Honors')
+    const dialog = page.getByRole('dialog', { name: 'Edit Honors', exact: true })
+    await honors.getByRole('button', { name: 'Add Honors', exact: true }).click()
+    await dialog.getByRole('button', { name: 'Back to Edit Profile' }).click()
+    const warning = dialog.locator('footer').getByRole('alert')
+    await expect(warning).toContainText('remove empty entries')
+    for (const edge of ['top', 'bottom']) {
+      await dialog.locator('.modal-body').evaluate((element, edge) => {
+        element.scrollTop = edge === 'top' ? 0 : element.scrollHeight
+      }, edge)
+      await expect(warning).toBeInViewport()
+      await expect(dialog.getByRole('button', { name: 'Back to Edit Profile' })).toBeInViewport()
+    }
+    await dialog.getByRole('heading', { name: 'Edit Honors', exact: true }).click()
+    await expect(warning).toHaveCount(0)
+    await dialog.getByRole('button', { name: 'Back to Edit Profile' }).click()
+    await expect(warning).toBeVisible()
+    await dialog.getByRole('button', { name: 'Remove Honors Entry 41', exact: true }).click()
+    // A same-year duplicate is still blocked, with its warning in the footer.
+    await honors.getByRole('button', { name: 'Add Honors', exact: true }).click()
+    const entry = honors
+      .locator('fieldset')
+      .filter({ has: page.getByRole('button', { name: 'Remove Honors Entry 41', exact: true }) })
+    await entry.getByRole('combobox', { name: 'Find an honor' }).fill('Camping')
+    await entry.getByRole('option', { name: 'Camping Skills I', exact: true }).click()
+    await entry.getByLabel('Year', { exact: true }).selectOption('2023-24')
+    await expect(warning).toContainText('already exists')
+    await expect(warning).toBeInViewport()
+    await page.screenshot({ path: `test-results/section-footer-${width}.png`, fullPage: true })
+    await dialog.getByRole('heading', { name: 'Edit Honors', exact: true }).click()
+    await expect(warning).toHaveCount(0)
+    await dialog.getByRole('button', { name: 'Remove Honors Entry 41', exact: true }).click()
+    await returnToEditor(page)
+  }
 })

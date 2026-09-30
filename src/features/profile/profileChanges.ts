@@ -5,7 +5,7 @@ import { statusLabel } from '../../lib/format'
 
 type Row = Record<string, Json>
 type Profile = Record<string, Row[]>
-type Item = { key: string; label: string; text: string }
+type Item = { key: string; label: string; text: string; year?: string; detail?: string }
 export type ProfileChange = {
   kind: 'Added' | 'Updated' | 'Removed'
   label: string
@@ -38,11 +38,10 @@ const labels: Record<string, string> = {
 }
 const tables: Record<string, string> = {
   staff_history: 'Staff History',
+  drill: 'Drill',
   drum_corps: 'Drums',
   pbe: 'PBE',
   tlt: 'TLT',
-  drill: 'Drill',
-  honors_earned: 'Honors',
   red_zone_drill_performance: 'Drill Performance',
   red_zone_drum_performance: 'Drum Performance',
   red_zone_honor_evaluations: 'Honor Evaluations',
@@ -53,6 +52,7 @@ const tables: Record<string, string> = {
   red_zone_archery: 'Archery',
   red_zone_lashing: 'Lashing',
   red_zone_burning_twine: 'Burning Twine',
+  honors_earned: 'Honors',
 }
 export function profileChanges(
   original: Profile,
@@ -62,17 +62,24 @@ export function profileChanges(
   // Normalize missing values, arrays, nested objects, and catalog IDs into readable comparison text.
   function display(value: Json | undefined, key: string): string {
     if (value === null || value === undefined || value === '')
-      return ['year', 'year_earned'].includes(key) ? 'Unknown' : 'Not Recorded'
+      return ['year', 'year_earned', 'years'].includes(key) ? 'Unknown' : 'Not Recorded'
     if (Array.isArray(value))
       return value.length
         ? value
             .map((item) => display(item, key))
-            .sort()
+            .sort((a, b) =>
+              (a === 'Unknown' ? '\uffff' : a).localeCompare(
+                b === 'Unknown' ? '\uffff' : b,
+                undefined,
+                { sensitivity: 'base' },
+              ),
+            )
             .join(', ')
         : 'None'
     if (typeof value === 'object')
       return (
         Object.entries(value)
+          .sort(([a], [b]) => a.localeCompare(b))
           .map(([field, item]) => `${labels[field] ?? field}: ${display(item, field)}`)
           .join('; ') || 'None'
       )
@@ -85,8 +92,37 @@ export function profileChanges(
   function describe(row: Row, omitBooks = false) {
     return Object.entries(row)
       .filter(([key]) => key in labels && !(omitBooks && key === 'books'))
+      .sort(([a], [b]) => {
+        const yearFields = ['year', 'year_earned', 'years']
+        return (
+          Number(yearFields.includes(b)) - Number(yearFields.includes(a)) ||
+          labels[a].localeCompare(labels[b])
+        )
+      })
       .map(([key, value]) => `${labels[key]}: ${display(value, key)}`)
       .join('; ')
+  }
+  function order(row: Row) {
+    const years = Array.isArray(row.years)
+      ? row.years.filter((year) => typeof year === 'string').sort()
+      : []
+    return {
+      year: String(row.year ?? row.year_earned ?? years[0] ?? '9999'),
+      detail: [
+        'name',
+        'team',
+        'honor_id',
+        'titles',
+        'drums',
+        'operations',
+        'results',
+        'placement',
+        'outcome',
+      ]
+        .filter((key) => row[key] !== undefined)
+        .map((key) => display(row[key], key))
+        .join('; '),
+    }
   }
   // Assign comparison keys to visible fields and history instances across different table shapes.
   function flatten(profile: Profile): Item[] {
@@ -100,6 +136,7 @@ export function profileChanges(
         key: `level:${entry.name}:${entry.year}`,
         label: `Levels / ${entry.name}`,
         text: describe(entry),
+        ...order(entry),
       })
     for (const row of profile.current_data)
       for (const key of ['school_year', 'status', 'current_title']) {
@@ -117,9 +154,16 @@ export function profileChanges(
               key: `${table}:${entry.year}`,
               label,
               text: describe(entry, table === 'pbe'),
+              ...order(entry),
             })
           }
-        else items.push({ key: `${table}:${row.id ?? `new-${index}`}`, label, text: describe(row) })
+        else
+          items.push({
+            key: `${table}:${row.id ?? `new-${index}`}`,
+            label,
+            text: describe(row),
+            ...order(row),
+          })
       }
     return items
   }
@@ -127,6 +171,11 @@ export function profileChanges(
     after = flatten(proposed)
   const remaining = [...after]
   const changes: ProfileChange[] = []
+  const ordering = new Map<ProfileChange, Item>()
+  function append(change: ProfileChange, item: Item) {
+    changes.push(change)
+    ordering.set(change, item)
+  }
   const unmatched: Item[] = []
   // Match unchanged instances first so removing one never disguises an untouched duplicate.
   for (const item of before) {
@@ -139,10 +188,31 @@ export function profileChanges(
     const index = remaining.findIndex((next) => next.key === item.key)
     if (index >= 0) {
       const next = remaining.splice(index, 1)[0]
-      changes.push({ kind: 'Updated', label: item.label, before: item.text, after: next.text })
-    } else changes.push({ kind: 'Removed', label: item.label, before: item.text })
+      append({ kind: 'Updated', label: item.label, before: item.text, after: next.text }, next)
+    } else append({ kind: 'Removed', label: item.label, before: item.text }, item)
   }
   // Anything still unpaired exists only in the proposed snapshot, so it is an addition.
-  for (const item of remaining) changes.push({ kind: 'Added', label: item.label, after: item.text })
-  return changes
+  for (const item of remaining) append({ kind: 'Added', label: item.label, after: item.text }, item)
+  const sections = [
+    'First Name',
+    'Last Name',
+    'Birthday',
+    'Notes',
+    'Years Active',
+    'Current Registration',
+    'Levels',
+    ...Object.values(tables),
+  ]
+  return changes.sort((a, b) => {
+    const left = ordering.get(a)!,
+      right = ordering.get(b)!
+    return (
+      sections.indexOf(left.label.split(' / ')[0]) -
+        sections.indexOf(right.label.split(' / ')[0]) ||
+      (left.year ?? '').localeCompare(right.year ?? '') ||
+      (left.detail ?? left.label).localeCompare(right.detail ?? right.label, undefined, {
+        sensitivity: 'base',
+      })
+    )
+  })
 }

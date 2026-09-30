@@ -655,13 +655,38 @@ test('member revision preserves history and enforces roles, ranges and access', 
       db.query("update pathfinders set years_active='[null]' where id=$1", [staffId]),
       (e) => e.code === '23514',
     )
-    await assert.rejects(
-      db.query('insert into honors_earned(pathfinder_id,honor_id,year_earned) values($1,$2,null)', [
-        staffId,
-        honorId,
-      ]),
-      (e) => e.code === '23505',
+    await db.query(
+      'insert into honors_earned(pathfinder_id,honor_id,year_earned) values($1,$2,null)',
+      [staffId, honorId],
     )
+    // Repeated unknown dates survive an atomic profile save across all history shapes.
+    const unknownOriginal = (await db.query('select get_profile_for_edit($1) value', [staffId]))
+      .rows[0].value
+    const unknownDraft = structuredClone(unknownOriginal)
+    for (const table of ['staff_history', 'drum_corps', 'pbe', 'tlt']) {
+      const entry = unknownDraft[table][0].history.find((item) => item.year === null)
+      unknownDraft[table][0].history.push(structuredClone(entry))
+    }
+    unknownDraft.pathfinders[0].levels.push(
+      structuredClone(unknownDraft.pathfinders[0].levels.find((item) => item.year === null)),
+    )
+    await db.query('select update_profile($1,$2,$3)', [staffId, unknownOriginal, unknownDraft])
+    const unknownSaved = (await db.query('select get_profile_for_edit($1) value', [staffId]))
+      .rows[0].value
+    for (const table of ['staff_history', 'drum_corps', 'pbe', 'tlt']) {
+      assert.equal(unknownSaved[table][0].history.filter((item) => item.year === null).length, 2)
+    }
+    // Bulk merges must preserve the additional unknown instances, without scalar-subquery errors.
+    for (const [fn, args] of [
+      [
+        'append_period_details',
+        [JSON.stringify(unknownSaved.drum_corps[0].history), null, 'drums', '["Bass"]'],
+      ],
+      ['append_pbe_history', [JSON.stringify(unknownSaved.pbe[0].history), null, '[]', '{}']],
+    ]) {
+      const merged = (await db.query(`select private.${fn}($1,$2,$3,$4) value`, args)).rows[0].value
+      assert.equal(merged.filter((item) => item.year === null).length, 2)
+    }
     // Ranking uses current Status and the highest-priority title, before names.
     await db.query(
       'update current_data set current_title=\'["Junior Staff","Club Director"]\' where pathfinder_id=$1',

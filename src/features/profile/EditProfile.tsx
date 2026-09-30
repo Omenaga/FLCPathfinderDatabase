@@ -18,6 +18,7 @@ import {
   STATUSES,
 } from '../../lib/pathfinders'
 import { profileChanges } from './profileChanges'
+import { introducesDuplicate, withDocumentedYears } from './profileDraft'
 import type { Json } from '../../lib/database.types'
 
 type Row = Record<string, Json>
@@ -64,7 +65,9 @@ export default function EditProfile({
   const [attempt, setAttempt] = useState(0)
   const [error, setError] = useState('')
   const [pending, setPending] = useState(false)
-  const [honorsOpen, setHonorsOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState<string | null>(null)
+  const [warning, setWarning] = useState('')
+  const sectionFields = useRef<HTMLDivElement>(null)
   // A non-null review switches from editing to confirmation and holds the exact proposed save.
   const [review, setReview] = useState<Profile | null>(null)
   const sending = useRef(false)
@@ -123,25 +126,36 @@ export default function EditProfile({
     void load()
     return () => controller.abort()
   }, [id, attempt])
-  // Merge a partial row edit immutably so React detects the change; invalidate any previous receipt.
-  function change(table: string, index: number, patch: Row) {
-    if (pending) return
-    setDraft(
-      (current) =>
-        current && {
-          ...current,
-          [table]: current[table].map((row, i) => (i === index ? { ...row, ...patch } : row)),
-        },
-    )
+  function updateDraft(next: Profile, table: string) {
+    if (!draft || pending) return
+    if (introducesDuplicate(draft, next)) {
+      setError('')
+      setWarning(
+        ['staff_history', 'drum_corps', 'pbe', 'tlt'].includes(table)
+          ? 'This year already exists in this section. Add details to its existing entry or choose another year.'
+          : 'This entry already exists for this year. Choose a different year or detail.',
+      )
+      return
+    }
+    setWarning('')
+    setDraft(next)
     setReview(null)
     setError('')
   }
-  // Append an unsaved row locally. The database assigns any required IDs during the confirmed save.
+  // Reject duplicates before they enter the draft, including overlapping Drill team/year pairs.
+  function change(table: string, index: number, patch: Row) {
+    if (!draft) return
+    updateDraft(
+      {
+        ...draft,
+        [table]: draft[table].map((row, i) => (i === index ? { ...row, ...patch } : row)),
+      },
+      table,
+    )
+  }
   function addRow(table: string, row: Row) {
-    if (pending) return
-    setDraft((current) => current && { ...current, [table]: [...current[table], row] })
-    setReview(null)
-    setError('')
+    if (!draft) return
+    updateDraft({ ...draft, [table]: [...draft[table], row] }, table)
   }
   // Use the catalog as the source of truth for the books associated with a PBE year.
   const booksFor = (year: Json) =>
@@ -149,6 +163,7 @@ export default function EditProfile({
   // Remove from the draft only; cancelling the editor leaves the database row untouched.
   function removeRow(table: string, index: number) {
     if (pending) return
+    setWarning('')
     setDraft(
       (current) => current && { ...current, [table]: current[table].filter((_, i) => i !== index) },
     )
@@ -171,17 +186,47 @@ export default function EditProfile({
       </div>
     )
   }
+  function validateHonors() {
+    if (draft?.honors_earned.some((row) => !row.honor_id)) {
+      setWarning(
+        'Select an honor for each entry, or remove empty entries before returning to Edit Profile.',
+      )
+      return false
+    }
+    return true
+  }
+  function closeSection() {
+    if (activeSection === 'honors_earned' && !validateHonors()) return
+    if (activeSection === 'drill' && draft?.drill.some((row) => !(row.years as Json[]).length)) {
+      setWarning(
+        'Choose at least one year or Unknown for each Drill entry, or remove the empty entry.',
+      )
+      return
+    }
+    const invalid = sectionFields.current?.querySelector<HTMLInputElement | HTMLSelectElement>(
+      'input:invalid, select:invalid, textarea:invalid',
+    )
+    if (invalid) {
+      const label = invalid.labels?.[0]?.textContent?.trim() || 'required fields'
+      setWarning(
+        `Complete ${label} for each entry, or remove incomplete entries before returning to Edit Profile.`,
+      )
+      return
+    }
+    setWarning('')
+    setActiveSection(null)
+  }
   // Validate the draft and prepare a receipt. This form submission does not yet write to the database.
   function submit(event: FormEvent) {
     event.preventDefault()
     if (!draft || !original || pending) return
     if (JSON.stringify(draft) === JSON.stringify(original)) return
-    if (draft.honors_earned.some((row) => !row.honor_id)) {
-      setError('Select an honor for each earned honor entry.')
+    if (!validateHonors()) {
+      setActiveSection('honors_earned')
       return
     }
     // Freeze the reviewed values; the receipt must describe exactly what will be saved.
-    const proposed = structuredClone(draft)
+    const proposed = withDocumentedYears(original, draft)
     if (JSON.stringify(proposed.pbe) !== JSON.stringify(original.pbe)) {
       proposed.pbe = proposed.pbe.map((row) => ({
         ...row,
@@ -296,7 +341,13 @@ export default function EditProfile({
     return (
       <MultiSelect
         label={label}
-        values={strings(value)}
+        values={strings(value).sort((a, b) =>
+          (a === 'Unknown' ? '\uffff' : a).localeCompare(
+            b === 'Unknown' ? '\uffff' : b,
+            undefined,
+            { sensitivity: 'base' },
+          ),
+        )}
         options={[...new Set([...options, ...strings(value)])]}
         onChange={(values) =>
           update(
@@ -305,6 +356,34 @@ export default function EditProfile({
         }
       />
     )
+  }
+  // Sort the display only. Original indexes keep updates/removals attached to the right draft row.
+  function orderedEntries(entries: Row[]) {
+    const year = (row: Row) =>
+      String(
+        row.year ??
+          row.year_earned ??
+          (Array.isArray(row.years)
+            ? row.years.filter((value) => typeof value === 'string').sort()[0]
+            : null) ??
+          '9999',
+      )
+    const detail = (row: Row) =>
+      String(
+        row.name ??
+          row.team ??
+          catalog?.honors.find((honor) => honor.id === row.honor_id)?.name ??
+          row.outcome ??
+          row.placement ??
+          '',
+      )
+    return entries
+      .map((entry, index) => ({ entry, index }))
+      .sort(
+        (a, b) =>
+          year(a.entry).localeCompare(year(b.entry)) ||
+          detail(a.entry).localeCompare(detail(b.entry), undefined, { sensitivity: 'base' }),
+      )
   }
   // Reuse the same add/update/remove controls for each table-backed history section.
   function rows(
@@ -323,7 +402,8 @@ export default function EditProfile({
             </button>
           )}
         </div>
-        {draft?.[table]?.map((row, index) => (
+        {table === 'honors_earned' && draft?.[table].length === 0 && <p>No honors recorded.</p>}
+        {orderedEntries(draft?.[table] ?? []).map(({ entry: row, index }) => (
           <fieldset
             className="edit-entry"
             key={String(row.id ?? row.pathfinder_id ?? `new-${index}`)}
@@ -348,10 +428,9 @@ export default function EditProfile({
   ) {
     const row = draft?.[table]?.[0]
     const entries = (row?.history ?? []) as Row[]
-    // Start with the newest unused period; use an unknown year when all listed periods are occupied.
+    // Unknown lets a new entry be added before its year is known.
     function add() {
-      const year =
-        [...PERIODS].reverse().find((year) => !entries.some((entry) => entry.year === year)) ?? null
+      const year = null
       const entry: Row = { year, [detailKey]: table === 'pbe' ? booksFor(year) : [] }
       if (row) change(table, 0, { history: [...entries, entry] })
       else addRow(table, { history: [entry] })
@@ -364,7 +443,7 @@ export default function EditProfile({
             Add {label}
           </button>
         </div>
-        {entries.map((entry, index) => {
+        {orderedEntries(entries).map(({ entry, index }) => {
           // Replace only the edited history instance, preserving the other entries within its parent row.
           const set = (patch: Row) =>
             change(table, 0, {
@@ -426,9 +505,7 @@ export default function EditProfile({
       <section className="edit-section" aria-label="Levels">
         <h3>Levels</h3>
         {LEVELS.map((name) => {
-          const matches = entries
-            .map((entry, index) => ({ entry, index }))
-            .filter(({ entry }) => entry.name === name)
+          const matches = orderedEntries(entries).filter(({ entry }) => entry.name === name)
           // Index -1 marks a display-only placeholder; selecting an outcome turns it into a real entry.
           const shown = matches.length
             ? matches
@@ -501,8 +578,8 @@ export default function EditProfile({
               </button>
             )}
           </div>
-          {entries.map(
-            (entry, index) =>
+          {orderedEntries(entries).map(
+            ({ entry, index }) =>
               entry.name === 'Master Guide' && (
                 <fieldset className="edit-entry" key={index}>
                   {removeButton('Master Guide Entry', () =>
@@ -524,6 +601,113 @@ export default function EditProfile({
       </section>
     )
   }
+  const sections = [
+    { table: 'levels', label: 'Levels', render: () => levels() },
+    {
+      table: 'staff_history',
+      label: 'Staff History',
+      render: () => history('staff_history', 'Staff History', 'titles', 'Titles', catalog!.staff),
+    },
+    {
+      table: 'drill',
+      label: 'Drill',
+      render: () =>
+        rows(
+          'drill',
+          'Drill',
+          (row, update) => (
+            <>
+              {choice(
+                'Team',
+                row.team,
+                ['Precision', 'Freestyle', 'Adult'],
+                (value) => update({ team: value }),
+                true,
+              )}
+              {multiple(
+                'Years',
+                row.years,
+                [...PERIODS, 'Unknown'],
+                (value) => update({ years: value }),
+                true,
+              )}
+            </>
+          ),
+          () => ({ team: null, years: [null] }),
+        ),
+    },
+    {
+      table: 'drum_corps',
+      label: 'Drums',
+      render: () => history('drum_corps', 'Drums', 'drums', 'Instruments', DRUMS),
+    },
+    { table: 'pbe', label: 'PBE', render: () => history('pbe', 'PBE', 'books', 'Bible Books', []) },
+    {
+      table: 'tlt',
+      label: 'TLT',
+      render: () => history('tlt', 'TLT', 'operations', 'Operations', OPERATIONS),
+    },
+    ...eventTables.map((table, index) => ({
+      table: `red_zone_${table}`,
+      label: EVENTS[index],
+      render: () =>
+        rows(
+          `red_zone_${table}`,
+          EVENTS[index],
+          (row, update) => (
+            <>
+              {text('Year', row.year, (value) => update({ year: value }), 'year')}
+              {choice('Placement', row.placement, PLACEMENTS, (value) =>
+                update({ placement: value }),
+              )}
+              {'name' in row &&
+                text(
+                  'Event / Evaluation Name',
+                  row.name,
+                  (value) => update({ name: value }),
+                  'text',
+                  true,
+                )}
+            </>
+          ),
+          () => ({
+            year: null,
+            placement: 'Participation',
+            ...(['honor_evaluations', 'bible_events'].includes(table) ? { name: '' } : {}),
+          }),
+        ),
+    })),
+    {
+      table: 'honors_earned',
+      label: 'Honors',
+      render: () =>
+        rows(
+          'honors_earned',
+          'Honors',
+          (row, update) => (
+            <>
+              {text('Year', row.year_earned, (value) => update({ year_earned: value }), 'year')}
+              <HonorPicker
+                value={catalog!.honors.find((honor) => honor.id === row.honor_id) ?? null}
+                onChange={(honor) => {
+                  if (honor)
+                    setCatalog(
+                      (current) =>
+                        current && {
+                          ...current,
+                          honors: [...current.honors.filter((item) => item.id !== honor.id), honor],
+                        },
+                    )
+                  update({ honor_id: honor?.id ?? null })
+                }}
+              />
+            </>
+          ),
+          () => ({ honor_id: null, year_earned: null }),
+        ),
+    },
+  ]
+  const section = sections.find((item) => item.table === activeSection)
   const changed = draft && original && JSON.stringify(draft) !== JSON.stringify(original)
   // The review screen replaces the form until confirmation or Back to Edit. Failed saves keep this snapshot.
   if (review && original && catalog) {
@@ -644,9 +828,7 @@ export default function EditProfile({
         <p role="status">Loading Profile Editor...</p>
       ) : (
         <form id={formId} className="record-form profile-editor" onSubmit={submit}>
-          <p>
-            Update details or add history below. Choose N/A for a class with no recorded outcome.
-          </p>
+          <p>Update personal details below, or open a section to edit its history.</p>
           {error && (
             <p className="error" role="alert">
               {error}
@@ -708,118 +890,64 @@ export default function EditProfile({
                   )}
               </>
             ))}
-            {levels()}
-            {history('staff_history', 'Staff History', 'titles', 'Titles', catalog.staff)}
-            {rows(
-              'drill',
-              'Drill',
-              (row, update) => (
-                <>
-                  {choice(
-                    'Team',
-                    row.team,
-                    ['Precision', 'Freestyle', 'Adult'],
-                    (value) => update({ team: value }),
-                    true,
-                  )}
-                  {multiple(
-                    'Years',
-                    row.years,
-                    [...PERIODS, 'Unknown'],
-                    (value) => update({ years: value }),
-                    true,
-                  )}
-                </>
-              ),
-              () => ({ team: null, years: [PERIODS.at(-1)!] }),
-            )}
-            {history('drum_corps', 'Drums', 'drums', 'Instruments', DRUMS)}
-            {history('pbe', 'PBE', 'books', 'Bible Books', [])}
-            {history('tlt', 'TLT', 'operations', 'Operations', OPERATIONS)}
-            {eventTables.map((table, index) =>
-              rows(
-                `red_zone_${table}`,
-                EVENTS[index],
-                (row, update) => (
-                  <>
-                    {text('Year', row.year, (value) => update({ year: value }), 'year')}
-                    {choice('Placement', row.placement, PLACEMENTS, (value) =>
-                      update({ placement: value }),
-                    )}
-                    {'name' in row &&
-                      text(
-                        'Event / Evaluation Name',
-                        row.name,
-                        (value) => update({ name: value }),
-                        'text',
-                        true,
-                      )}
-                  </>
-                ),
-                () => ({
-                  year: PERIODS.at(-1)!,
-                  placement: 'Participation',
-                  ...(['honor_evaluations', 'bible_events'].includes(table) ? { name: '' } : {}),
-                }),
-              ),
-            )}
-            <section className="edit-section" aria-label="Honors">
-              <div className="section-heading">
-                <h3>Honors</h3>
-                <button type="button" className="secondary" onClick={() => setHonorsOpen(true)}>
-                  Edit Honors
-                </button>
-              </div>
-              <p>{draft.honors_earned.length} honor entries in this profile.</p>
-            </section>
+            {sections.map((item) => {
+              const count =
+                item.table === 'levels'
+                  ? ((draft.pathfinders[0].levels ?? []) as Row[]).length
+                  : (draft[item.table] ?? []).reduce(
+                      (total, row) => total + (Array.isArray(row.history) ? row.history.length : 1),
+                      0,
+                    )
+              return (
+                <section className="edit-section" key={item.table} aria-label={item.label}>
+                  <div className="section-heading">
+                    <h3>{item.label}</h3>
+                    <button
+                      type="button"
+                      className="secondary"
+                      onClick={() => {
+                        setWarning('')
+                        setActiveSection(item.table)
+                      }}
+                    >
+                      Edit {item.label}
+                    </button>
+                  </div>
+                  <p>
+                    {count} {count === 1 ? 'entry' : 'entries'} in this section.
+                  </p>
+                </section>
+              )
+            })}
           </fieldset>
         </form>
       )}
-      {honorsOpen && draft && catalog && (
+      {section && draft && catalog && (
         <Modal
-          title="Edit Honors"
-          header={<h2>Edit Honors</h2>}
-          onClose={() => setHonorsOpen(false)}
+          title={`Edit ${section.label}`}
+          header={<h2>Edit {section.label}</h2>}
+          onClose={closeSection}
+          onClickCapture={() => setWarning('')}
           hideClose
           headerActions={
-            <button type="button" onClick={() => setHonorsOpen(false)}>
+            <button type="button" onClick={closeSection}>
               Back to Edit Profile
             </button>
           }
+          footer={
+            warning ? (
+              <p className="duplicate-warning" role="alert">
+                {warning}
+              </p>
+            ) : (
+              <p className="section-save-note">
+                Changes stay in your draft until Save Changes and Confirm.
+              </p>
+            )
+          }
         >
-          <p>
-            Honor changes stay in your profile draft. Save Changes in Edit Profile to review and
-            confirm them.
-          </p>
-          <div className="record-form profile-editor">
-            {draft.honors_earned.length === 0 && <p>No honors recorded.</p>}
-            {rows(
-              'honors_earned',
-              'Honors',
-              (row, update) => (
-                <>
-                  {text('Year', row.year_earned, (value) => update({ year_earned: value }), 'year')}
-                  <HonorPicker
-                    value={catalog.honors.find((honor) => honor.id === row.honor_id) ?? null}
-                    onChange={(honor) => {
-                      if (honor)
-                        setCatalog(
-                          (current) =>
-                            current && {
-                              ...current,
-                              honors: [
-                                ...current.honors.filter((item) => item.id !== honor.id),
-                                honor,
-                              ],
-                            },
-                        )
-                      update({ honor_id: honor?.id ?? null })
-                    }}
-                  />
-                </>
-              ),
-              () => ({ honor_id: null, year_earned: PERIODS.at(-1)! }),
-            )}
+          <div ref={sectionFields} className="record-form profile-editor">
+            {section.render()}
           </div>
         </Modal>
       )}
